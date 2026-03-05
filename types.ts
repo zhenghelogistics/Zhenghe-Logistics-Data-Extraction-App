@@ -1,0 +1,131 @@
+export interface LogisticsParties {
+  shipper_supplier?: string | null;
+  consignee_buyer?: string | null;
+  notify_party?: string | null;
+}
+
+export interface DocumentMetadata {
+  reference_number?: string | null;
+  related_reference_number?: string | null; // e.g. BL Number on a Voucher
+  date?: string | null;
+  currency?: string | null;
+  incoterms?: string | null;
+  parties?: LogisticsParties;
+}
+
+export interface LogisticsDetails {
+  vessel_name?: string | null;
+  voyage_number?: string | null;
+  port_of_loading?: string | null;
+  port_of_discharge?: string | null;
+  container_numbers?: string[];
+  marks_and_numbers?: string | null;
+}
+
+export interface LineItemCharge {
+  description?: string | null;
+  amount?: number | null;
+}
+
+export interface DocumentFinancials {
+  total_amount?: number | null;
+  total_tax_amount?: number | null;
+  line_item_charges?: LineItemCharge[];
+}
+
+export interface CargoItem {
+  description?: string | null;
+  quantity?: number | null;
+  unit_price?: number | null;
+  total?: number | null;
+  hs_code?: string | null;
+}
+
+export interface CargoDetails {
+  total_gross_weight?: number | null;
+  total_net_weight?: number | null;
+  total_packages?: number | null;
+  weight_unit?: string | null;
+  line_items?: CargoItem[];
+}
+
+export interface PaymentVoucherDetails {
+  pss_invoice_number?: string | null;
+  carrier_invoice_number?: string | null;
+  bl_number?: string | null;
+  payable_amount?: string | null;
+  total_payable_amount?: string | null;
+  charges_summary?: string | null;
+}
+
+export interface LogisticsLocalCharges {
+  bl_number?: string | null;
+  carrier_forwarder?: string | null;
+  pss_invoice_number?: string | null;
+  freight_term?: string | null;
+  place_of_destination?: string | null;
+  container_type?: string | null;
+  container_qty?: string | null;
+  thc_amount?: string | null;
+  seal_fee?: string | null;
+  bl_fee?: string | null;
+  bl_printed_fee?: string | null;
+  ens_ams_fee?: string | null;
+  other_charges?: string | null;
+  remarks?: string | null;
+  total_payable_amount?: string | null;
+}
+
+export interface OutwardPermitDeclaration {
+  permit_number?: string | null;
+  exporter?: string | null;
+  consignee?: string | null;
+  port_of_loading?: string | null;
+  port_of_discharge?: string | null;
+  total_fob_value?: string | null;
+  gst_amount?: string | null;
+}
+
+export interface TransportJob {
+  job_number?: string | null;
+  customer?: string | null;
+  pickup_location?: string | null;
+  delivery_location?: string | null;
+  container_number?: string | null;
+  job_date?: string | null;
+}
+
+export interface DocumentData {
+  document_type: string;
+  metadata: DocumentMetadata;
+  logistics_details: LogisticsDetails;
+  financials: DocumentFinancials;
+  cargo_details: CargoDetails;
+  payment_voucher_details?: PaymentVoucherDetails;
+  logistics_local_charges?: LogisticsLocalCharges;
+  outward_permit_declaration?: OutwardPermitDeclaration;
+  transport_job?: TransportJob;
+}
+
+// Wrapper for the API response which now returns a list
+export interface ExtractionResponse {
+  documents: DocumentData[];
+}
+
+export interface ProcessedFile {
+  id: string;
+  file: File;
+  status: 'pending' | 'processing' | 'completed' | 'error' | 'warning';
+  data?: DocumentData[];
+  errorMessage?: string;
+  validationErrors?: string[];
+  uploadedAt?: string; // ISO string from Supabase created_at
+}
+
+export enum FileStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  ERROR = 'error',
+  WARNING = 'warning'
+}

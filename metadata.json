@@ -1,0 +1,5 @@
+{
+  "name": "Remix: Invoice Intelligence",
+  "description": "Automated PDF invoice data extraction using Gemini Flash. Upload invoices to extract Shipper, Invoice #, Date, Amount, and Port of Loading, then export to CSV.",
+  "requestFramePermissions": []
+}

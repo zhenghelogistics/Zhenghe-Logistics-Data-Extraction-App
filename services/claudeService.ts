@@ -1,3 +1,5 @@
+import { PDFDocument } from "pdf-lib";
+import { GoogleGenAI } from "@google/genai";
 import { DocumentData, ExtractionResponse } from "../types";
 import { AppConfig } from "../config";
 
@@ -69,17 +71,26 @@ EXTRACTION RULES FOR "Logistics Local Charges Report":
 - B. CARRIER / FORWARDER: If MSC → 'MSC MEDITERRANEAN SHIPPING CO SA'. If ONE → 'OCEAN NETWORK EXPRESS PTE. LTD'.
 - C. PSS INVOICE NUMBER: Invoice number on the BL.
 - D. FREIGHT TERM: 'PREPAID' if ocean freight charges exist, else 'COLLECT'.
-- E. PLACE OF DESTINATION: Final destination (e.g., AUCKLAND – NEW ZEALAND).
-- F. CNTR TYPE: 20', 40', 40HC, 20RF, etc.
+- E. PLACE OF DESTINATION: Take from the BL field labelled "PLACE OF DELIVERY" or "FINAL DESTINATION". Format MUST be "CITY - COUNTRY" (e.g., FOS SUR MER - FRANCE, AUCKLAND - NEW ZEALAND). For shipments to GUANGZHOU JIAOXIN TERMINAL, use "JiaoXin - China".
+- F. CNTR TYPE: Normalize container type codes as follows — output ONLY the standardized form:
+  * 20' → for codes: 20GP, 20DC, 20DV, 20FT, 20GB, 20SD, 20ST
+  * 20'RF → for codes: 20RF
+  * 40' → for codes: 40GP
+  * 40HC → for codes: 40HQ, 40H, 40 HIGH CUBE
+  * 40RF → for codes: 40RF, 40' refer
+  * 40RFHC → for codes: 40HR, 40RH, 40RQ, 4RH, 40 reefer high cube
 - G. CONTAINER QTY: From BL or Invoice.
-- H. (SGD) THC: Terminal Handling Charge — PER CONTAINER charge.
-- I. (SGD) SEAL FEE: Per seal charge.
+- H. (SGD) THC: Look for T.H.C, THC, Terminal Handling Charge. Extract the PER CONTAINER UNIT charge (not the total). e.g. if 2 containers × $150 each, return "150.00".
+- I. (SGD) SEAL FEE: Look for SEAL FEE, CONTAINER SEAL. Extract the PER SEAL UNIT charge (not the total). e.g. if 2 seals × $20 each, return "20.00".
 - J. (SGD) BL FEE: Bill of Lading / Document Fee.
 - K. (SGD) BL PRINTED FEE: Leave blank if none.
 - L. (SGD) ENS / AMS / SCMC: ENS Filing, AMS, AFR, SCMC, Cargo Data Declaration total.
-- M. (SGD) OTHERS CHARGES: Sum of EDI Fee, Cert Fee, Misc, Adding Seal, ASR, ICS2, CDD. Do NOT include Surrender Fee.
-- N. REMARKS: Name of charges included in 'Others'.
-- O. TOTAL AMOUNT: Sum of all charges. Must match invoice total.
+- M. (SGD) OTHERS CHARGES: ONLY include these specific charges (sum them if multiple apply): EDI Transmission Fee / Export Service Fee, Certificate Issue Fee, MISC CHARGES, ADDING SEAL, ASR, Interchange Cona, ICS2 Filing, ICS2, UNLOCK BL FEE, CDD CARGO. Take values in SGD only. Do NOT include Surrender Fee or any other charges not listed here.
+- N. REMARKS: List the names of charges included in 'Others Charges'.
+- O. TOTAL AMOUNT: Leave blank. Do not extract.
+
+SPECIAL RULE FOR ONE (OCEAN NETWORK EXPRESS) FREIGHTED BLs:
+- When the carrier is ONE and the BL is freighted (has ocean freight charges), ALL charges (THC, Seal Fee, BL Fee, ENS, Others) must be taken from the PREPAID column only.
 
 IMPORTANT:
 - If a value is not found, return null or empty string. Do NOT guess.
@@ -227,78 +238,77 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
   return Array.from(uniqueDocs.values());
 };
 
+// Split a PDF file into chunks of `chunkSize` pages, returned as base64 strings
+const splitPdfIntoChunks = async (file: File, chunkSize = 10): Promise<{ base64: string; pages: string }[]> => {
+  const arrayBuffer = await file.arrayBuffer();
+  const srcDoc = await PDFDocument.load(arrayBuffer);
+  const totalPages = srcDoc.getPageCount();
+
+  if (totalPages <= chunkSize) {
+    const base64 = await fileToBase64(file);
+    return [{ base64, pages: `1-${totalPages}` }];
+  }
+
+  const chunks: { base64: string; pages: string }[] = [];
+  for (let start = 0; start < totalPages; start += chunkSize) {
+    const end = Math.min(start + chunkSize, totalPages);
+    const chunkDoc = await PDFDocument.create();
+    const pageIndices = Array.from({ length: end - start }, (_, i) => start + i);
+    const copiedPages = await chunkDoc.copyPages(srcDoc, pageIndices);
+    copiedPages.forEach(p => chunkDoc.addPage(p));
+    const bytes = await chunkDoc.save();
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    }
+    const base64 = btoa(binary);
+    chunks.push({ base64, pages: `${start + 1}-${end}` });
+  }
+  return chunks;
+};
+
+const extractFromChunk = async (
+  base64: string,
+  systemPrompt: string
+): Promise<DocumentData[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        config: { systemInstruction: systemPrompt },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inlineData: { mimeType: "application/pdf", data: base64 } },
+              { text: "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object." },
+            ],
+          },
+        ],
+      });
+
+      const text = response.text || "";
+      if (!text) throw new Error("No data returned from Gemini");
+      const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+      const result = JSON.parse(clean) as ExtractionResponse;
+      return result.documents || [];
+    } catch (error: any) {
+      if (attempt === maxRetries) throw error;
+      await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt - 1)));
+    }
+  }
+  return [];
+};
+
 export const extractDocumentData = async (
   file: File,
   customInstructions: string[] = []
 ): Promise<DocumentData[]> => {
-  const maxRetries = 3;
   const systemPrompt = buildSystemPrompt(customInstructions);
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const base64Data = await fileToBase64(file);
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY || "",
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001", // Fast + cheap for high-volume extraction
-          max_tokens: 8000,
-          system: systemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "document",
-                  source: {
-                    type: "base64",
-                    media_type: "application/pdf",
-                    data: base64Data,
-                  },
-                },
-                {
-                  type: "text",
-                  text: "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object.",
-                },
-              ],
-            },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        const isRetryable = response.status === 429 || response.status === 500 || response.status === 503;
-        if (attempt === maxRetries || !isRetryable) {
-          throw new Error(err.error?.message || `API error ${response.status}`);
-        }
-        const delay = 2000 * Math.pow(2, attempt - 1);
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-
-      const data = await response.json();
-      const text = data.content?.map((b: any) => b.text || "").join("") || "";
-
-      if (!text) throw new Error("No data returned from Claude");
-
-      // Strip markdown code fences if present
-      const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-      const result = JSON.parse(clean) as ExtractionResponse;
-      return deduplicateDocuments(result.documents || []);
-
-    } catch (error: any) {
-      if (attempt === maxRetries) throw error;
-      const delay = 2000 * Math.pow(2, attempt - 1);
-      console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message);
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-
-  return [];
+  const chunks = await splitPdfIntoChunks(file, 10);
+  const results = await Promise.all(chunks.map(c => extractFromChunk(c.base64, systemPrompt)));
+  const allDocs = results.flat();
+  return deduplicateDocuments(allDocs);
 };

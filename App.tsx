@@ -175,7 +175,7 @@ function App() {
     addLog('Starting batch processing...');
 
     const pendingFiles = files.filter(f => f.status === FileStatus.PENDING);
-    const concurrencyLimit = 5; // Claude API handles higher concurrency
+    const concurrencyLimit = 10;
 
     const processSingleFile = async (fileWrapper: ProcessedFile) => {
       setFiles(prev => prev.map(f =>

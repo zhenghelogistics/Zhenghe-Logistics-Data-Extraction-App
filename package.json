@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@google/genai": "^1.40.0",
     "@supabase/supabase-js": "^2.98.0",
     "clsx": "^2.1.1",

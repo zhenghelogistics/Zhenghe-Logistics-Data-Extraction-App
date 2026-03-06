@@ -53,7 +53,11 @@ export const AppConfig = {
       ]
     },
     'Outward Permit Declaration': {
-      columns: ['Permit Number', 'Exporter', 'Consignee', 'POL', 'POD', 'Total FOB Value', 'GST Amount']
+      columns: [
+        'a) HS CODE', 'b) DESCRIPTION',
+        'b1) INVOICE DESC', 'b2) PACKING LIST DESC', 'b3) BL DESC', 'b4) PO DESC',
+        'f) DESCRIPTION MATCH', 'c) NET WEIGHT (KGS)', 'd) ITEM PRICE', 'e) COUNTRY OF ORIGIN'
+      ]
     },
     'Transport Job': {
       columns: ['Job Number', 'Customer', 'Pick-up', 'Delivery', 'Container #', 'Date']

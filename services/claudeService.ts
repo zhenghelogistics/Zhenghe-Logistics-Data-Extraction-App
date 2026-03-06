@@ -1,5 +1,5 @@
 import { PDFDocument } from "pdf-lib";
-import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { DocumentData, ExtractionResponse } from "../types";
 import { AppConfig } from "../config";
 
@@ -92,6 +92,18 @@ EXTRACTION RULES FOR "Logistics Local Charges Report":
 SPECIAL RULE FOR ONE (OCEAN NETWORK EXPRESS) FREIGHTED BLs:
 - When the carrier is ONE and the BL is freighted (has ocean freight charges), ALL charges (THC, Seal Fee, BL Fee, ENS, Others) must be taken from the PREPAID column only.
 
+EXTRACTION RULES FOR "Outward Permit Declaration" (Logistics Team):
+- HS CODE: From PURCHASE ORDER item description, field labelled "HS Code" or similar. Numbers only (e.g. 84137000).
+- INVOICE DESCRIPTION (raw): Copy the item description exactly as written in the INVOICE. No formatting.
+- PACKING LIST DESCRIPTION (raw): Copy the item description exactly as written in the PACKING LIST. No formatting.
+- BL DESCRIPTION (raw): Copy the item description exactly as written in the BILL OF LADING. No formatting.
+- PO DESCRIPTION (raw): Copy the item description exactly as written in the PURCHASE ORDER. No formatting.
+- DESCRIPTION MATCH: Compare all four raw descriptions above. Do they all refer to the same item? Output "MATCH" or "MISMATCH - [which document differs]". Be strict.
+- DESCRIPTION (formatted): From INVOICE item description. Format as: [QTY as whole integer] [UOM] [ITEM DESCRIPTION]. Remove all decimals from quantity (e.g. 1.000 → 1). Example: "1 UNIT CENTRIFUGAL PUMP TYPE: WI+35/35 IN/OUTLET: SMS 76/51 MM". If DESCRIPTION MATCH is MISMATCH, leave this blank.
+- NET WEIGHT (KGS): Nett Weight number from PACKING LIST column "Nett Weight (kgs)". Number only, no units.
+- ITEM PRICE: Extended Price from INVOICE. Include currency symbol. e.g. "1500.00 USD".
+- COUNTRY OF ORIGIN: From PURCHASE ORDER item description field "Product Of Origin". Full country name in capitals e.g. "GERMANY".
+
 IMPORTANT:
 - If a value is not found, return null or empty string. Do NOT guess.
 - Convert all monetary values to SGD if possible.
@@ -165,7 +177,17 @@ Respond ONLY with valid JSON matching this exact structure:
         "port_of_loading": "string or null",
         "port_of_discharge": "string or null",
         "total_fob_value": "string or null",
-        "gst_amount": "string or null"
+        "gst_amount": "string or null",
+        "hs_code": "string or null",
+        "description": "string or null",
+        "invoice_description": "string or null",
+        "packing_list_description": "string or null",
+        "bl_description": "string or null",
+        "po_description": "string or null",
+        "description_match": "string or null",
+        "net_weight_kgs": "string or null",
+        "item_price": "string or null",
+        "country_of_origin": "string or null"
       },
       "transport_job": {
         "job_number": "string or null",
@@ -271,26 +293,36 @@ const extractFromChunk = async (
   base64: string,
   systemPrompt: string
 ): Promise<DocumentData[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+  const client = new Anthropic({
+    apiKey: process.env.VITE_ANTHROPIC_API_KEY || "",
+    dangerouslyAllowBrowser: true,
+  });
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        config: { systemInstruction: systemPrompt },
-        contents: [
+      const response = await client.messages.create({
+        model: "claude-opus-4-6",
+        max_tokens: 8192,
+        system: systemPrompt,
+        messages: [
           {
             role: "user",
-            parts: [
-              { inlineData: { mimeType: "application/pdf", data: base64 } },
-              { text: "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object." },
+            content: [
+              {
+                type: "document",
+                source: { type: "base64", media_type: "application/pdf", data: base64 },
+              },
+              {
+                type: "text",
+                text: "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object.",
+              },
             ],
           },
         ],
       });
 
-      const text = response.text || "";
-      if (!text) throw new Error("No data returned from Gemini");
+      const text = response.content[0].type === "text" ? response.content[0].text : "";
+      if (!text) throw new Error("No data returned from Claude");
       const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
       const result = JSON.parse(clean) as ExtractionResponse;
       return result.documents || [];

@@ -84,6 +84,17 @@ export interface OutwardPermitDeclaration {
   port_of_discharge?: string | null;
   total_fob_value?: string | null;
   gst_amount?: string | null;
+  // Logistics team extraction fields
+  hs_code?: string | null;
+  description?: string | null;
+  invoice_description?: string | null;
+  packing_list_description?: string | null;
+  bl_description?: string | null;
+  po_description?: string | null;
+  description_match?: string | null;
+  net_weight_kgs?: string | null;
+  item_price?: string | null;
+  country_of_origin?: string | null;
 }
 
 export interface TransportJob {

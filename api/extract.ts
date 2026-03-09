@@ -26,6 +26,11 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  if (!process.env.ANTHROPIC_API_KEY) {
+    res.status(500).json({ error: "ANTHROPIC_API_KEY is not set in environment variables" });
+    return;
+  }
+
   const client = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
   });

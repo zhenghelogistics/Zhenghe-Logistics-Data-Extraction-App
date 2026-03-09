@@ -11,8 +11,26 @@ import { UserRole, USERS } from './users';
 // @ts-ignore
 import JSZip from 'jszip';
 import ConfirmationModal from './components/ConfirmationModal';
+import {
+  Ship, User, LogOut, Upload, Zap, Download, FileText, Loader2,
+  FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
+  Anchor, Package, ShoppingCart, Code2,
+} from 'lucide-react';
 
 const CUSTOM_RULES_STORAGE_KEY = 'zhenghe_custom_rules';
+
+const TAB_ICONS: Record<string, React.ReactNode> = {
+  'All Files': <FolderOpen size={15} />,
+  'All': <LayoutDashboard size={15} />,
+  'Logistics Local Charges Report': <Receipt size={15} />,
+  'Outward Permit Declaration': <FileCheck2 size={15} />,
+  'Payment Voucher/GL': <CreditCard size={15} />,
+  'Bill of Lading': <Anchor size={15} />,
+  'Commercial Invoice': <FileText size={15} />,
+  'Packing List': <Package size={15} />,
+  'Purchase Order': <ShoppingCart size={15} />,
+  'Developer Notes': <Code2 size={15} />,
+};
 
 function App() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -21,6 +39,7 @@ function App() {
   const [logs, setLogs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>('All');
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
   const [customRules, setCustomRules] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(CUSTOM_RULES_STORAGE_KEY);
@@ -28,11 +47,9 @@ function App() {
     } catch { return []; }
   });
 
-  // Delete Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
 
-  // Persist custom rules to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem(CUSTOM_RULES_STORAGE_KEY, JSON.stringify(customRules));
   }, [customRules]);
@@ -58,7 +75,6 @@ function App() {
     setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
   };
 
-  // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -71,19 +87,15 @@ function App() {
     checkSession();
   }, []);
 
-  // Load documents when user logs in
   useEffect(() => {
     if (!userRole) return;
-
     const loadDocs = async () => {
       addLog('Fetching existing documents from database...');
       const docs = await fetchDocuments();
       if (docs.length === 0) return;
-
       const processedFiles: ProcessedFile[] = docs.map(d => {
         let parsedData: DocumentData[] | undefined;
         if (d.extracted_data) {
-          // Supabase JSONB comes back as an object already — handle both cases
           parsedData = typeof d.extracted_data === 'string'
             ? JSON.parse(d.extracted_data)
             : d.extracted_data;
@@ -93,14 +105,12 @@ function App() {
           file: new File([], d.filename, { type: 'application/pdf' }),
           status: d.status as FileStatus,
           data: parsedData,
-          uploadedAt: d.created_at, // Real upload date from DB
+          uploadedAt: d.created_at,
         };
       });
-
       setFiles(processedFiles);
       addLog(`Loaded ${docs.length} documents from database.`);
     };
-
     loadDocs();
   }, [userRole]);
 
@@ -122,16 +132,38 @@ function App() {
     return user ? user.teamName : 'Logistics Data Controller';
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files?.length) return;
-    const newFiles: ProcessedFile[] = Array.from(event.target.files).map((file: File) => ({
+  const addFilesToQueue = (newFilesArray: File[]) => {
+    const pdfs = newFilesArray.filter(f => f.type === 'application/pdf');
+    if (!pdfs.length) return;
+    const newFiles: ProcessedFile[] = pdfs.map((file: File) => ({
       id: Math.random().toString(36).substring(7),
       file,
       status: FileStatus.PENDING,
     }));
     setFiles(prev => [...prev, ...newFiles]);
     addLog(`Added ${newFiles.length} file(s) to queue.`);
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files?.length) return;
+    addFilesToQueue(Array.from(event.target.files));
     event.target.value = '';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    addFilesToQueue(Array.from(e.dataTransfer.files));
   };
 
   const handleIncotermUpdate = (id: string, docIndex: number, newIncoterm: string) => {
@@ -157,7 +189,6 @@ function App() {
     if (!fileToDelete) return;
     const id = fileToDelete;
     addLog(`Attempting to delete file ${id}...`);
-
     const result = await deleteDocument(id);
     if (result.success) {
       setFiles(prev => prev.filter(f => f.id !== id));
@@ -169,11 +200,9 @@ function App() {
     setFileToDelete(null);
   };
 
-  // Process pending files with concurrency control
   const processFiles = useCallback(async () => {
     setIsProcessing(true);
     addLog('Starting batch processing...');
-
     const pendingFiles = files.filter(f => f.status === FileStatus.PENDING);
     const concurrencyLimit = 10;
 
@@ -182,26 +211,19 @@ function App() {
         f.id === fileWrapper.id ? { ...f, status: FileStatus.PROCESSING } : f
       ));
       addLog(`Processing: ${fileWrapper.file.name}`);
-
       try {
-        // Pass custom rules into extraction
         const dataList = await extractDocumentData(fileWrapper.file, customRules);
         const validationErrors = validateDocumentData(dataList);
-
         const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
         if (validationErrors.length > 0) {
           addLog(`Warnings for ${fileWrapper.file.name}: ${validationErrors.join(', ')}`);
         } else {
           addLog(`Done: ${fileWrapper.file.name} — ${dataList.length} document(s) found.`);
         }
-
         const savedDoc = await saveDocument(fileWrapper.file.name, newStatus, dataList);
-
         setFiles(prev => prev.map(f =>
           f.id === fileWrapper.id ? {
-            ...f,
-            status: newStatus,
-            data: dataList,
+            ...f, status: newStatus, data: dataList,
             validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
             id: savedDoc?.id || f.id,
           } : f
@@ -216,7 +238,6 @@ function App() {
       }
     };
 
-    // Process in chunks
     for (let i = 0; i < pendingFiles.length; i += concurrencyLimit) {
       const chunk = pendingFiles.slice(i, i + concurrencyLimit);
       await Promise.all(chunk.map(f => processSingleFile(f)));
@@ -300,7 +321,7 @@ function App() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url); // Clean up memory
+    URL.revokeObjectURL(url);
     addLog('Exported ZIP Report');
   };
 
@@ -319,13 +340,16 @@ function App() {
 
   const pendingCount = files.filter(f => f.status === FileStatus.PENDING).length;
   const completedCount = files.filter(f => f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING).length;
+  const processingCount = files.filter(f => f.status === FileStatus.PROCESSING).length;
+  const errorCount = files.filter(f => f.status === FileStatus.ERROR).length;
+  const hasFiles = files.length > 0;
 
   if (isSessionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-500">Loading session...</p>
+          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-400 text-sm">Loading session...</p>
         </div>
       </div>
     );
@@ -333,99 +357,253 @@ function App() {
 
   if (!userRole) return <LoginScreen onLogin={handleLogin} />;
 
+  const mainTabs = tabs.filter(t => t !== 'Developer Notes');
+  const hasDevNotes = tabs.includes('Developer Notes');
+
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="flex h-screen bg-slate-100 overflow-hidden">
 
-        {/* Header */}
-        <div className="md:flex md:items-center md:justify-between mb-8">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-              {getTeamName(userRole)}
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Classify and extract complex logistics data using Claude AI.
-            </p>
-          </div>
-          <div className="mt-4 flex flex-col md:flex-row gap-2 md:ml-4 md:mt-0">
-            <label
-              htmlFor="file-upload"
-              className={`cursor-pointer inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              Select PDFs
-              <input id="file-upload" name="file-upload" type="file" accept="application/pdf" multiple className="sr-only" onChange={handleFileChange} disabled={isProcessing} />
-            </label>
-            <button
-              type="button"
-              onClick={processFiles}
-              disabled={isProcessing || pendingCount === 0}
-              className={`inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm ${isProcessing || pendingCount === 0 ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-            >
-              {isProcessing ? 'Processing...' : `Process ${pendingCount > 0 ? pendingCount : ''} Files`}
-            </button>
-            <button
-              type="button"
-              onClick={downloadReport}
-              disabled={completedCount === 0}
-              className={`inline-flex items-center justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700 ${completedCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              Download Report (Zip)
-            </button>
-            <button
-              type="button"
-              onClick={downloadLogs}
-              disabled={logs.length === 0}
-              className={`inline-flex items-center justify-center rounded-md bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 ${logs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              Log
-            </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-            >
-              Sign Out
-            </button>
+      {/* ─── Sidebar ─── */}
+      <aside className="w-56 bg-slate-900 flex flex-col flex-shrink-0">
+
+        {/* Brand */}
+        <div className="px-4 py-5 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Ship size={16} className="text-white" />
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm leading-none">Zhenghe</p>
+              <p className="text-slate-500 text-xs mt-0.5">Logistics Portal</p>
+            </div>
           </div>
         </div>
 
-        {/* Custom Rules Panel */}
-        <CustomRulesPanel rules={customRules} onRulesChange={setCustomRules} />
+        {/* Navigation */}
+        <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
+          <p className="px-3 mb-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+            Documents
+          </p>
+          {mainTabs.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer text-left ${
+                activeTab === tab
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <span className="flex-shrink-0">{TAB_ICONS[tab] || <FileText size={15} />}</span>
+              <span className="truncate text-xs">{tab}</span>
+            </button>
+          ))}
 
-        {/* Tabs */}
-        <div className="mb-6 border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
-            {tabs.map(tab => (
+          {hasDevNotes && (
+            <>
+              <div className="my-3 border-t border-slate-800" />
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium ${activeTab === tab ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}`}
+                onClick={() => setActiveTab('Developer Notes')}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer text-left ${
+                  activeTab === 'Developer Notes'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                }`}
               >
-                {tab}
+                <Code2 size={15} className="flex-shrink-0" />
+                <span className="text-xs">Developer Notes</span>
               </button>
-            ))}
-          </nav>
-        </div>
+            </>
+          )}
+        </nav>
 
-        {/* Content */}
-        {activeTab === 'Developer Notes' ? (
-          <DeveloperNotes />
-        ) : files.length === 0 ? (
-          <div className="text-center rounded-lg border-2 border-dashed border-gray-300 p-12 hover:border-gray-400">
-            <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v20c0 4.418 7.163 8 16 8 1.381 0 2.721-.087 4-.252M8 14c0 4.418 7.163 8 16 8s16-3.582 16-8M8 14c0-4.418 7.163-8 16-8s16 3.582 16 8m0 0v14m0-4c0 4.418-7.163 8-16 8S8 28.418 8 24m32 10v6m0 0v6m0-6h6m-6 0h-6" />
-            </svg>
-            <span className="mt-2 block text-sm font-semibold text-gray-900">Upload documents to get started</span>
-            <label htmlFor="file-upload-center" className="mt-2 inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 cursor-pointer">
-              Select PDF Files
-              <input id="file-upload-center" name="file-upload-center" type="file" accept="application/pdf" multiple className="sr-only" onChange={handleFileChange} disabled={isProcessing} />
-            </label>
+        {/* User Footer */}
+        <div className="px-2 py-3 border-t border-slate-800">
+          <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
+            <div className="w-7 h-7 bg-blue-600/20 border border-blue-500/30 rounded-full flex items-center justify-center flex-shrink-0">
+              <User size={13} className="text-blue-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-slate-300 text-xs font-medium truncate">{getTeamName(userRole)}</p>
+              <p className="text-slate-600 text-xs">Active session</p>
+            </div>
           </div>
-        ) : (
-          <ResultsTable files={files} onUpdateIncoterm={handleIncotermUpdate} onDeleteFile={handleDeleteFile} activeTab={activeTab} userRole={userRole} />
-        )}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-slate-300 text-xs transition-colors cursor-pointer"
+          >
+            <LogOut size={13} />
+            Sign Out
+          </button>
+        </div>
+      </aside>
 
+      {/* ─── Main Area ─── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+
+        {/* Top Bar */}
+        <header className="bg-white border-b border-slate-200 px-6 py-3 flex-shrink-0">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-sm font-semibold text-slate-900">{activeTab}</h1>
+              <p className="text-xs text-slate-400">AI-powered logistics document extraction</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Live Stats */}
+              {hasFiles && (
+                <div className="flex items-center gap-3 pr-3 mr-1 border-r border-slate-200">
+                  <div className="text-center">
+                    <p className="text-base font-bold text-slate-800 leading-none">{files.length}</p>
+                    <p className="text-xs text-slate-400">Files</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-base font-bold text-emerald-600 leading-none">{completedCount}</p>
+                    <p className="text-xs text-slate-400">Done</p>
+                  </div>
+                  {pendingCount > 0 && (
+                    <div className="text-center">
+                      <p className="text-base font-bold text-amber-500 leading-none">{pendingCount}</p>
+                      <p className="text-xs text-slate-400">Pending</p>
+                    </div>
+                  )}
+                  {errorCount > 0 && (
+                    <div className="text-center">
+                      <p className="text-base font-bold text-red-500 leading-none">{errorCount}</p>
+                      <p className="text-xs text-slate-400">Errors</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Select PDFs */}
+              <label
+                htmlFor="file-upload"
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors cursor-pointer ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                <Upload size={14} />
+                Select PDFs
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept="application/pdf"
+                  multiple
+                  className="sr-only"
+                  onChange={handleFileChange}
+                  disabled={isProcessing}
+                />
+              </label>
+
+              {/* Process */}
+              <button
+                onClick={processFiles}
+                disabled={isProcessing || pendingCount === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                {isProcessing
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : <Zap size={14} />
+                }
+                {isProcessing ? 'Processing...' : `Process${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+              </button>
+
+              {/* Export */}
+              <button
+                onClick={downloadReport}
+                disabled={completedCount === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                <Download size={14} />
+                Export
+              </button>
+
+              {/* Logs */}
+              <button
+                onClick={downloadLogs}
+                disabled={logs.length === 0}
+                title="Download Logs"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                <FileText size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          {isProcessing && (
+            <div className="mt-3 pb-1">
+              <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Loader2 size={11} className="animate-spin" />
+                  Processing {processingCount} file{processingCount !== 1 ? 's' : ''}...
+                </span>
+                <span>{completedCount} of {files.length} complete</span>
+              </div>
+              <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 rounded-full transition-all duration-500"
+                  style={{ width: `${files.length > 0 ? (completedCount / files.length) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </header>
+
+        {/* Scrollable Content */}
+        <main className="flex-1 overflow-auto p-5">
+          <CustomRulesPanel rules={customRules} onRulesChange={setCustomRules} />
+
+          {activeTab === 'Developer Notes' ? (
+            <DeveloperNotes />
+          ) : !hasFiles ? (
+            /* ── Drag & Drop Upload Zone ── */
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => document.getElementById('file-upload-drop')?.click()}
+              className={`flex flex-col items-center justify-center min-h-96 rounded-2xl border-2 border-dashed transition-all cursor-pointer select-none ${
+                isDragging
+                  ? 'border-blue-400 bg-blue-50 scale-[1.01]'
+                  : 'border-slate-300 bg-white hover:border-blue-300 hover:bg-slate-50'
+              }`}
+            >
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 transition-colors ${isDragging ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                <Upload size={28} className={isDragging ? 'text-blue-500' : 'text-slate-400'} />
+              </div>
+              <p className="text-slate-800 font-semibold text-base mb-1">
+                {isDragging ? 'Drop your PDFs here' : 'Upload PDF Documents'}
+              </p>
+              <p className="text-slate-400 text-sm mb-5">
+                Drag & drop files here, or click to browse
+              </p>
+              <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors pointer-events-none">
+                <Upload size={15} />
+                Browse Files
+              </div>
+              <p className="text-slate-400 text-xs mt-4">PDF files only</p>
+              <input
+                id="file-upload-drop"
+                type="file"
+                accept="application/pdf"
+                multiple
+                className="sr-only"
+                onChange={handleFileChange}
+                disabled={isProcessing}
+              />
+            </div>
+          ) : (
+            <ResultsTable
+              files={files}
+              onUpdateIncoterm={handleIncotermUpdate}
+              onDeleteFile={handleDeleteFile}
+              activeTab={activeTab}
+              userRole={userRole}
+            />
+          )}
+        </main>
       </div>
+
       <ConfirmationModal
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}

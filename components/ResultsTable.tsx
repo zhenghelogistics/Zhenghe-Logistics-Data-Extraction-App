@@ -198,19 +198,19 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
     const dynamicHeaders = ['File Name', 'Status', 'Document Types Found', 'Upload Date', 'Actions'];
     
     return (
-      <div className="mt-8 overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-300">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
               <tr>
                 {dynamicHeaders.map(header => (
-                   <th key={header} scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 first:pl-4 sm:first:pl-6">
+                   <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider first:pl-4 sm:first:pl-5">
                      {header}
                    </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-slate-100 bg-white">
               {files.map(file => {
                 // Summarize types found in this file
                 const typesFound = file.data 
@@ -218,30 +218,30 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                   : '-';
 
                 return (
-                  <tr key={file.id}>
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                  <tr key={file.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="whitespace-nowrap py-3.5 pl-4 pr-3 text-sm font-medium text-slate-800 sm:pl-5">
                       {file.file.name}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm">
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm">
                       {renderStatusBadge(file.status as FileStatus)}
                       {file.status === FileStatus.ERROR && <span className="text-red-500 text-xs block">{file.errorMessage}</span>}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">
                       {typesFound}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      {new Date().toLocaleDateString()} {/* Placeholder for upload date */}
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">
+                      {new Date().toLocaleDateString()}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
-                       <button 
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
+                       <button
                          type="button"
                          onClick={(e) => {
                            e.stopPropagation();
                            onDeleteFile(file.id);
-                         }} 
-                         className="text-red-600 hover:text-red-900 cursor-pointer"
+                         }}
+                         className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
                        >
-                         <Trash2 size={16} />
+                         <Trash2 size={15} />
                        </button>
                     </td>
                   </tr>
@@ -259,8 +259,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
 
   if (displayRows.length === 0 && processingFiles.length === 0) {
     return (
-      <div className="mt-8 text-center text-sm text-gray-500 py-8 border-2 border-dashed border-gray-200 rounded-lg">
-        No documents found for {activeTab}
+      <div className="text-center text-sm text-slate-400 py-12 border-2 border-dashed border-slate-200 rounded-xl bg-white">
+        No documents found for <span className="font-medium text-slate-600">{activeTab}</span>
       </div>
     );
   }
@@ -279,84 +279,82 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
   }
 
   return (
-    <div className="mt-8 overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-300">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-slate-200">
+          <thead className="bg-slate-50">
             <tr>
               {dynamicHeaders.map(header => (
-                 <th key={header} scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 first:pl-4 sm:first:pl-6">
+                 <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider first:pl-4 sm:first:pl-5">
                    {header}
                  </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-slate-100 bg-white">
             {/* Render Processing Files first (if in All tab) */}
             {processingFiles.map(file => (
-               <tr key={file.id}>
-                 <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-blue-600 sm:pl-6 font-medium">
+               <tr key={file.id} className="hover:bg-slate-50 transition-colors">
+                 <td className="whitespace-nowrap py-3.5 pl-4 pr-3 text-sm text-blue-600 sm:pl-5 font-medium">
                    {file.status === FileStatus.PROCESSING ? 'Processing...' : file.status === FileStatus.PENDING ? 'Pending' : 'Error'}
                  </td>
-                 <td colSpan={dynamicHeaders.length - 4} className="whitespace-nowrap px-3 py-4 text-sm text-gray-400">
+                 <td colSpan={dynamicHeaders.length - 4} className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-400">
                    {file.status === FileStatus.ERROR ? <span className="text-red-500">{file.errorMessage || 'Unknown Error'}</span> : 'Analysis in progress'}
                  </td>
-                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{file.file.name}</td>
-                 <td className="whitespace-nowrap px-3 py-4 text-sm">
+                 <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{file.file.name}</td>
+                 <td className="whitespace-nowrap px-3 py-3.5 text-sm">
                    {renderStatusBadge(file.status as FileStatus)}
                  </td>
-                 <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
-                    <button 
+                 <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
+                    <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        console.log('Trash clicked (Processing) for ID:', file.id);
                         onDeleteFile(file.id);
-                      }} 
-                      className="text-red-600 hover:text-red-900 cursor-pointer z-50 relative"
+                      }}
+                      className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                  </td>
                </tr>
             ))}
-            
+
             {/* Render Completed/Warning Rows */}
-            {displayRows.map((row, idx) => {
+            {displayRows.map((row) => {
               const uniqueKey = `${row.file.id}-${row.docIndex}`;
               const d = row.data;
 
               return (
-              <tr key={uniqueKey}>
+              <tr key={uniqueKey} className="hover:bg-slate-50 transition-colors">
                 {activeTab === 'All' && userRole !== 'logistics' ? (
                    // Generic Row for "All" view
                    <>
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">{d.document_type}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{d.metadata?.reference_number || '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{d.metadata?.date || '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500" title={d.metadata?.parties?.shipper_supplier || ''}>
+                    <td className="whitespace-nowrap py-3.5 pl-4 pr-3 text-sm font-medium text-slate-800 sm:pl-5">{d.document_type}</td>
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{d.metadata?.reference_number || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{d.metadata?.date || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500" title={d.metadata?.parties?.shipper_supplier || ''}>
                       {d.metadata?.parties?.shipper_supplier ? d.metadata.parties.shipper_supplier.substring(0, 15) + '...' : '-'}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">
                        {d.financials?.total_amount ? d.financials.total_amount : d.cargo_details?.total_gross_weight ? `${d.cargo_details.total_gross_weight} kg` : '-'}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-xs">
+                    <td className="whitespace-nowrap px-3 py-3.5 text-xs text-slate-400">
                        {row.file.file.name}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm">
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm">
                       {renderStatusBadge(row.file.status as FileStatus)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
-                      <button 
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
+                      <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log('Trash clicked (Generic) for ID:', row.file.id);
                           onDeleteFile(row.file.id);
-                        }} 
-                        className="text-red-600 hover:text-red-900 cursor-pointer z-50 relative"
+                        }}
+                        className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={15} />
                       </button>
                     </td>
                    </>
@@ -364,21 +362,20 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                   // Specific Row for Typed view OR Logistics View
                   <>
                     {dynamicHeaders.slice(0, -1).map((header, idx) => (
-                      <td key={idx} className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 first:pl-4 sm:first:pl-6">
+                      <td key={idx} className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-600 first:pl-4 sm:first:pl-5">
                         {renderDynamicCell(header, d, row.file.id, row.docIndex)}
                       </td>
                     ))}
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
-                      <button 
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
+                      <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log('Trash clicked (Specific) for ID:', row.file.id);
                           onDeleteFile(row.file.id);
-                        }} 
-                        className="text-red-600 hover:text-red-900 cursor-pointer z-50 relative"
+                        }}
+                        className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={15} />
                       </button>
                     </td>
                   </>

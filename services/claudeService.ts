@@ -8,12 +8,23 @@ const getNestedValue = (obj: any, path: string) => {
   return path.split(".").reduce((prev, curr) => (prev ? prev[curr] : undefined), obj);
 };
 
+// Document types that store their reference in type-specific fields, not metadata.reference_number
+const TYPES_WITHOUT_METADATA_REF = new Set([
+  'Logistics Local Charges Report',
+  'Payment Voucher/GL',
+  'Transport Job',
+  'Bill of Lading',
+  'Outward Permit Declaration',
+]);
+
 export const validateDocumentData = (dataList: DocumentData[]): string[] => {
   const allErrors: string[] = [];
 
   dataList.forEach((data, index) => {
     const prefix = `Doc ${index + 1} (${data.document_type}):`;
     AppConfig.validation.requiredFields.forEach((fieldPath) => {
+      // Skip metadata.reference_number for types that use their own ID fields
+      if (fieldPath === 'metadata.reference_number' && TYPES_WITHOUT_METADATA_REF.has(data.document_type)) return;
       const value = getNestedValue(data, fieldPath);
       if (!value || (typeof value === "string" && value.trim() === "")) {
         allErrors.push(`${prefix} Missing ${fieldPath}`);
@@ -49,11 +60,12 @@ YOUR CRITICAL MISSION:
 4. **EXTRACT ALL**: Create a separate entry in the 'documents' list for EACH distinct transaction found.
 
 CLASSIFICATION GUIDELINES:
-1. **"Logistics Local Charges Report"**: Any Tax Invoice, Freight Invoice, or Debit Note from a Carrier/Forwarder with logistics charges (THC, Seal Fee, etc.).
-2. **"Payment Voucher/GL"**: Any document requiring payment.
+**CRITICAL**: A Tax Invoice or Freight Invoice that contains a BL number is NOT a "Bill of Lading". The BL number is just a reference field. Classify by the PRIMARY nature of the document:
+1. **"Logistics Local Charges Report"**: Any Tax Invoice, Freight Invoice, or Debit Note from a Carrier/Forwarder with logistics charges (THC, Seal Fee, BL Fee, etc.). Even if it references a BL number.
+2. **"Payment Voucher/GL"**: Any document requiring payment approval/recording.
 3. **"Outward Permit Declaration"**: Singapore Customs Outward Permit.
 4. **"Transport Job"**: Transport Job Sheet.
-5. **"Bill of Lading"**: Standalone Bill of Lading.
+5. **"Bill of Lading"**: ONLY a standalone Bill of Lading document itself — not an invoice that references one.
 
 **CRITICAL DUAL-ENTRY RULE**:
 - If you encounter a Tax Invoice or Freight Invoice:
@@ -62,9 +74,11 @@ CLASSIFICATION GUIDELINES:
 - WHY: Ensures the document appears in both Logistics Table AND Accounts Table.
 
 EXTRACTION RULES FOR "Payment Voucher/GL":
-- INVOICE NUMBER: Map to both 'pss_invoice_number' AND 'carrier_invoice_number'.
-- PAYABLE AMOUNT: Grand Total with currency (e.g., "250.00 SGD").
-- BL NUMBER: Extract if present.
+- PSS INVOICE NUMBER ('pss_invoice_number'): The invoice number stated ON the BL or associated with the BL/PO/Ocean Freight document. It typically appears next to a label like "Invoice:", "Invoice No:", or "Inv:". Format it as "#" followed by the number (e.g., "Invoice: 25091366" → "#25091366"). This number comes from the Invoice, PO, Ocean Freight, or BL document — NOT from the carrier's own invoice number.
+- CARRIER INVOICE NUMBER ('carrier_invoice_number'): The invoice number issued by the carrier/forwarder on their tax invoice (e.g., "SGD987.12"). This is a different number from PSS Invoice Number.
+- BL NUMBER ('bl_number'): Extract the BL/HBL number if present.
+- PAYABLE AMOUNT ('payable_amount'): Grand Total with currency (e.g., "250.00 SGD").
+- CHARGES SUMMARY ('charges_summary'): List the charge TYPES found in the tax invoice, comma-separated. Use these short forms for known charges: THC (Terminal Handling Charges), BL (BL Fee / Document Fee), SEALS (Seal Fee), O.F (Ocean Freight), ENS, AMS, SBL (Surrender of BL), PRINTED BL. For any OTHER charges not in this list, include them as they appear on the invoice (e.g., "FOOD GRADE", "FUMIGATION", "ISPS"). Example output: "THC, SEALS, BL, SBL, ENS, FOOD GRADE". Only include charges that are actually present in the document.
 
 EXTRACTION RULES FOR "Logistics Local Charges Report":
 - A. BL NUMBER: HBL/House Bill of Lading (e.g., 'EGLV070500202135').
@@ -87,7 +101,7 @@ EXTRACTION RULES FOR "Logistics Local Charges Report":
 - L. (SGD) ENS / AMS / SCMC: ENS Filing, AMS, AFR, SCMC, Cargo Data Declaration total.
 - M. (SGD) OTHERS CHARGES: ONLY include these specific charges (sum them if multiple apply): EDI Transmission Fee / Export Service Fee, Certificate Issue Fee, MISC CHARGES, ADDING SEAL, ASR, Interchange Cona, ICS2 Filing, ICS2, UNLOCK BL FEE, CDD CARGO. Take values in SGD only. Do NOT include Surrender Fee or any other charges not listed here.
 - N. REMARKS: List the names of charges included in 'Others Charges'.
-- O. TOTAL AMOUNT: Leave blank. Do not extract.
+- O. TOTAL AMOUNT: Extract the grand total payable amount from the invoice (e.g., "838.50"). Number only, no currency symbol.
 
 SPECIAL RULE FOR ONE (OCEAN NETWORK EXPRESS) FREIGHTED BLs:
 - When the carrier is ONE and the BL is freighted (has ocean freight charges), ALL charges (THC, Seal Fee, BL Fee, ENS, Others) must be taken from the PREPAID column only.
@@ -221,11 +235,15 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
       const hasCarrier = l.carrier_forwarder && l.carrier_forwarder.length > 1;
       const hasInvoice = l.pss_invoice_number && l.pss_invoice_number.length > 1;
 
-      if (!hasBL || (!hasCarrier && !hasInvoice)) return;
-
       const bl = l.bl_number || "UNKNOWN";
       const inv = l.pss_invoice_number || "NO_INV";
       const carrier = l.carrier_forwarder || "NO_CARRIER";
+
+      // If we have nothing to deduplicate on, keep the doc with a unique key
+      if (!hasBL && !hasCarrier && !hasInvoice) {
+        uniqueDocs.set(`LOG_${Math.random()}`, doc);
+        return;
+      }
 
       let key = `LOG_${bl.trim().toUpperCase()}`;
       key += inv !== "NO_INV"
@@ -294,15 +312,15 @@ const extractFromChunk = async (
   systemPrompt: string
 ): Promise<DocumentData[]> => {
   const client = new Anthropic({
-    apiKey: process.env.VITE_ANTHROPIC_API_KEY || "",
+    apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || "",
     dangerouslyAllowBrowser: true,
   });
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const response = await client.messages.create({
-        model: "claude-opus-4-6",
-        max_tokens: 8192,
+        model: "claude-sonnet-4-6",
+        max_tokens: 16000,
         system: systemPrompt,
         messages: [
           {
@@ -339,8 +357,18 @@ export const extractDocumentData = async (
   customInstructions: string[] = []
 ): Promise<DocumentData[]> => {
   const systemPrompt = buildSystemPrompt(customInstructions);
-  const chunks = await splitPdfIntoChunks(file, 10);
-  const results = await Promise.all(chunks.map(c => extractFromChunk(c.base64, systemPrompt)));
-  const allDocs = results.flat();
+  const chunks = await splitPdfIntoChunks(file, 5);
+
+  // Process chunks one at a time with a delay to avoid rate limits
+  const allDocs: DocumentData[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const result = await extractFromChunk(chunks[i].base64, systemPrompt);
+    allDocs.push(...result);
+    // Wait 30 seconds between chunks to stay within the 30k tokens/min rate limit
+    if (i < chunks.length - 1) {
+      await new Promise(r => setTimeout(r, 30000));
+    }
+  }
+
   return deduplicateDocuments(allDocs);
 };

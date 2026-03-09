@@ -36,46 +36,45 @@ const CustomRulesPanel: React.FC<CustomRulesPanelProps> = ({ rules, onRulesChang
   };
 
   return (
-    <div className="mb-6 border border-indigo-100 rounded-lg bg-indigo-50/50 overflow-hidden">
-      {/* Header — always visible */}
+    <div className="mb-4 border border-slate-200 rounded-xl bg-white overflow-hidden shadow-sm">
+      {/* Header */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-indigo-50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-2">
-          <Lightbulb size={16} className="text-indigo-500" />
-          <span className="text-sm font-semibold text-indigo-700">
+          <Lightbulb size={15} className="text-blue-500" />
+          <span className="text-sm font-semibold text-slate-700">
             Custom Extraction Rules
           </span>
           {rules.length > 0 && (
-            <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
               {rules.length} active
             </span>
           )}
         </div>
-        {isOpen ? <ChevronUp size={16} className="text-indigo-400" /> : <ChevronDown size={16} className="text-indigo-400" />}
+        {isOpen ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
       </button>
 
       {isOpen && (
-        <div className="px-4 pb-4 space-y-4">
-          <p className="text-xs text-indigo-600">
+        <div className="px-4 pb-4 space-y-3 border-t border-slate-100">
+          <p className="text-xs text-slate-500 pt-3">
             Tell the AI what extra information to look for — plain English, no coding needed.
-            These rules apply to every document you process.
           </p>
 
           {/* Active Rules */}
           {rules.length > 0 && (
-            <ul className="space-y-2">
+            <ul className="space-y-1.5">
               {rules.map((rule, i) => (
-                <li key={i} className="flex items-start gap-2 bg-white rounded-md px-3 py-2 text-sm text-gray-700 shadow-sm">
+                <li key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700">
                   <span className="flex-1">{rule}</span>
                   <button
                     type="button"
                     onClick={() => removeRule(i)}
-                    className="text-red-400 hover:text-red-600 flex-shrink-0 mt-0.5"
+                    className="text-slate-400 hover:text-red-500 flex-shrink-0 transition-colors cursor-pointer"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </li>
               ))}
@@ -90,29 +89,29 @@ const CustomRulesPanel: React.FC<CustomRulesPanelProps> = ({ rules, onRulesChang
               onChange={(e) => setNewRule(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addRule()}
               placeholder='e.g. "Also extract the vessel departure date"'
-              className="flex-1 text-sm rounded-md border border-indigo-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              className="flex-1 text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-slate-800 placeholder-slate-400"
             />
             <button
               type="button"
               onClick={addRule}
               disabled={!newRule.trim()}
-              className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
-              <PlusCircle size={14} />
+              <PlusCircle size={13} />
               Add
             </button>
           </div>
 
           {/* Example suggestions */}
           <div>
-            <p className="text-xs font-medium text-indigo-500 mb-2">Quick add examples:</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="text-xs font-medium text-slate-400 mb-2">Quick add:</p>
+            <div className="flex flex-wrap gap-1.5">
               {EXAMPLE_RULES.filter(ex => !rules.includes(ex)).map((ex, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => addExample(ex)}
-                  className="text-xs bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-full px-3 py-1 transition-colors"
+                  className="text-xs bg-slate-50 border border-slate-200 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 rounded-full px-3 py-1 transition-colors cursor-pointer"
                 >
                   + {ex}
                 </button>

@@ -1,4 +1,5 @@
 import { PDFDocument } from "pdf-lib";
+import Anthropic from "@anthropic-ai/sdk";
 import { DocumentData, ExtractionResponse } from "../types";
 import { AppConfig } from "../config";
 
@@ -310,19 +311,37 @@ const extractFromChunk = async (
   base64: string,
   systemPrompt: string
 ): Promise<DocumentData[]> => {
+  const client = new Anthropic({
+    apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || "",
+    dangerouslyAllowBrowser: true,
+  });
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetch("/api/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64, systemPrompt }),
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 16000,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "document",
+                source: { type: "base64", media_type: "application/pdf", data: base64 },
+              },
+              {
+                type: "text",
+                text: "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object.",
+              },
+            ],
+          },
+        ],
       });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(err.error || `HTTP ${response.status}`);
-      }
-      const result = await response.json() as ExtractionResponse;
+      const text = response.content[0].type === "text" ? response.content[0].text : "";
+      if (!text) throw new Error("No data returned from Claude");
+      const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+      const result = JSON.parse(clean) as ExtractionResponse;
       return result.documents || [];
     } catch (error: any) {
       if (attempt === maxRetries) throw error;

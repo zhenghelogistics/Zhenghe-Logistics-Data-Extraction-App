@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProcessedFile, FileStatus, DocumentData } from '../types';
 import { AppConfig } from '../config';
 import { CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Trash2 } from 'lucide-react';
@@ -8,11 +8,31 @@ interface ResultsTableProps {
   files: ProcessedFile[];
   onUpdateIncoterm: (fileId: string, docIndex: number, value: string) => void;
   onDeleteFile: (fileId: string) => void;
+  onBulkDelete: (ids: string[]) => void;
   activeTab: string;
   userRole: UserRole | null;
 }
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onDeleteFile, activeTab, userRole }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onDeleteFile, onBulkDelete, activeTab, userRole }) => {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeTab]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = (allIds: string[]) => {
+    const allSelected = allIds.every(id => selectedIds.has(id));
+    setSelectedIds(allSelected ? new Set() : new Set(allIds));
+  };
+
   if (files.length === 0) {
     return null;
   }
@@ -195,60 +215,89 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
 
   // Special handling for "All Files" tab - Show one row per FILE, not per document
   if (activeTab === 'All Files') {
-    const dynamicHeaders = ['File Name', 'Status', 'Document Types Found', 'Upload Date', 'Actions'];
-    
-    return (
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                {dynamicHeaders.map(header => (
-                   <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider first:pl-4 sm:first:pl-5">
-                     {header}
-                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {files.map(file => {
-                // Summarize types found in this file
-                const typesFound = file.data 
-                  ? Array.from(new Set(file.data.map(d => d.document_type))).join(', ') 
-                  : '-';
+    const allFileIds = files.map(f => f.id);
+    const allSelected = allFileIds.length > 0 && allFileIds.every(id => selectedIds.has(id));
 
-                return (
-                  <tr key={file.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="whitespace-nowrap py-3.5 pl-4 pr-3 text-sm font-medium text-slate-800 sm:pl-5">
-                      {file.file.name}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-sm">
-                      {renderStatusBadge(file.status as FileStatus)}
-                      {file.status === FileStatus.ERROR && <span className="text-red-500 text-xs block">{file.errorMessage}</span>}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">
-                      {typesFound}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">
-                      {new Date().toLocaleDateString()}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
-                       <button
-                         type="button"
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           onDeleteFile(file.id);
-                         }}
-                         className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
-                       >
-                         <Trash2 size={15} />
-                       </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+    return (
+      <div className="space-y-2">
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-lg">
+            <span className="text-sm text-red-700 font-medium">{selectedIds.size} selected</span>
+            <button
+              type="button"
+              onClick={() => onBulkDelete(Array.from(selectedIds))}
+              className="flex items-center gap-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md transition-colors"
+            >
+              <Trash2 size={13} /> Delete Selected
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm text-red-500 hover:text-red-700 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th scope="col" className="px-3 py-3 pl-4">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={() => handleSelectAll(allFileIds)}
+                      className="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                    />
+                  </th>
+                  {['File Name', 'Status', 'Document Types Found', 'Upload Date', 'Actions'].map(header => (
+                    <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {files.map(file => {
+                  const typesFound = file.data
+                    ? Array.from(new Set(file.data.map(d => d.document_type))).join(', ')
+                    : '-';
+                  return (
+                    <tr key={file.id} className={`hover:bg-slate-50 transition-colors ${selectedIds.has(file.id) ? 'bg-red-50' : ''}`}>
+                      <td className="px-3 py-3.5 pl-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(file.id)}
+                          onChange={() => toggleSelect(file.id)}
+                          className="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="whitespace-nowrap py-3.5 pr-3 text-sm font-medium text-slate-800">
+                        {file.file.name}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3.5 text-sm">
+                        {renderStatusBadge(file.status as FileStatus)}
+                        {file.status === FileStatus.ERROR && <span className="text-red-500 text-xs block">{file.errorMessage}</span>}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{typesFound}</td>
+                      <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{new Date().toLocaleDateString()}</td>
+                      <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onDeleteFile(file.id); }}
+                          className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -278,14 +327,45 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
     dynamicHeaders = ['Type', 'Ref #', 'Date', 'Entity', 'Amount/Details', 'Source File', 'Status', 'Actions']; 
   }
 
+  const allVisibleIds = Array.from(new Set(displayRows.map(r => r.file.id)));
+  const allVisibleSelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedIds.has(id));
+
   return (
+    <div className="space-y-2">
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-lg">
+          <span className="text-sm text-red-700 font-medium">{selectedIds.size} file(s) selected</span>
+          <button
+            type="button"
+            onClick={() => onBulkDelete(Array.from(selectedIds))}
+            className="flex items-center gap-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md transition-colors"
+          >
+            <Trash2 size={13} /> Delete Selected
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-red-500 hover:text-red-700 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
+              <th scope="col" className="px-3 py-3 pl-4">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={() => handleSelectAll(allVisibleIds)}
+                  className="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                />
+              </th>
               {dynamicHeaders.map(header => (
-                 <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider first:pl-4 sm:first:pl-5">
+                 <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                    {header}
                  </th>
               ))}
@@ -326,11 +406,19 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
               const d = row.data;
 
               return (
-              <tr key={uniqueKey} className="hover:bg-slate-50 transition-colors">
+              <tr key={uniqueKey} className={`hover:bg-slate-50 transition-colors ${selectedIds.has(row.file.id) ? 'bg-red-50' : ''}`}>
+                <td className="px-3 py-3.5 pl-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(row.file.id)}
+                    onChange={() => toggleSelect(row.file.id)}
+                    className="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                  />
+                </td>
                 {activeTab === 'All' && userRole !== 'logistics' ? (
                    // Generic Row for "All" view
                    <>
-                    <td className="whitespace-nowrap py-3.5 pl-4 pr-3 text-sm font-medium text-slate-800 sm:pl-5">{d.document_type}</td>
+                    <td className="whitespace-nowrap py-3.5 pr-3 text-sm font-medium text-slate-800">{d.document_type}</td>
                     <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{d.metadata?.reference_number || '-'}</td>
                     <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{d.metadata?.date || '-'}</td>
                     <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500" title={d.metadata?.parties?.shipper_supplier || ''}>
@@ -385,6 +473,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
           </tbody>
         </table>
       </div>
+    </div>
     </div>
   );
 };

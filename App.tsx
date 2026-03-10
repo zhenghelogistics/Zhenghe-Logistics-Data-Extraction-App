@@ -185,6 +185,19 @@ function App() {
     setDeleteModalOpen(true);
   };
 
+  const handleBulkDelete = async (ids: string[]) => {
+    if (!window.confirm(`Delete ${ids.length} file(s)? This cannot be undone.`)) return;
+    for (const id of ids) {
+      const result = await deleteDocument(id);
+      if (result.success) {
+        setFiles(prev => prev.filter(f => f.id !== id));
+        addLog(`Deleted file ${id}`);
+      } else {
+        addLog(`Error deleting ${id}: ${result.message}`);
+      }
+    }
+  };
+
   const confirmDeleteFile = async () => {
     if (!fileToDelete) return;
     const id = fileToDelete;
@@ -597,6 +610,7 @@ function App() {
               files={files}
               onUpdateIncoterm={handleIncotermUpdate}
               onDeleteFile={handleDeleteFile}
+              onBulkDelete={handleBulkDelete}
               activeTab={activeTab}
               userRole={userRole}
             />

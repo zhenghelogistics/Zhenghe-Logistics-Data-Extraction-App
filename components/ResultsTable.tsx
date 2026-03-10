@@ -279,9 +279,12 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                       </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm">
                         {renderStatusBadge(file.status as FileStatus)}
-                        {file.status === FileStatus.ERROR && <span className="text-red-500 text-xs block">{file.errorMessage}</span>}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{typesFound}</td>
+                      <td className="px-3 py-3.5 text-sm text-slate-500 max-w-xs">
+                        {file.status === FileStatus.ERROR
+                          ? <span className="text-red-500 text-xs">{file.errorMessage || 'Processing failed — try re-uploading'}</span>
+                          : typesFound}
+                      </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{new Date().toLocaleDateString()}</td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
                         <button

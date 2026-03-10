@@ -81,8 +81,8 @@ EXTRACTION RULES FOR "Payment Voucher/GL":
 - CHARGES SUMMARY ('charges_summary'): List the charge TYPES found in the tax invoice, comma-separated. Use these short forms for known charges: THC (Terminal Handling Charges), BL (BL Fee / Document Fee), SEALS (Seal Fee), O.F (Ocean Freight), ENS, AMS, SBL (Surrender of BL), PRINTED BL. For any OTHER charges not in this list, include them as they appear on the invoice (e.g., "FOOD GRADE", "FUMIGATION", "ISPS"). Example output: "THC, SEALS, BL, SBL, ENS, FOOD GRADE". Only include charges that are actually present in the document.
 
 EXTRACTION RULES FOR "Logistics Local Charges Report":
-- A. BL NUMBER: HBL/House Bill of Lading (e.g., 'EGLV070500202135').
-- B. CARRIER / FORWARDER: If MSC → 'MSC MEDITERRANEAN SHIPPING CO SA'. If ONE → 'OCEAN NETWORK EXPRESS PTE. LTD'.
+- A. BL NUMBER: Prefer the House BL (HBL) number (e.g., 'EGLV070500202135'). If no HBL exists, use the Master BL (MBL) number instead.
+- B. CARRIER / FORWARDER: Look at the LETTERHEAD or ISSUING COMPANY NAME on the invoice, freight note, or BL document — do not rely solely on the BL number. Known mappings: MSC → 'MSC MEDITERRANEAN SHIPPING CO SA', ONE → 'OCEAN NETWORK EXPRESS PTE. LTD'. For all others, extract the FULL COMPANY NAME as printed on the document. If a forwarder issued their invoice using an MBL, use the forwarder name from their invoice letterhead.
 - C. PSS INVOICE NUMBER: Invoice number on the BL.
 - D. FREIGHT TERM: 'PREPAID' if ocean freight charges exist, else 'COLLECT'.
 - E. PLACE OF DESTINATION: Take from the BL field labelled "PLACE OF DELIVERY" or "FINAL DESTINATION". Format MUST be "CITY - COUNTRY" (e.g., FOS SUR MER - FRANCE, AUCKLAND - NEW ZEALAND). For shipments to GUANGZHOU JIAOXIN TERMINAL, use "JiaoXin - China".
@@ -95,7 +95,7 @@ EXTRACTION RULES FOR "Logistics Local Charges Report":
   * 40RFHC → for codes: 40HR, 40RH, 40RQ, 4RH, 40 reefer high cube
 - G. CONTAINER QTY: From BL or Invoice.
 - H. (SGD) THC: Look for T.H.C, THC, Terminal Handling Charge. Extract the PER CONTAINER UNIT charge (not the total). e.g. if 2 containers × $150 each, return "150.00".
-- I. (SGD) SEAL FEE: Look for SEAL FEE, CONTAINER SEAL. Extract the PER SEAL UNIT charge (not the total). e.g. if 2 seals × $20 each, return "20.00".
+- I. (SGD) SEAL FEE: ONLY capture "SLF Seal Fee". Do NOT include "ISL International Seal Fee" or any other seal-related charges — these are NOT local charges and must be ignored entirely. Extract the PER SEAL UNIT charge (not the total). e.g. if 2 seals × $20 each, return "20.00".
 - J. (SGD) BL FEE: Bill of Lading / Document Fee.
 - K. (SGD) BL PRINTED FEE: Leave blank if none.
 - L. (SGD) ENS / AMS / SCMC: ENS Filing, AMS, AFR, SCMC, Cargo Data Declaration total.

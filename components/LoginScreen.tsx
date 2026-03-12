@@ -123,7 +123,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   onChange={(e) => setRole(e.target.value as UserRole)}
                   className="block w-full px-4 py-4 bg-white border-2 border-blue-100 rounded-full text-blue-900 focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition-all outline-none appearance-none"
                 >
-                  <option value={UserRole.LOGISTICS}>Logistics Team</option>
+                  <option value={UserRole.LOGISTICS}>Shipping Department</option>
                   <option value={UserRole.ACCOUNTS}>Accounts Team</option>
                   <option value={UserRole.TRANSPORT}>Transport Team</option>
                 </select>

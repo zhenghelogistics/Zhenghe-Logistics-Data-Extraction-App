@@ -22,7 +22,7 @@ export const USERS: User[] = [
     username: 'Dongdong',
     password: '67!',
     role: UserRole.LOGISTICS,
-    teamName: 'Logistics Team'
+    teamName: 'Shipping Department'
   },
   {
     username: 'Tungtung',

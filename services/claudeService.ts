@@ -314,10 +314,11 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
         uniqueDocs.set(key, doc);
       }
     } else if (doc.document_type === "Outward Permit Declaration") {
-      // Deduplicate OPD entries by container number
-      const containerNo = doc.outward_permit_declaration.container_no?.trim().toUpperCase();
+      // Deduplicate OPD entries by container number; discard rows without a valid container (e.g. B/L Draft summary page)
+      const containerNo = doc.outward_permit_declaration?.container_no?.trim().toUpperCase();
       const isValidContainer = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
-      const key = isValidContainer ? `OPD_${containerNo}` : `OPD_${Math.random()}`;
+      if (!isValidContainer) return;
+      const key = `OPD_${containerNo}`;
       if (!uniqueDocs.has(key)) uniqueDocs.set(key, doc);
     } else {
       let key = "";

@@ -152,14 +152,20 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
 
       // Allied Report
       case 'Container/Booking No': return data.allied_report?.container_booking_no || '-';
-      case 'Repair': return data.allied_report?.repair || '-';
-      case 'Detention': return data.allied_report?.detention || '-';
+      case 'Repair': return data.allied_report?.repair || data.cdac_report?.repair || '-';
+      case 'Detention': return data.allied_report?.detention || data.cdac_report?.detention || '-';
       case 'DHC In': return data.allied_report?.dhc_in || '-';
       case 'Data Admin Fee (In)': return data.allied_report?.data_admin_fee_in || '-';
       case 'DHE Out': return data.allied_report?.dhe_out || '-';
       case 'DHC Out': return data.allied_report?.dhc_out || '-';
-      case 'Washing': return data.allied_report?.washing || '-';
+      case 'Washing': return data.allied_report?.washing || data.cdac_report?.washing || '-';
       case 'DHE In': return data.allied_report?.dhe_in || '-';
+
+      // CDAC Report
+      case 'Container Number': return data.cdac_report?.container_number || '-';
+      case 'Demurage': return data.cdac_report?.demurage || '-';
+      case 'Admin Fees': return data.cdac_report?.admin_fees || '-';
+      case 'DHC': return data.cdac_report?.dhc || '-';
       
       // Bill of Lading Specifics
       // BL Number is already handled above in Payment Voucher section

@@ -129,6 +129,16 @@ export interface AlliedReport {
   dhe_in?: string | null;
 }
 
+export interface CdacReport {
+  container_number?: string | null;
+  repair?: string | null;
+  detention?: string | null;
+  demurage?: string | null;
+  admin_fees?: string | null;
+  washing?: string | null;
+  dhc?: string | null;
+}
+
 export interface DocumentData {
   document_type: string;
   metadata: DocumentMetadata;
@@ -140,6 +150,7 @@ export interface DocumentData {
   outward_permit_declaration?: OutwardPermitDeclaration;
   transport_job?: TransportJob;
   allied_report?: AlliedReport;
+  cdac_report?: CdacReport;
 }
 
 // Wrapper for the API response which now returns a list

@@ -54,7 +54,9 @@ export const AppConfig = {
     },
     'Outward Permit Declaration': {
       columns: [
-        'a) HS CODE', 'b) DESCRIPTION', 'c) NET WEIGHT (KGS)', 'd) ITEM PRICE', 'e) COUNTRY OF ORIGIN'
+        'BL number', 'Carrier', 'Consignee', 'Container No', 'Seal No', 'Ctnr Type',
+        'Final Destination (Port Code)', 'Vessel Name', 'Voyage',
+        'HS code', 'Description', 'Net Weight', 'Value', 'Total Outer Pack', 'Gross weight'
       ]
     },
     'Transport Job': {

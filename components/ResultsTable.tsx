@@ -127,30 +127,21 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case "Charges": return data.payment_voucher_details?.charges_summary || data.financials?.line_item_charges?.map(c => `${c.description}: ${c.amount}`).join('; ') || '-';
       
       // Outward Permit Declaration
-      case 'Permit Number': return data.outward_permit_declaration?.permit_number || '-';
-      case 'Exporter': return data.outward_permit_declaration?.exporter || '-';
+      case 'BL number': return data.outward_permit_declaration?.bl_number || '-';
+      case 'Carrier': return data.outward_permit_declaration?.carrier || '-';
       case 'Consignee': return data.outward_permit_declaration?.consignee || '-';
-      case 'Total FOB Value': return data.outward_permit_declaration?.total_fob_value || '-';
-      case 'GST Amount': return data.outward_permit_declaration?.gst_amount || '-';
-      // Logistics team OPD fields
-      case 'a) HS CODE': return data.outward_permit_declaration?.hs_code || '-';
-      case 'b) DESCRIPTION': return data.outward_permit_declaration?.description || '-';
-      case 'b1) INVOICE DESC': return data.outward_permit_declaration?.invoice_description || '-';
-      case 'b2) PACKING LIST DESC': return data.outward_permit_declaration?.packing_list_description || '-';
-      case 'b3) BL DESC': return data.outward_permit_declaration?.bl_description || '-';
-      case 'b4) PO DESC': return data.outward_permit_declaration?.po_description || '-';
-      case 'f) DESCRIPTION MATCH': {
-        const match = data.outward_permit_declaration?.description_match || '-';
-        const isMismatch = match.startsWith('MISMATCH');
-        return (
-          <span className={isMismatch ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
-            {match}
-          </span>
-        );
-      }
-      case 'c) NET WEIGHT (KGS)': return data.outward_permit_declaration?.net_weight_kgs || '-';
-      case 'd) ITEM PRICE': return data.outward_permit_declaration?.item_price || '-';
-      case 'e) COUNTRY OF ORIGIN': return data.outward_permit_declaration?.country_of_origin || '-';
+      case 'Container No': return data.outward_permit_declaration?.container_no || '-';
+      case 'Seal No': return data.outward_permit_declaration?.seal_no || '-';
+      case 'Ctnr Type': return data.outward_permit_declaration?.container_type || '-';
+      case 'Final Destination (Port Code)': return data.outward_permit_declaration?.final_destination_port || '-';
+      case 'Vessel Name': return data.outward_permit_declaration?.vessel_name || '-';
+      case 'Voyage': return data.outward_permit_declaration?.voyage || '-';
+      case 'HS code': return data.outward_permit_declaration?.hs_code || '-';
+      case 'Description': return data.outward_permit_declaration?.description || '-';
+      case 'Net Weight': return data.outward_permit_declaration?.net_weight_kgs || '-';
+      case 'Value': return data.outward_permit_declaration?.item_price || '-';
+      case 'Total Outer Pack': return data.outward_permit_declaration?.total_outer_pack || '-';
+      case 'Gross weight': return data.outward_permit_declaration?.gross_weight || '-';
 
       // Transport Job
       case 'Job Number': return data.transport_job?.job_number || '-';

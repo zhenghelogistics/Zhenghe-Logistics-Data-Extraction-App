@@ -84,16 +84,27 @@ export interface OutwardPermitDeclaration {
   port_of_discharge?: string | null;
   total_fob_value?: string | null;
   gst_amount?: string | null;
-  // Logistics team extraction fields
+  // Shipping team extraction fields
+  bl_number?: string | null;
+  carrier?: string | null;
+  container_no?: string | null;
+  seal_no?: string | null;
+  container_type?: string | null;
+  final_destination_port?: string | null;
+  vessel_name?: string | null;
+  voyage?: string | null;
   hs_code?: string | null;
   description?: string | null;
+  net_weight_kgs?: string | null;
+  item_price?: string | null;
+  total_outer_pack?: string | null;
+  gross_weight?: string | null;
+  // Description cross-check fields
   invoice_description?: string | null;
   packing_list_description?: string | null;
   bl_description?: string | null;
   po_description?: string | null;
   description_match?: string | null;
-  net_weight_kgs?: string | null;
-  item_price?: string | null;
   country_of_origin?: string | null;
 }
 

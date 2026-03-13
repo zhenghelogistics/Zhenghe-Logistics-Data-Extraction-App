@@ -106,16 +106,56 @@ EXTRACTION RULES FOR "Logistics Local Charges Report":
 SPECIAL RULE FOR ONE (OCEAN NETWORK EXPRESS) FREIGHTED BLs:
 - When the carrier is ONE and the BL is freighted (has ocean freight charges), ALL charges (THC, Seal Fee, BL Fee, ENS, Others) must be taken from the PREPAID column only.
 
-EXTRACTION RULES FOR "Outward Permit Declaration" (Logistics Team):
-- HS CODE: From PURCHASE ORDER item description, field labelled "HS Code" or similar. Numbers only (e.g. 84137000).
+EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
+- BL NUMBER: Booking reference / BL number from BL draft or Shipping Instruction (SI). Use the HBL if present, otherwise MBL.
+- CARRIER: Carrier/shipping line name from SI or BL draft letterhead.
+- CONSIGNEE: Consignee name and address from BL draft or SI.
+- CONTAINER NO: Container number(s) from BL draft or SI (e.g. TCKU1234567).
+- SEAL NO: Seal number(s) from BL draft or SI.
+- CTNR TYPE: Container type and count from BL draft or SI (e.g. "1 x 20GP", "2 x 40HC").
+- FINAL DESTINATION (PORT CODE): Final destination from SI field "Final Destination" or BL draft field "Place of Delivery". Show the port code if visible (e.g. "BEAU" for Beaufort, "PKMPW" for Port Klang), otherwise show the full port name.
+- VESSEL NAME: Vessel name from BL draft or SI.
+- VOYAGE: Voyage number from BL draft or SI.
+- HS CODE LOOKUP RULE:
+  * If the Purchase Order customer is "PSS" OR the document letterhead reads "PULAU SAMBU SINGAPORE":
+    Look up the HS code from this reference table by matching the product description:
+    COCONUT CREAM/COCONUT MILK → 21069093 (ID)
+    CANNED PINEAPPLE → 20082010 (ID)
+    COCONUT CREAM POWDER/COCONUT MILK POWDER → 11063000 (ID)
+    COCONUT WATER → 20098920 (ID)
+    COCONUT MILK DRINK → 22029930 (ID)
+    COCONUT WATER CONCENTRATE → 20098930 (ID)
+    PINEAPPLE JUICE CONCENTRATE → 20094900 (ID)
+    DESICCATED COCONUT → 08011100 (ID)
+    REVERSE OSMOSIS WATER / AFTER SAND FILTER WATER → 22019090 (ID)
+    COCONUT SHELL CHARCOAL → 44022010 (ID)
+    VIRGIN COCONUT OIL → 15131110 (ID)
+    OTHER COCONUT OIL → 15131190 (ID)
+    T-SHIRT (MEN) POLO → 61099020 (SG)
+    CALENDARS → 49100000 (ID)
+    FLYERS / WOBBLER / SHELFTALKER → 49111090 (MY)
+    STANDEE → 48191000 (SG)
+    EMPTY CARTON BOXES → 48191000 (SG)
+    POSTER → 49111090 (MY)
+    RECIPE BOOKS → 49011000 (MY)
+    LEAFLETS → 49111090 (MY)
+    BARCODE LABEL / STICKERS → 48119099 (MY)
+    BANNER → 49119990 (SG)
+    SHIRT → 61059000 (SG)
+    NOTE BOOK → 48201000 (ID)
+    COCONUT CANDY → 17049099 (ID)
+    DRINKING WATER → 22011010 (ID)
+  * Otherwise: Extract the HS code directly from the document as provided. Numbers only (e.g. 84137000).
+- DESCRIPTION (formatted): From INVOICE item description. Format as: [QTY as whole integer] [UOM] [ITEM DESCRIPTION]. Remove all decimals from quantity (e.g. 1.000 → 1). Example: "1 UNIT CENTRIFUGAL PUMP TYPE: WI+35/35 IN/OUTLET: SMS 76/51 MM". If descriptions across INVOICE, PACKING LIST, BL, and PO do not match, leave this blank.
+- NET WEIGHT: Nett Weight Grand Total from PACKING LIST column "Nett Weight (kgs)". Number only, no units.
+- VALUE: Total Amount / Extended Price from INVOICE. Include currency symbol. e.g. "1500.00 USD".
+- TOTAL OUTER PACK: Quantity Grand Total from SI or PACKING LIST. Number and unit (e.g. "250 CTNS").
+- GROSS WEIGHT: Weight Grand Total (gross) from SI or PACKING LIST. Number and unit (e.g. "3500.00 KGS").
 - INVOICE DESCRIPTION (raw): Copy the item description exactly as written in the INVOICE. No formatting.
 - PACKING LIST DESCRIPTION (raw): Copy the item description exactly as written in the PACKING LIST. No formatting.
 - BL DESCRIPTION (raw): Copy the item description exactly as written in the BILL OF LADING. No formatting.
 - PO DESCRIPTION (raw): Copy the item description exactly as written in the PURCHASE ORDER. No formatting.
 - DESCRIPTION MATCH: Compare all four raw descriptions above. Do they all refer to the same item? Output "MATCH" or "MISMATCH - [which document differs]". Be strict.
-- DESCRIPTION (formatted): From INVOICE item description. Format as: [QTY as whole integer] [UOM] [ITEM DESCRIPTION]. Remove all decimals from quantity (e.g. 1.000 → 1). Example: "1 UNIT CENTRIFUGAL PUMP TYPE: WI+35/35 IN/OUTLET: SMS 76/51 MM". If DESCRIPTION MATCH is MISMATCH, leave this blank.
-- NET WEIGHT (KGS): Nett Weight number from PACKING LIST column "Nett Weight (kgs)". Number only, no units.
-- ITEM PRICE: Extended Price from INVOICE. Include currency symbol. e.g. "1500.00 USD".
 - COUNTRY OF ORIGIN: From PURCHASE ORDER item description field "Product Of Origin". Full country name in capitals e.g. "GERMANY".
 
 IMPORTANT:
@@ -192,15 +232,25 @@ Respond ONLY with valid JSON matching this exact structure:
         "port_of_discharge": "string or null",
         "total_fob_value": "string or null",
         "gst_amount": "string or null",
+        "bl_number": "string or null",
+        "carrier": "string or null",
+        "container_no": "string or null",
+        "seal_no": "string or null",
+        "container_type": "string or null",
+        "final_destination_port": "string or null",
+        "vessel_name": "string or null",
+        "voyage": "string or null",
         "hs_code": "string or null",
         "description": "string or null",
+        "net_weight_kgs": "string or null",
+        "item_price": "string or null",
+        "total_outer_pack": "string or null",
+        "gross_weight": "string or null",
         "invoice_description": "string or null",
         "packing_list_description": "string or null",
         "bl_description": "string or null",
         "po_description": "string or null",
         "description_match": "string or null",
-        "net_weight_kgs": "string or null",
-        "item_price": "string or null",
         "country_of_origin": "string or null"
       },
       "transport_job": {

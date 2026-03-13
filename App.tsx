@@ -7,7 +7,7 @@ import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
 import { ProcessedFile, FileStatus, DocumentData } from './types';
 import { AppConfig } from './config';
-import { UserRole, USERS } from './users';
+import { UserRole, TEAM_NAMES } from './users';
 // @ts-ignore
 import JSZip from 'jszip';
 import ConfirmationModal from './components/ConfirmationModal';
@@ -128,8 +128,7 @@ function App() {
   };
 
   const getTeamName = (role: UserRole | null) => {
-    const user = USERS.find(u => u.role === role);
-    return user ? user.teamName : 'Logistics Data Controller';
+    return role ? TEAM_NAMES[role] : 'Logistics Data Controller';
   };
 
   const addFilesToQueue = (newFilesArray: File[]) => {

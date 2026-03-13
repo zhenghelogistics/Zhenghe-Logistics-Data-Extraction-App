@@ -107,11 +107,12 @@ SPECIAL RULE FOR ONE (OCEAN NETWORK EXPRESS) FREIGHTED BLs:
 - When the carrier is ONE and the BL is freighted (has ocean freight charges), ALL charges (THC, Seal Fee, BL Fee, ENS, Others) must be taken from the PREPAID column only.
 
 EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
+- DOCUMENT STRUCTURE: An OPD file typically contains multiple 2-page Shipping Instructions (SI) followed by a B/L Draft summary page. Each SI covers EXACTLY ONE container. Create ONE separate Outward Permit Declaration entry for EACH Shipping Instruction found. Do NOT create a separate entry for the B/L Draft summary page — use it for reference only (e.g. for BL number, carrier). For CONTAINER NO and SEAL NO, look in the "FOR SHIPPING DEPARTMENT ONLY" section at the bottom of page 2 of each SI (labeled "Container / Seal No: CONTAINER / SEAL").
 - BL NUMBER: Booking reference / BL number from BL draft or Shipping Instruction (SI). Use the HBL if present, otherwise MBL.
 - CARRIER: Carrier/shipping line name from SI or BL draft letterhead.
 - CONSIGNEE: Consignee name and address from BL draft or SI.
-- CONTAINER NO: Container number(s) from BL draft or SI (e.g. TCKU1234567).
-- SEAL NO: Seal number(s) from BL draft or SI.
+- CONTAINER NO: Single container number from the "FOR SHIPPING DEPARTMENT ONLY" section of THIS SI's page 2 (e.g. TCKU1234567). One value only — not a list.
+- SEAL NO: Single seal number from the "FOR SHIPPING DEPARTMENT ONLY" section of THIS SI's page 2 (e.g. EMCSEC1524). One value only — not a list.
 - CTNR TYPE: Container type and count from BL draft or SI (e.g. "1 x 20GP", "2 x 40HC").
 - FINAL DESTINATION (PORT CODE): Final destination from SI field "Final Destination" or BL draft field "Place of Delivery". Show the port code if visible (e.g. "BEAU" for Beaufort, "PKMPW" for Port Klang), otherwise show the full port name.
 - VESSEL NAME: Vessel name from BL draft or SI.
@@ -279,7 +280,7 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
   const uniqueDocs = new Map<string, DocumentData>();
 
   docs.forEach((doc) => {
-    if (doc.logistics_local_charges) {
+    if (doc.document_type === "Logistics Local Charges Report" && doc.logistics_local_charges) {
       const l = doc.logistics_local_charges;
       const hasBL = l.bl_number && l.bl_number.length > 1;
       const hasCarrier = l.carrier_forwarder && l.carrier_forwarder.length > 1;
@@ -312,6 +313,12 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
       } else {
         uniqueDocs.set(key, doc);
       }
+    } else if (doc.document_type === "Outward Permit Declaration") {
+      // Deduplicate OPD entries by container number
+      const containerNo = doc.outward_permit_declaration.container_no?.trim().toUpperCase();
+      const isValidContainer = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
+      const key = isValidContainer ? `OPD_${containerNo}` : `OPD_${Math.random()}`;
+      if (!uniqueDocs.has(key)) uniqueDocs.set(key, doc);
     } else {
       let key = "";
       if (doc.payment_voucher_details?.pss_invoice_number) {
@@ -406,7 +413,7 @@ export const extractDocumentData = async (
   customInstructions: string[] = []
 ): Promise<DocumentData[]> => {
   const systemPrompt = buildSystemPrompt(customInstructions);
-  const chunks = await splitPdfIntoChunks(file, 5);
+  const chunks = await splitPdfIntoChunks(file, 20);
 
   // Process chunks one at a time with a delay to avoid rate limits
   const allDocs: DocumentData[] = [];

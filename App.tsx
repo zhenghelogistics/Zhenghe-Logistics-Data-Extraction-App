@@ -281,16 +281,13 @@ function App() {
 
     const generateCSVForType = (type: string, list: { data: DocumentData; filename: string }[]) => {
       let headers: string[] = [];
-      if (userRole === UserRole.LOGISTICS) {
-        headers = ['A. BL NUMBER','B. CARRIER / FORWARDER','C. PSS INVOICE NUMBER','D. FREIGHT TERM','E. PLACE OF DESTINATION','F. CNTR TYPE','G. CONTAINER QTY','H. (SGD) THC','I. (SGD) SEAL FEE','J. (SGD) BL FEE','K. (SGD) BL PRINTED FEE','L. (SGD) ENS / AMS / SCMC','M. (SGD) OTHERS CHARGES','N. REMARKS','O. TOTAL AMOUNT','Source File'];
-      } else {
-        switch (type) {
-          case 'Outward Permit Declaration': headers = ['BL Number','Carrier','Consignee','Container No','Seal No','Ctnr Type','Final Destination','Vessel Name','Voyage','HS Code','Description','Net Weight','Value','Total Outer Pack','Gross Weight','Source File']; break;
-          case 'Payment Voucher/GL': headers = ["PSS's Invoice #","Carrier/Forwarder Inv #","BL Number","Payable Amount","Total Payable Amount","Charges","Source File"]; break;
-          case 'Bill of Lading': headers = ['BL Number','Shipper','Consignee','Notify Party','Vessel','Voyage','POL','POD','Source File']; break;
-          case 'Commercial Invoice': headers = ['Invoice Number','Supplier','Buyer','Incoterms','Total Amount','Currency','Date','Source File']; break;
-          default: headers = ['Document Type','Reference Number','Date','Entity','Total Amount','Source File'];
-        }
+      switch (type) {
+        case 'Logistics Local Charges Report': headers = ['A. BL NUMBER','B. CARRIER / FORWARDER','C. PSS INVOICE NUMBER','D. FREIGHT TERM','E. PLACE OF DESTINATION','F. CNTR TYPE','G. CONTAINER QTY','H. (SGD) THC','I. (SGD) SEAL FEE','J. (SGD) BL FEE','K. (SGD) BL PRINTED FEE','L. (SGD) ENS / AMS / SCMC','M. (SGD) OTHERS CHARGES','N. REMARKS','O. TOTAL AMOUNT','Source File']; break;
+        case 'Outward Permit Declaration': headers = ['BL Number','Carrier','Consignee','Container No','Seal No','Ctnr Type','Final Destination','Vessel Name','Voyage','HS Code','Description','Net Weight','Value','Total Outer Pack','Gross Weight','Source File']; break;
+        case 'Payment Voucher/GL': headers = ["PSS's Invoice #","Carrier/Forwarder Inv #","BL Number","Payable Amount","Total Payable Amount","Charges","Source File"]; break;
+        case 'Bill of Lading': headers = ['BL Number','Shipper','Consignee','Notify Party','Vessel','Voyage','POL','POD','Source File']; break;
+        case 'Commercial Invoice': headers = ['Invoice Number','Supplier','Buyer','Incoterms','Total Amount','Currency','Date','Source File']; break;
+        default: headers = ['Document Type','Reference Number','Date','Entity','Total Amount','Source File'];
       }
 
       const rows = list.map(({ data: d, filename }) => {
@@ -299,12 +296,11 @@ function App() {
         const fin = d.financials || {};
         const log = d.logistics_details || {};
 
-        if (userRole === UserRole.LOGISTICS) {
-          const l = d.logistics_local_charges || {};
-          return [safe(l.bl_number||m.reference_number),safe(l.carrier_forwarder),safe(l.pss_invoice_number),safe(l.freight_term),safe(l.place_of_destination),safe(l.container_type),safe(l.container_qty),safe(l.thc_amount),safe(l.seal_fee),safe(l.bl_fee),safe(l.bl_printed_fee),safe(l.ens_ams_fee),safe(l.other_charges),safe(l.remarks),safe(l.total_payable_amount),safe(filename)].join(',');
-        }
-
         switch (type) {
+          case 'Logistics Local Charges Report': {
+            const l = d.logistics_local_charges || {};
+            return [safe(l.bl_number||m.reference_number),safe(l.carrier_forwarder),safe(l.pss_invoice_number),safe(l.freight_term),safe(l.place_of_destination),safe(l.container_type),safe(l.container_qty),safe(l.thc_amount),safe(l.seal_fee),safe(l.bl_fee),safe(l.bl_printed_fee),safe(l.ens_ams_fee),safe(l.other_charges),safe(l.remarks),safe(l.total_payable_amount),safe(filename)].join(',');
+          }
           case 'Outward Permit Declaration': {
             const opd = d.outward_permit_declaration || {};
             return [safe(opd.bl_number),safe(opd.carrier),safe(opd.consignee),safe(opd.container_no),safe(opd.seal_no),safe(opd.container_type),safe(opd.final_destination_port),safe(opd.vessel_name),safe(opd.voyage),safe(opd.hs_code),safe(opd.description),safe(opd.net_weight_kgs),safe(opd.item_price),safe(opd.total_outer_pack),safe(opd.gross_weight),safe(filename)].join(',');

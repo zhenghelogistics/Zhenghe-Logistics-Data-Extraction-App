@@ -286,6 +286,7 @@ function App() {
         case 'Payment Voucher/GL': headers = ["PSS's Invoice #","Carrier/Forwarder Inv #","BL Number","Payable Amount","Total Payable Amount","Charges","Source File"]; break;
         case 'Bill of Lading': headers = ['BL Number','Shipper','Consignee','Notify Party','Vessel','Voyage','POL','POD','Source File']; break;
         case 'Commercial Invoice': headers = ['Invoice Number','Supplier','Buyer','Incoterms','Total Amount','Currency','Date','Source File']; break;
+        case 'Allied Report': headers = ['Container/Booking No','Repair','Detention','DHC In','Data Admin Fee (In)','DHE Out','DHC Out','Washing','DHE In','Source File']; break;
         default: headers = ['Document Type','Reference Number','Date','Entity','Total Amount','Source File'];
       }
 
@@ -313,6 +314,10 @@ function App() {
             return [safe(m.reference_number),safe(p.shipper_supplier),safe(p.consignee_buyer),safe(p.notify_party),safe(log.vessel_name),safe(log.voyage_number),safe(log.port_of_loading),safe(log.port_of_discharge),safe(filename)].join(',');
           case 'Commercial Invoice':
             return [safe(m.reference_number),safe(p.shipper_supplier),safe(p.consignee_buyer),safe(m.incoterms),safe(fin.total_amount),safe(m.currency),safe(m.date),safe(filename)].join(',');
+          case 'Allied Report': {
+            const ar = d.allied_report || {};
+            return [safe(ar.container_booking_no),safe(ar.repair),safe(ar.detention),safe(ar.dhc_in),safe(ar.data_admin_fee_in),safe(ar.dhe_out),safe(ar.dhc_out),safe(ar.washing),safe(ar.dhe_in),safe(filename)].join(',');
+          }
           default:
             return [safe(d.document_type),safe(m.reference_number),safe(m.date),safe(p.shipper_supplier),safe(fin.total_amount),safe(filename)].join(',');
         }

@@ -15,6 +15,7 @@ const TYPES_WITHOUT_METADATA_REF = new Set([
   'Transport Job',
   'Bill of Lading',
   'Outward Permit Declaration',
+  'Allied Report',
 ]);
 
 export const validateDocumentData = (dataList: DocumentData[]): string[] => {
@@ -66,6 +67,7 @@ CLASSIFICATION GUIDELINES:
 3. **"Outward Permit Declaration"**: Singapore Customs Outward Permit.
 4. **"Transport Job"**: Transport Job Sheet.
 5. **"Bill of Lading"**: ONLY a standalone Bill of Lading document itself — not an invoice that references one.
+6. **"Allied Report"**: An ALLIED Containers report listing container/booking numbers with associated charges (Repair, Detention, DHC In/Out, DHE In/Out, Washing, Data Admin Fee).
 
 **CRITICAL DUAL-ENTRY RULE**:
 - If you encounter a Tax Invoice or Freight Invoice:
@@ -159,6 +161,18 @@ EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
 - DESCRIPTION MATCH: Compare all four raw descriptions above. Do they all refer to the same item? Output "MATCH" or "MISMATCH - [which document differs]". Be strict.
 - COUNTRY OF ORIGIN: From PURCHASE ORDER item description field "Product Of Origin". Full country name in capitals e.g. "GERMANY".
 
+EXTRACTION RULES FOR "Allied Report" (Transport Team):
+- DOCUMENT STRUCTURE: An ALLIED Containers report lists multiple container/booking rows. Create ONE separate Allied Report entry for EACH row in the report.
+- CONTAINER/BOOKING NO: The container or booking number for this row (e.g. CAAU2548100, ONEU7673294).
+- REPAIR: Amount from the 'REPAIR' column for this row. Number only (e.g. "24.00"). Null if blank.
+- DETENTION: Amount from the 'DETENTION' column for this row (e.g. "2555.58"). Null if blank.
+- DHC IN: Amount from the 'DHC IN' column for this row (e.g. "70.00"). Null if blank.
+- DATA ADMIN FEE (IN): Amount from the 'DATA ADMIN FEE (IN)' column for this row (e.g. "5.00"). Null if blank.
+- DHE OUT: Amount from the 'DHE OUT' column for this row (e.g. "80.00"). Null if blank.
+- DHC OUT: Amount from the 'DHC OUT' column for this row (e.g. "60.00"). Null if blank.
+- WASHING: Amount from the 'WASHING' column for this row (e.g. "25.00"). Null if blank.
+- DHE IN: Amount from the 'DHE IN' column for this row (e.g. "4.00"). Null if blank.
+
 IMPORTANT:
 - If a value is not found, return null or empty string. Do NOT guess.
 - Convert all monetary values to SGD if possible.
@@ -167,7 +181,7 @@ Respond ONLY with valid JSON matching this exact structure:
 {
   "documents": [
     {
-      "document_type": "string (one of: Bill of Lading, Commercial Invoice, Packing List, Purchase Order, Payment Voucher/GL, Container Report, Logistics Local Charges Report, Outward Permit Declaration, Transport Job, Unknown)",
+      "document_type": "string (one of: Bill of Lading, Commercial Invoice, Packing List, Purchase Order, Payment Voucher/GL, Container Report, Logistics Local Charges Report, Outward Permit Declaration, Transport Job, Allied Report, Unknown)",
       "metadata": {
         "reference_number": "string",
         "related_reference_number": "string or null",
@@ -261,6 +275,17 @@ Respond ONLY with valid JSON matching this exact structure:
         "delivery_location": "string or null",
         "container_number": "string or null",
         "job_date": "string or null"
+      },
+      "allied_report": {
+        "container_booking_no": "string or null",
+        "repair": "string or null",
+        "detention": "string or null",
+        "dhc_in": "string or null",
+        "data_admin_fee_in": "string or null",
+        "dhe_out": "string or null",
+        "dhc_out": "string or null",
+        "washing": "string or null",
+        "dhe_in": "string or null"
       }
     }
   ]

@@ -29,7 +29,7 @@ export const AppConfig = {
       defaultTab: 'Logistics Local Charges Report'
     },
     transport: {
-      allowedTypes: ['All Files', 'Transport Job'],
+      allowedTypes: ['All Files', 'Transport Job', 'Allied Report'],
       defaultTab: 'Transport Job'
     }
   },
@@ -73,6 +73,9 @@ export const AppConfig = {
     },
     'Container Report': {
       columns: ['Container #', 'Type', 'Status', 'Charges', 'Washing Fees'],
+    },
+    'Allied Report': {
+      columns: ['Container/Booking No', 'Repair', 'Detention', 'DHC In', 'Data Admin Fee (In)', 'DHE Out', 'DHC Out', 'Washing', 'DHE In'],
     }
   }
 };

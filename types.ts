@@ -117,6 +117,18 @@ export interface TransportJob {
   job_date?: string | null;
 }
 
+export interface AlliedReport {
+  container_booking_no?: string | null;
+  repair?: string | null;
+  detention?: string | null;
+  dhc_in?: string | null;
+  data_admin_fee_in?: string | null;
+  dhe_out?: string | null;
+  dhc_out?: string | null;
+  washing?: string | null;
+  dhe_in?: string | null;
+}
+
 export interface DocumentData {
   document_type: string;
   metadata: DocumentMetadata;
@@ -127,6 +139,7 @@ export interface DocumentData {
   logistics_local_charges?: LogisticsLocalCharges;
   outward_permit_declaration?: OutwardPermitDeclaration;
   transport_job?: TransportJob;
+  allied_report?: AlliedReport;
 }
 
 // Wrapper for the API response which now returns a list

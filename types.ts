@@ -140,6 +140,19 @@ export interface CdacReport {
   dhc?: string | null;
 }
 
+export interface CdasReport {
+  container_number?: string | null;
+  dhc_in?: string | null;
+  dhc_out?: string | null;
+  dhe_in?: string | null;
+  dhe_out?: string | null;
+  data_admin_fee?: string | null;
+  washing?: string | null;
+  repair?: string | null;
+  detention?: string | null;
+  demurrage?: string | null;
+}
+
 export interface DocumentData {
   document_type: string;
   metadata: DocumentMetadata;
@@ -152,6 +165,7 @@ export interface DocumentData {
   transport_job?: TransportJob;
   allied_report?: AlliedReport;
   cdac_report?: CdacReport;
+  cdas_report?: CdasReport;
 }
 
 // Wrapper for the API response which now returns a list

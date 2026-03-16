@@ -17,6 +17,7 @@ const TYPES_WITHOUT_METADATA_REF = new Set([
   'Outward Permit Declaration',
   'Allied Report',
   'CDAC Report',
+  'CDAS Report',
 ]);
 
 export const validateDocumentData = (dataList: DocumentData[]): string[] => {
@@ -70,6 +71,7 @@ CLASSIFICATION GUIDELINES:
 5. **"Bill of Lading"**: ONLY a standalone Bill of Lading document itself — not an invoice that references one.
 6. **"Allied Report"**: An ALLIED Containers report listing container/booking numbers with associated charges (Repair, Detention, DHC In/Out, DHE In/Out, Washing, Data Admin Fee).
 7. **"CDAC Report"**: A CDAC (Container Depot) report listing container numbers with charges extracted from a "Depot Remark" column (Repair/Damage, Detention, Demurage, Admin Fee, Washing, DHC).
+8. **"CDAS Report"**: A "TRANSPORTER DAILY TRANSACTION REPORT" — has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each row = one container transaction. Charges are in the "Depot Remark" column as semicolon-separated pairs.
 
 **CRITICAL DUAL-ENTRY RULE**:
 - If you encounter a Tax Invoice or Freight Invoice:
@@ -187,6 +189,22 @@ EXTRACTION RULES FOR "Allied Report" (Transport Team):
 - DETENTION: The amount from any row where Customer Type is "DETENTION" for this container. Null if not present.
 - WASHING: The amount from any row where Customer Type is "WASHING" for this container. Null if not present.
 - DEMURRAGE: The amount from any row where Customer Type is "DEMURRAGE" for this container. Null if not present.
+
+EXTRACTION RULES FOR "CDAS Report" (Transport Team):
+- DOCUMENT STRUCTURE: This is a "TRANSPORTER DAILY TRANSACTION REPORT". It has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each section has a transaction table.
+- ONE ENTRY PER ROW: Each row in a section table = ONE container. Create ONE CDAS Report entry per row across ALL sections.
+- CONTAINER NUMBER: From the "Container Number" column.
+- DEPOT REMARK PARSING: The "Depot Remark" column contains semicolon-separated charge pairs like "CHARGE NAME; $AMOUNT". Parse each pair to fill the correct field:
+  - "DHC IN" or "DHC" or "DEPOT HANDLING CHARGE" (no OUT) → dhc_in
+  - "DHC OUT" → dhc_out
+  - "DHE IN" or "DHE" (no OUT) → dhe_in
+  - "DHE OUT" → dhe_out
+  - "ADMIN FEE" or "DOC FEE" → data_admin_fee (if both present in same row, use the larger amount)
+  - "DETENTION" → detention
+  - "REPAIR" or "DAMAGE" → repair
+  - "WASHING" or "FB WATER WASHING" or "WATER WASHING" → washing
+  - "DEMURRAGE" → demurrage
+- Strip the "$" symbol and return numeric strings only (e.g. "75.00" not "$75.00").
 
 IMPORTANT:
 - If a value is not found, return null or empty string. Do NOT guess.
@@ -311,6 +329,18 @@ Respond ONLY with valid JSON matching this exact structure:
         "admin_fees": "string or null",
         "washing": "string or null",
         "dhc": "string or null"
+      },
+      "cdas_report": {
+        "container_number": "string or null",
+        "dhc_in": "string or null",
+        "dhc_out": "string or null",
+        "dhe_in": "string or null",
+        "dhe_out": "string or null",
+        "data_admin_fee": "string or null",
+        "washing": "string or null",
+        "repair": "string or null",
+        "detention": "string or null",
+        "demurrage": "string or null"
       }
     }
   ]
@@ -371,10 +401,12 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
       const key = `OPD_${containerNo}`;
       if (!uniqueDocs.has(key)) uniqueDocs.set(key, doc);
     } else if (doc.document_type === 'Allied Report') {
-      // Allied Reports are deduplicated exclusively by deduplicateByContainer (by container_booking_no).
+      // Allied/CDAS Reports are deduplicated exclusively by deduplicateByContainer.
       // Using metadata.reference_number here would collapse all containers sharing the same invoice
       // number into one entry, so we let them pass through with unique keys.
       uniqueDocs.set(`ALLIED_${Math.random()}`, doc);
+    } else if (doc.document_type === 'CDAS Report') {
+      uniqueDocs.set(`CDAS_${Math.random()}`, doc);
     } else {
       let key = "";
       if (doc.payment_voucher_details?.pss_invoice_number) {
@@ -424,34 +456,44 @@ const splitPdfIntoChunks = async (file: File, chunkSize = 10): Promise<{ base64:
 // The AI sometimes creates one entry per table row even when the same container
 // appears in multiple sections (e.g. IN section + OUT section). This function
 // consolidates them deterministically — first non-null value wins per field.
+const mergeChargeFields = (dest: any, src: any) => {
+  dest.dhc_in         = dest.dhc_in         ?? src.dhc_in;
+  dest.dhc_out        = dest.dhc_out        ?? src.dhc_out;
+  dest.dhe_in         = dest.dhe_in         ?? src.dhe_in;
+  dest.dhe_out        = dest.dhe_out        ?? src.dhe_out;
+  dest.data_admin_fee = dest.data_admin_fee ?? src.data_admin_fee;
+  dest.washing        = dest.washing        ?? src.washing;
+  dest.repair         = dest.repair         ?? src.repair;
+  dest.detention      = dest.detention      ?? src.detention;
+  dest.demurrage      = dest.demurrage      ?? src.demurrage;
+};
+
 const deduplicateByContainer = (docs: DocumentData[]): DocumentData[] => {
   const alliedDocs = docs.filter(d => d.document_type === 'Allied Report');
-  const otherDocs = docs.filter(d => d.document_type !== 'Allied Report');
+  const cdasDocs   = docs.filter(d => d.document_type === 'CDAS Report');
+  const otherDocs  = docs.filter(d => d.document_type !== 'Allied Report' && d.document_type !== 'CDAS Report');
 
-  if (alliedDocs.length === 0) return docs;
-
-  const mergedMap = new Map<string, DocumentData>();
+  const alliedMap = new Map<string, DocumentData>();
   for (const doc of alliedDocs) {
     const key = doc.allied_report?.container_booking_no?.trim().toUpperCase() || `__unknown_${Math.random()}`;
-    if (!mergedMap.has(key)) {
-      mergedMap.set(key, { ...doc, allied_report: { ...doc.allied_report } });
+    if (!alliedMap.has(key)) {
+      alliedMap.set(key, { ...doc, allied_report: { ...doc.allied_report } });
     } else {
-      const existing = mergedMap.get(key)!;
-      const src = doc.allied_report || {};
-      const dest = existing.allied_report!;
-      dest.dhc_in          = dest.dhc_in          ?? src.dhc_in;
-      dest.dhc_out         = dest.dhc_out         ?? src.dhc_out;
-      dest.dhe_in          = dest.dhe_in          ?? src.dhe_in;
-      dest.dhe_out         = dest.dhe_out         ?? src.dhe_out;
-      dest.data_admin_fee  = dest.data_admin_fee  ?? src.data_admin_fee;
-      dest.washing         = dest.washing         ?? src.washing;
-      dest.repair          = dest.repair          ?? src.repair;
-      dest.detention       = dest.detention       ?? src.detention;
-      dest.demurrage       = dest.demurrage       ?? src.demurrage;
+      mergeChargeFields(alliedMap.get(key)!.allied_report!, doc.allied_report || {});
     }
   }
 
-  return [...otherDocs, ...mergedMap.values()];
+  const cdasMap = new Map<string, DocumentData>();
+  for (const doc of cdasDocs) {
+    const key = doc.cdas_report?.container_number?.trim().toUpperCase() || `__unknown_${Math.random()}`;
+    if (!cdasMap.has(key)) {
+      cdasMap.set(key, { ...doc, cdas_report: { ...doc.cdas_report } });
+    } else {
+      mergeChargeFields(cdasMap.get(key)!.cdas_report!, doc.cdas_report || {});
+    }
+  }
+
+  return [...otherDocs, ...alliedMap.values(), ...cdasMap.values()];
 };
 
 const extractFromChunk = async (

@@ -290,6 +290,7 @@ function App() {
         case 'Commercial Invoice': headers = ['Invoice Number','Supplier','Buyer','Incoterms','Total Amount','Currency','Date','Source File']; break;
         case 'Allied Report': headers = ['Container/Booking No','DHC In','DHC Out','DHE In','DHE Out','Data Admin Fee','Washing','Repair','Detention','Demurrage','Source File']; break;
         case 'CDAC Report': headers = ['Container Number','Repair','Detention','Demurage','Admin Fees','Washing','DHC','Source File']; break;
+        case 'CDAS Report': headers = ['Container Number','DHC In','DHC Out','DHE In','DHE Out','Data Admin Fee','Washing','Repair','Detention','Demurrage','Source File']; break;
         default: headers = ['Document Type','Reference Number','Date','Entity','Total Amount','Source File'];
       }
 
@@ -324,6 +325,10 @@ function App() {
           case 'CDAC Report': {
             const cr = d.cdac_report || {};
             return [safe(cr.container_number),safe(cr.repair),safe(cr.detention),safe(cr.demurage),safe(cr.admin_fees),safe(cr.washing),safe(cr.dhc),safe(filename)].join(',');
+          }
+          case 'CDAS Report': {
+            const cs = d.cdas_report || {};
+            return [safe(cs.container_number),safe(cs.dhc_in),safe(cs.dhc_out),safe(cs.dhe_in),safe(cs.dhe_out),safe(cs.data_admin_fee),safe(cs.washing),safe(cs.repair),safe(cs.detention),safe(cs.demurrage),safe(filename)].join(',');
           }
           default:
             return [safe(d.document_type),safe(m.reference_number),safe(m.date),safe(p.shipper_supplier),safe(fin.total_amount),safe(filename)].join(',');

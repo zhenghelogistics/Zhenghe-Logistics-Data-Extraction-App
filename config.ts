@@ -79,6 +79,9 @@ export const AppConfig = {
     },
     'CDAC Report': {
       columns: ['Container Number', 'Repair', 'Detention', 'Demurage', 'Admin Fees', 'Washing', 'DHC'],
+    },
+    'CDAS Report': {
+      columns: ['Container Number', 'DHC In', 'DHC Out', 'DHE In', 'DHE Out', 'Data Admin Fee', 'Washing', 'Repair', 'Detention', 'Demurrage'],
     }
   }
 };

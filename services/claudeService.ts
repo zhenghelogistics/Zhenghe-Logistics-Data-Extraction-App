@@ -1,5 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import Anthropic from "@anthropic-ai/sdk";
+import { jsonrepair } from "jsonrepair";
 import { DocumentData, ExtractionResponse } from "../types";
 import { AppConfig } from "../config";
 
@@ -579,8 +580,8 @@ const extractFromChunk = async (
     try {
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
-        max_tokens: 16000,
-        system: systemPrompt,
+        max_tokens: 12000,
+        system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         messages: [
           {
             role: "user",
@@ -600,7 +601,7 @@ const extractFromChunk = async (
       const text = response.content[0].type === "text" ? response.content[0].text : "";
       if (!text) throw new Error("No data returned from Claude");
       const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-      const result = JSON.parse(clean) as ExtractionResponse;
+      const result = JSON.parse(jsonrepair(clean)) as ExtractionResponse;
       const docs = result.documents || [];
       return deduplicateByContainer(docs);
     } catch (error: any) {

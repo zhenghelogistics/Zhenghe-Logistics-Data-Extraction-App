@@ -152,14 +152,13 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
 
       // Allied Report
       case 'Container/Booking No': return data.allied_report?.container_booking_no || '-';
+      case 'DHC': return data.allied_report?.dhc || '-';
+      case 'DHE': return data.allied_report?.dhe || '-';
+      case 'Data Admin Fee': return data.allied_report?.data_admin_fee || '-';
       case 'Repair': return data.allied_report?.repair || data.cdac_report?.repair || '-';
       case 'Detention': return data.allied_report?.detention || data.cdac_report?.detention || '-';
-      case 'DHC In': return data.allied_report?.dhc_in || '-';
-      case 'Data Admin Fee (In)': return data.allied_report?.data_admin_fee_in || '-';
-      case 'DHE Out': return data.allied_report?.dhe_out || '-';
-      case 'DHC Out': return data.allied_report?.dhc_out || '-';
+      case 'Demurrage': return data.allied_report?.demurrage || '-';
       case 'Washing': return data.allied_report?.washing || data.cdac_report?.washing || '-';
-      case 'DHE In': return data.allied_report?.dhe_in || '-';
 
       // CDAC Report
       case 'Container Number': return data.cdac_report?.container_number || '-';

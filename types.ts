@@ -119,14 +119,13 @@ export interface TransportJob {
 
 export interface AlliedReport {
   container_booking_no?: string | null;
+  dhc?: string | null;
+  dhe?: string | null;
+  data_admin_fee?: string | null;
+  washing?: string | null;
   repair?: string | null;
   detention?: string | null;
-  dhc_in?: string | null;
-  data_admin_fee_in?: string | null;
-  dhe_out?: string | null;
-  dhc_out?: string | null;
-  washing?: string | null;
-  dhe_in?: string | null;
+  demurrage?: string | null;
 }
 
 export interface CdacReport {

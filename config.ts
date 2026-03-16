@@ -29,7 +29,7 @@ export const AppConfig = {
       defaultTab: 'Logistics Local Charges Report'
     },
     transport: {
-      allowedTypes: ['All Files', 'Transport Job', 'Allied Report', 'CDAC Report'],
+      allowedTypes: ['All Files', 'Transport Job', 'Allied Report', 'CDAC Report', 'CDAS Report'],
       defaultTab: 'Transport Job'
     }
   },

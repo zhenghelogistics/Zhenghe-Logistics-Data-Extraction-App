@@ -412,6 +412,39 @@ const splitPdfIntoChunks = async (file: File, chunkSize = 10): Promise<{ base64:
   return chunks;
 };
 
+// Merges Allied Report and CDAC Report duplicate entries by container number.
+// The AI sometimes creates one entry per table row even when the same container
+// appears in multiple sections (e.g. IN section + OUT section). This function
+// consolidates them deterministically — first non-null value wins per field.
+const deduplicateByContainer = (docs: DocumentData[]): DocumentData[] => {
+  const alliedDocs = docs.filter(d => d.document_type === 'Allied Report');
+  const otherDocs = docs.filter(d => d.document_type !== 'Allied Report');
+
+  if (alliedDocs.length === 0) return docs;
+
+  const mergedMap = new Map<string, DocumentData>();
+  for (const doc of alliedDocs) {
+    const key = doc.allied_report?.container_booking_no?.trim().toUpperCase() || `__unknown_${Math.random()}`;
+    if (!mergedMap.has(key)) {
+      mergedMap.set(key, { ...doc, allied_report: { ...doc.allied_report } });
+    } else {
+      const existing = mergedMap.get(key)!;
+      const src = doc.allied_report || {};
+      const dest = existing.allied_report!;
+      dest.repair              = dest.repair              ?? src.repair;
+      dest.detention           = dest.detention           ?? src.detention;
+      dest.dhc_in              = dest.dhc_in              ?? src.dhc_in;
+      dest.data_admin_fee_in   = dest.data_admin_fee_in   ?? src.data_admin_fee_in;
+      dest.dhe_out             = dest.dhe_out             ?? src.dhe_out;
+      dest.dhc_out             = dest.dhc_out             ?? src.dhc_out;
+      dest.washing             = dest.washing             ?? src.washing;
+      dest.dhe_in              = dest.dhe_in              ?? src.dhe_in;
+    }
+  }
+
+  return [...otherDocs, ...mergedMap.values()];
+};
+
 const extractFromChunk = async (
   base64: string,
   systemPrompt: string
@@ -447,7 +480,8 @@ const extractFromChunk = async (
       if (!text) throw new Error("No data returned from Claude");
       const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
       const result = JSON.parse(clean) as ExtractionResponse;
-      return result.documents || [];
+      const docs = result.documents || [];
+      return deduplicateByContainer(docs);
     } catch (error: any) {
       if (attempt === maxRetries) throw error;
       await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt - 1)));

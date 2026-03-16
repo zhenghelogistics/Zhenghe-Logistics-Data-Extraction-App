@@ -580,7 +580,7 @@ const extractFromChunk = async (
     try {
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
-        max_tokens: 12000,
+        max_tokens: 16000,
         system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         messages: [
           {
@@ -601,8 +601,42 @@ const extractFromChunk = async (
       const text = response.content[0].type === "text" ? response.content[0].text : "";
       if (!text) throw new Error("No data returned from Claude");
       const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-      const result = JSON.parse(jsonrepair(clean)) as ExtractionResponse;
-      const docs = result.documents || [];
+      let docs: DocumentData[] = [];
+      try {
+        const result = JSON.parse(jsonrepair(clean)) as ExtractionResponse;
+        docs = result.documents || [];
+      } catch {
+        // jsonrepair failed — likely a hard truncation mid-token.
+        // Extract every completed document object that appears before the cutoff.
+        const matches = clean.matchAll(/"document_type"\s*:\s*"([^"]+)"/g);
+        const partialDocs: DocumentData[] = [];
+        for (const match of matches) {
+          // Find the start of the enclosing object for this document_type key
+          const keyPos = match.index ?? 0;
+          let depth = 0, start = keyPos;
+          while (start > 0) {
+            start--;
+            if (clean[start] === '}') depth++;
+            else if (clean[start] === '{') {
+              if (depth === 0) break;
+              depth--;
+            }
+          }
+          // Try to parse from that opening brace to the next complete closing brace
+          let end = keyPos, d = 0;
+          for (let i = start; i < clean.length; i++) {
+            if (clean[i] === '{') d++;
+            else if (clean[i] === '}') { d--; if (d === 0) { end = i; break; } }
+          }
+          if (end > start) {
+            try {
+              const obj = JSON.parse(jsonrepair(clean.slice(start, end + 1)));
+              if (obj.document_type) partialDocs.push(obj as DocumentData);
+            } catch { /* skip unparseable fragment */ }
+          }
+        }
+        docs = partialDocs;
+      }
       return deduplicateByContainer(docs);
     } catch (error: any) {
       if (attempt === maxRetries) throw error;

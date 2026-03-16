@@ -122,14 +122,20 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case "PSS's Invoice #": return data.payment_voucher_details?.pss_invoice_number || '-';
       case "Carrier/Forwarder Inv #": return data.payment_voucher_details?.carrier_invoice_number || data.metadata?.reference_number || '-';
       case "BL Number": return data.payment_voucher_details?.bl_number || data.metadata?.related_reference_number || data.metadata?.reference_number || '-';
-      case "Payable Amount": return data.payment_voucher_details?.payable_amount || (data.financials?.total_amount ? `${data.financials.total_amount.toLocaleString()} ${data.metadata?.currency || ''}` : '-');
-      case "Total Payable Amount": return data.payment_voucher_details?.total_payable_amount || '-';
+      case "Payable Amount": {
+        const raw = data.payment_voucher_details?.payable_amount || (data.financials?.total_amount ? `${data.financials.total_amount.toLocaleString()} ${data.metadata?.currency || ''}` : '-');
+        return typeof raw === 'string' ? raw.replace(/SGD\s*/gi, '').trim() || '-' : raw;
+      }
+      case "Total Payable Amount": {
+        const raw = data.payment_voucher_details?.total_payable_amount || '-';
+        return typeof raw === 'string' ? raw.replace(/SGD\s*/gi, '').trim() || '-' : raw;
+      }
       case "Charges": return data.payment_voucher_details?.charges_summary || data.financials?.line_item_charges?.map(c => `${c.description}: ${c.amount}`).join('; ') || '-';
       
       // Outward Permit Declaration
       case 'BL number': return data.outward_permit_declaration?.bl_number || '-';
       case 'Carrier': return data.outward_permit_declaration?.carrier || '-';
-      case 'Consignee': return data.outward_permit_declaration?.consignee || '-';
+      case 'Consignee': return data.outward_permit_declaration?.consignee || data.metadata?.parties?.consignee_buyer || '-';
       case 'Container No': return data.outward_permit_declaration?.container_no || '-';
       case 'Seal No': return data.outward_permit_declaration?.seal_no || '-';
       case 'Ctnr Type': return data.outward_permit_declaration?.container_type || '-';
@@ -138,7 +144,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case 'Voyage': return data.outward_permit_declaration?.voyage || '-';
       case 'HS code': return data.outward_permit_declaration?.hs_code || '-';
       case 'Description': return data.outward_permit_declaration?.description || '-';
-      case 'Net Weight': return data.outward_permit_declaration?.net_weight_kgs || '-';
+      case 'Net Weight': return data.outward_permit_declaration?.net_weight_kgs || `${data.cargo_details?.total_net_weight || ''} ${data.cargo_details?.weight_unit || ''}`.trim() || '-';
       case 'Value Amount': return data.outward_permit_declaration?.item_price_amount || '-';
       case 'Value Currency': return data.outward_permit_declaration?.item_price_currency || '-';
       case 'Total Outer Pack Qty': return data.outward_permit_declaration?.total_outer_pack_qty || '-';
@@ -174,7 +180,6 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       // Bill of Lading Specifics
       // BL Number is already handled above in Payment Voucher section
       case 'Shipper': return data.metadata?.parties?.shipper_supplier || '-';
-      case 'Consignee': return data.metadata?.parties?.consignee_buyer || '-';
       case 'Vessel/Voyage': return `${data.logistics_details?.vessel_name || ''} ${data.logistics_details?.voyage_number || ''}`.trim() || '-';
       case 'POL': return data.logistics_details?.port_of_loading || data.outward_permit_declaration?.port_of_loading || '-';
       case 'POD': return data.logistics_details?.port_of_discharge || data.outward_permit_declaration?.port_of_discharge || '-';
@@ -207,7 +212,6 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case 'Seller': return data.metadata?.parties?.shipper_supplier || '-';
       case 'Total Packages': return data.cargo_details?.total_packages || '-';
       case 'Gross Weight': return `${data.cargo_details?.total_gross_weight || ''} ${data.cargo_details?.weight_unit || ''}`;
-      case 'Net Weight': return `${data.cargo_details?.total_net_weight || ''} ${data.cargo_details?.weight_unit || ''}`;
       case 'Marks': return data.logistics_details?.marks_and_numbers || '-';
 
       // PO

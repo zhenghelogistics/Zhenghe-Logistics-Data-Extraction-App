@@ -155,9 +155,12 @@ EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
   * Otherwise: Extract the HS code directly from the document as provided. Numbers only (e.g. 84137000).
 - DESCRIPTION (formatted): From INVOICE item description. Format as: [QTY as whole integer] [UOM] [ITEM DESCRIPTION]. Remove all decimals from quantity (e.g. 1.000 → 1). Example: "1 UNIT CENTRIFUGAL PUMP TYPE: WI+35/35 IN/OUTLET: SMS 76/51 MM". If descriptions across INVOICE, PACKING LIST, BL, and PO do not match, leave this blank.
 - NET WEIGHT: Nett Weight Grand Total from PACKING LIST column "Nett Weight (kgs)". Number only, no units.
-- VALUE: Total Amount / Extended Price from INVOICE. Include currency symbol. e.g. "1500.00 USD".
-- TOTAL OUTER PACK: Quantity Grand Total from SI or PACKING LIST. Number and unit (e.g. "250 CTNS").
-- GROSS WEIGHT: Weight Grand Total (gross) from SI or PACKING LIST. Number and unit (e.g. "3500.00 KGS").
+- VALUE AMOUNT ('item_price_amount'): Total Amount / Extended Price from INVOICE. Number only, no currency. e.g. "1500.00".
+- VALUE CURRENCY ('item_price_currency'): Currency code from INVOICE value. e.g. "USD".
+- TOTAL OUTER PACK QTY ('total_outer_pack_qty'): Quantity Grand Total from SI or PACKING LIST. Number only. e.g. "250".
+- TOTAL OUTER PACK UNIT ('total_outer_pack_unit'): Unit type from SI or PACKING LIST. e.g. "CTNS".
+- GROSS WEIGHT AMOUNT ('gross_weight_amount'): Weight Grand Total (gross) from SI or PACKING LIST. Number only. e.g. "3500.00".
+- GROSS WEIGHT UNIT ('gross_weight_unit'): Unit from SI or PACKING LIST. e.g. "KGS".
 - INVOICE DESCRIPTION (raw): Copy the item description exactly as written in the INVOICE. No formatting.
 - PACKING LIST DESCRIPTION (raw): Copy the item description exactly as written in the PACKING LIST. No formatting.
 - BL DESCRIPTION (raw): Copy the item description exactly as written in the BILL OF LADING. No formatting.
@@ -291,9 +294,12 @@ Respond ONLY with valid JSON matching this exact structure:
         "hs_code": "string or null",
         "description": "string or null",
         "net_weight_kgs": "string or null",
-        "item_price": "string or null",
-        "total_outer_pack": "string or null",
-        "gross_weight": "string or null",
+        "item_price_amount": "string or null",
+        "item_price_currency": "string or null",
+        "total_outer_pack_qty": "string or null",
+        "total_outer_pack_unit": "string or null",
+        "gross_weight_amount": "string or null",
+        "gross_weight_unit": "string or null",
         "invoice_description": "string or null",
         "packing_list_description": "string or null",
         "bl_description": "string or null",

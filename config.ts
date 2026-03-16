@@ -56,7 +56,7 @@ export const AppConfig = {
       columns: [
         'BL number', 'Carrier', 'Consignee', 'Container No', 'Seal No', 'Ctnr Type',
         'Final Destination (Port Code)', 'Vessel Name', 'Voyage',
-        'HS code', 'Description', 'Net Weight', 'Value', 'Total Outer Pack', 'Gross weight'
+        'HS code', 'Description', 'Net Weight', 'Value Amount', 'Value Currency', 'Total Outer Pack Qty', 'Total Outer Pack Unit', 'Gross Weight Amount', 'Gross Weight Unit'
       ]
     },
     'Transport Job': {

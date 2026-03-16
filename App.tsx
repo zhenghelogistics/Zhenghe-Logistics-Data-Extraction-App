@@ -284,7 +284,7 @@ function App() {
       let headers: string[] = [];
       switch (type) {
         case 'Logistics Local Charges Report': headers = ['A. BL NUMBER','B. CARRIER / FORWARDER','C. PSS INVOICE NUMBER','D. FREIGHT TERM','E. PLACE OF DESTINATION','F. CNTR TYPE','G. CONTAINER QTY','H. (SGD) THC','I. (SGD) SEAL FEE','J. (SGD) BL FEE','K. (SGD) BL PRINTED FEE','L. (SGD) ENS / AMS / SCMC','M. (SGD) OTHERS CHARGES','N. REMARKS','O. TOTAL AMOUNT','Source File']; break;
-        case 'Outward Permit Declaration': headers = ['BL Number','Carrier','Consignee','Container No','Seal No','Ctnr Type','Final Destination','Vessel Name','Voyage','HS Code','Description','Net Weight','Value','Total Outer Pack','Gross Weight','Source File']; break;
+        case 'Outward Permit Declaration': headers = ['BL Number','Carrier','Consignee','Container No','Seal No','Ctnr Type','Final Destination','Vessel Name','Voyage','HS Code','Description','Net Weight','Value Amount','Value Currency','Total Outer Pack Qty','Total Outer Pack Unit','Gross Weight Amount','Gross Weight Unit','Source File']; break;
         case 'Payment Voucher/GL': headers = ["PSS's Invoice #","Carrier/Forwarder Inv #","BL Number","Payable Amount","Total Payable Amount","Charges","Source File"]; break;
         case 'Bill of Lading': headers = ['BL Number','Shipper','Consignee','Notify Party','Vessel','Voyage','POL','POD','Source File']; break;
         case 'Commercial Invoice': headers = ['Invoice Number','Supplier','Buyer','Incoterms','Total Amount','Currency','Date','Source File']; break;
@@ -307,7 +307,7 @@ function App() {
           }
           case 'Outward Permit Declaration': {
             const opd = d.outward_permit_declaration || {};
-            return [safe(opd.bl_number),safe(opd.carrier),safe(opd.consignee),safe(opd.container_no),safe(opd.seal_no),safe(opd.container_type),safe(opd.final_destination_port),safe(opd.vessel_name),safe(opd.voyage),safe(opd.hs_code),safe(opd.description),safe(opd.net_weight_kgs),safe(opd.item_price),safe(opd.total_outer_pack),safe(opd.gross_weight),safe(filename)].join(',');
+            return [safe(opd.bl_number),safe(opd.carrier),safe(opd.consignee),safe(opd.container_no),safe(opd.seal_no),safe(opd.container_type),safe(opd.final_destination_port),safe(opd.vessel_name),safe(opd.voyage),safe(opd.hs_code),safe(opd.description),safe(opd.net_weight_kgs),safe(opd.item_price_amount),safe(opd.item_price_currency),safe(opd.total_outer_pack_qty),safe(opd.total_outer_pack_unit),safe(opd.gross_weight_amount),safe(opd.gross_weight_unit),safe(filename)].join(',');
           }
           case 'Payment Voucher/GL': {
             const pv = d.payment_voucher_details || {};

@@ -139,9 +139,12 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case 'HS code': return data.outward_permit_declaration?.hs_code || '-';
       case 'Description': return data.outward_permit_declaration?.description || '-';
       case 'Net Weight': return data.outward_permit_declaration?.net_weight_kgs || '-';
-      case 'Value': return data.outward_permit_declaration?.item_price || '-';
-      case 'Total Outer Pack': return data.outward_permit_declaration?.total_outer_pack || '-';
-      case 'Gross weight': return data.outward_permit_declaration?.gross_weight || '-';
+      case 'Value Amount': return data.outward_permit_declaration?.item_price_amount || '-';
+      case 'Value Currency': return data.outward_permit_declaration?.item_price_currency || '-';
+      case 'Total Outer Pack Qty': return data.outward_permit_declaration?.total_outer_pack_qty || '-';
+      case 'Total Outer Pack Unit': return data.outward_permit_declaration?.total_outer_pack_unit || '-';
+      case 'Gross Weight Amount': return data.outward_permit_declaration?.gross_weight_amount || '-';
+      case 'Gross Weight Unit': return data.outward_permit_declaration?.gross_weight_unit || '-';
 
       // Transport Job
       case 'Job Number': return data.transport_job?.job_number || '-';

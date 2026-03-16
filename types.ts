@@ -96,9 +96,12 @@ export interface OutwardPermitDeclaration {
   hs_code?: string | null;
   description?: string | null;
   net_weight_kgs?: string | null;
-  item_price?: string | null;
-  total_outer_pack?: string | null;
-  gross_weight?: string | null;
+  item_price_amount?: string | null;
+  item_price_currency?: string | null;
+  total_outer_pack_qty?: string | null;
+  total_outer_pack_unit?: string | null;
+  gross_weight_amount?: string | null;
+  gross_weight_unit?: string | null;
   // Description cross-check fields
   invoice_description?: string | null;
   packing_list_description?: string | null;

@@ -366,6 +366,11 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
       if (!isValidContainer) return;
       const key = `OPD_${containerNo}`;
       if (!uniqueDocs.has(key)) uniqueDocs.set(key, doc);
+    } else if (doc.document_type === 'Allied Report') {
+      // Allied Reports are deduplicated exclusively by deduplicateByContainer (by container_booking_no).
+      // Using metadata.reference_number here would collapse all containers sharing the same invoice
+      // number into one entry, so we let them pass through with unique keys.
+      uniqueDocs.set(`ALLIED_${Math.random()}`, doc);
     } else {
       let key = "";
       if (doc.payment_voucher_details?.pss_invoice_number) {

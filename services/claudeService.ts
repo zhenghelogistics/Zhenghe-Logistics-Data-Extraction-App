@@ -492,21 +492,32 @@ const extractFromChunk = async (
 
 export const extractDocumentData = async (
   file: File,
-  customInstructions: string[] = []
+  customInstructions: string[] = [],
+  onProgress?: (stage: string) => void
 ): Promise<DocumentData[]> => {
   const systemPrompt = buildSystemPrompt(customInstructions);
+
+  onProgress?.('Reading PDF...');
   const chunks = await splitPdfIntoChunks(file, 20);
 
-  // Process chunks one at a time with a delay to avoid rate limits
   const allDocs: DocumentData[] = [];
   for (let i = 0; i < chunks.length; i++) {
+    onProgress?.(chunks.length > 1
+      ? `Sending to Claude (${i + 1} of ${chunks.length} pages)...`
+      : 'Sending to Claude...'
+    );
     const result = await extractFromChunk(chunks[i].base64, systemPrompt);
     allDocs.push(...result);
-    // Wait 30 seconds between chunks to stay within the 30k tokens/min rate limit
+
     if (i < chunks.length - 1) {
-      await new Promise(r => setTimeout(r, 30000));
+      // Count down the 30s rate limit wait so users know it's not stuck
+      for (let s = 30; s > 0; s--) {
+        onProgress?.(`Rate limit — waiting ${s}s before next page...`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
     }
   }
 
+  onProgress?.('Processing results...');
   return deduplicateDocuments(allDocs);
 };

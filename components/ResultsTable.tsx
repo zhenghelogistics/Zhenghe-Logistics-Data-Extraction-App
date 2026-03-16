@@ -390,7 +390,9 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                    {file.status === FileStatus.PROCESSING ? 'Processing...' : file.status === FileStatus.PENDING ? 'Pending' : 'Error'}
                  </td>
                  <td colSpan={dynamicHeaders.length - 4} className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-400">
-                   {file.status === FileStatus.ERROR ? <span className="text-red-500">{file.errorMessage || 'Unknown Error'}</span> : 'Analysis in progress'}
+                   {file.status === FileStatus.ERROR
+                     ? <span className="text-red-500">{file.errorMessage || 'Unknown Error'}</span>
+                     : <span className="inline-flex items-center gap-1.5"><Loader2 size={11} className="animate-spin shrink-0" />{file.stage || 'Analysis in progress'}</span>}
                  </td>
                  <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{file.file.name}</td>
                  <td className="whitespace-nowrap px-3 py-3.5 text-sm">

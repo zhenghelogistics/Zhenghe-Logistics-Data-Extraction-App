@@ -166,6 +166,7 @@ export interface ProcessedFile {
   errorMessage?: string;
   validationErrors?: string[];
   uploadedAt?: string; // ISO string from Supabase created_at
+  stage?: string; // Current extraction stage shown during processing
 }
 
 export enum FileStatus {

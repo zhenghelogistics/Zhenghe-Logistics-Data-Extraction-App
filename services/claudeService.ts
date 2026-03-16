@@ -174,16 +174,17 @@ EXTRACTION RULES FOR "CDAC Report" (Transport Team):
 - DHC: Look for "DHC IN", "DHC OUT", or "DEPOT HANDLING CHARGE" in the Depot Remark. Extract the dollar amount (e.g. "DHC IN; $75.00" → "$75.00", "DEPOT HANDLING CHARGE; $78.00" → "$78.00"). Null if not present.
 
 EXTRACTION RULES FOR "Allied Report" (Transport Team):
-- DOCUMENT STRUCTURE: An ALLIED Containers report lists multiple container/booking rows. Create ONE separate Allied Report entry for EACH row in the report.
-- CONTAINER/BOOKING NO: The container or booking number for this row (e.g. CAAU2548100, ONEU7673294).
-- REPAIR: Amount from the 'REPAIR' column for this row. Number only (e.g. "24.00"). Null if blank.
-- DETENTION: Amount from the 'DETENTION' column for this row (e.g. "2555.58"). Null if blank.
-- DHC IN: Amount from the 'DHC IN' column for this row (e.g. "70.00"). Null if blank.
-- DATA ADMIN FEE (IN): Amount from the 'DATA ADMIN FEE (IN)' column for this row (e.g. "5.00"). Null if blank.
-- DHE OUT: Amount from the 'DHE OUT' column for this row (e.g. "80.00"). Null if blank.
-- DHC OUT: Amount from the 'DHC OUT' column for this row (e.g. "60.00"). Null if blank.
-- WASHING: Amount from the 'WASHING' column for this row (e.g. "25.00"). Null if blank.
-- DHE IN: Amount from the 'DHE IN' column for this row (e.g. "4.00"). Null if blank.
+- DOCUMENT STRUCTURE: An ALLIED Containers report may have multiple sections (e.g. an IN section and an OUT section). The SAME container number may appear in multiple sections with different charge columns. You MUST consolidate all charges for the same container into ONE single entry. Create ONE Allied Report entry per unique container/booking number — never duplicate a container number.
+- CONSOLIDATION RULE: If container CMAU7642286 appears in an IN section (with DHC In, DHE In, Data Admin Fee) AND again in an OUT section (with DHC Out, DHE Out), merge them into a single entry with all fields populated.
+- CONTAINER/BOOKING NO: The container or booking number (e.g. CAAU2548100, ONEU7673294).
+- REPAIR: Amount from the 'REPAIR' column. Number only (e.g. "24.00"). Null if blank across all sections.
+- DETENTION: Amount from the 'DETENTION' column (e.g. "2555.58"). Null if blank across all sections.
+- DHC IN: Amount from the 'DHC IN' column (e.g. "70.00"). Null if blank across all sections.
+- DATA ADMIN FEE (IN): Amount from the 'DATA ADMIN FEE (IN)' column (e.g. "5.00"). Null if blank across all sections.
+- DHE OUT: Amount from the 'DHE OUT' column (e.g. "80.00"). Null if blank across all sections.
+- DHC OUT: Amount from the 'DHC OUT' column (e.g. "60.00"). Null if blank across all sections.
+- WASHING: Amount from the 'WASHING' column (e.g. "25.00"). Null if blank across all sections.
+- DHE IN: Amount from the 'DHE IN' column (e.g. "4.00"). Null if blank across all sections.
 
 IMPORTANT:
 - If a value is not found, return null or empty string. Do NOT guess.

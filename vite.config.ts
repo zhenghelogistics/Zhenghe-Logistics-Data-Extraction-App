@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
+        __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.VITE_ANTHROPIC_API_KEY': JSON.stringify(env.VITE_ANTHROPIC_API_KEY),

@@ -49,6 +49,27 @@ function App() {
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  useEffect(() => {
+    const currentScripts = new Set(
+      Array.from(document.querySelectorAll<HTMLScriptElement>('script[src]')).map(s => s.src)
+    );
+    const check = async () => {
+      try {
+        const res = await fetch('/', { cache: 'no-store' });
+        const html = await res.text();
+        const parser = new DOMParser();
+        const parsed = parser.parseFromString(html, 'text/html');
+        const newSrcs = Array.from(parsed.querySelectorAll<HTMLScriptElement>('script[src]'))
+          .map(s => s.getAttribute('src') || '');
+        const hasNew = newSrcs.some(src => src && !Array.from(currentScripts).some(curr => curr.endsWith(src)));
+        if (hasNew) setUpdateAvailable(true);
+      } catch { /* ignore network errors */ }
+    };
+    const id = setInterval(check, 5 * 60 * 1000); // check every 5 minutes
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(CUSTOM_RULES_STORAGE_KEY, JSON.stringify(customRules));
@@ -392,6 +413,14 @@ function App() {
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
+      {updateAvailable && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white text-center py-2 text-sm font-medium shadow-md">
+          A new version is available.{' '}
+          <button onClick={() => window.location.reload()} className="underline font-semibold hover:text-blue-200">
+            Click here to refresh
+          </button>
+        </div>
+      )}
 
       {/* ─── Sidebar ─── */}
       <aside className="w-56 bg-slate-900 flex flex-col flex-shrink-0">

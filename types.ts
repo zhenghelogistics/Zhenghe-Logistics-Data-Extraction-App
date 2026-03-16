@@ -119,8 +119,10 @@ export interface TransportJob {
 
 export interface AlliedReport {
   container_booking_no?: string | null;
-  dhc?: string | null;
-  dhe?: string | null;
+  dhc_in?: string | null;
+  dhc_out?: string | null;
+  dhe_in?: string | null;
+  dhe_out?: string | null;
   data_admin_fee?: string | null;
   washing?: string | null;
   repair?: string | null;

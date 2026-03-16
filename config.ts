@@ -75,7 +75,7 @@ export const AppConfig = {
       columns: ['Container #', 'Type', 'Status', 'Charges', 'Washing Fees'],
     },
     'Allied Report': {
-      columns: ['Container/Booking No', 'DHC', 'DHE', 'Data Admin Fee', 'Washing', 'Repair', 'Detention', 'Demurrage'],
+      columns: ['Container/Booking No', 'DHC In', 'DHC Out', 'DHE In', 'DHE Out', 'Data Admin Fee', 'Washing', 'Repair', 'Detention', 'Demurrage'],
     },
     'CDAC Report': {
       columns: ['Container Number', 'Repair', 'Detention', 'Demurage', 'Admin Fees', 'Washing', 'DHC'],

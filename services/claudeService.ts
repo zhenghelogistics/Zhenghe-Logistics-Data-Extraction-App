@@ -177,9 +177,11 @@ EXTRACTION RULES FOR "Allied Report" (Transport Team):
 - DOCUMENT STRUCTURE: This is a Receipts Journal. Each row in the summary table is ONE receipt for ONE charge type for ONE container. The SAME container number appears multiple times — once per charge type. The "Customer Type" column tells you the charge type.
 - CRITICAL: Read ONLY the summary table (the receipts journal grid at the start). Ignore all individual receipt pages that follow.
 - GROUP BY CONTAINER: For each unique Container/Booking No, create ONE Allied Report entry collecting all its charges across all rows.
-- EXAMPLE: Container CMAU7642286 appears in rows for "DATA ADMIN FEE (IN)" ($5), "DHE IN" ($4), "DHC IN" ($80), and "REPAIR" ($21.35) — these all merge into ONE entry: dhc=80, dhe=4, data_admin_fee=5, repair=21.35.
-- DHC: The amount from any row where Customer Type is "DHC IN" or "DHC OUT" for this container (e.g. "80.00"). Null if not present.
-- DHE: The amount from any row where Customer Type is "DHE IN" or "DHE OUT" for this container (e.g. "4.00"). Null if not present.
+- EXAMPLE: Container CMAU7642286 appears in rows for "DATA ADMIN FEE (IN)" ($5), "DHE IN" ($4), "DHC IN" ($80), and "REPAIR" ($21.35) — these all merge into ONE entry: dhc_in=80, dhe_in=4, data_admin_fee=5, repair=21.35.
+- DHC IN: The amount from any row where Customer Type is "DHC IN" for this container (e.g. "80.00"). Null if not present.
+- DHC OUT: The amount from any row where Customer Type is "DHC OUT" for this container. Null if not present.
+- DHE IN: The amount from any row where Customer Type is "DHE IN" for this container (e.g. "4.00"). Null if not present.
+- DHE OUT: The amount from any row where Customer Type is "DHE OUT" for this container. Null if not present.
 - DATA ADMIN FEE: The amount from any row where Customer Type is "DATA ADMIN FEE (IN)" or "DATA ADMIN FEE (OUT)" for this container (e.g. "5.00"). Null if not present.
 - REPAIR: The amount from any row where Customer Type is "REPAIR" for this container. Null if not present.
 - DETENTION: The amount from any row where Customer Type is "DETENTION" for this container. Null if not present.
@@ -291,8 +293,10 @@ Respond ONLY with valid JSON matching this exact structure:
       },
       "allied_report": {
         "container_booking_no": "string or null",
-        "dhc": "string or null",
-        "dhe": "string or null",
+        "dhc_in": "string or null",
+        "dhc_out": "string or null",
+        "dhe_in": "string or null",
+        "dhe_out": "string or null",
         "data_admin_fee": "string or null",
         "washing": "string or null",
         "repair": "string or null",
@@ -435,8 +439,10 @@ const deduplicateByContainer = (docs: DocumentData[]): DocumentData[] => {
       const existing = mergedMap.get(key)!;
       const src = doc.allied_report || {};
       const dest = existing.allied_report!;
-      dest.dhc             = dest.dhc             ?? src.dhc;
-      dest.dhe             = dest.dhe             ?? src.dhe;
+      dest.dhc_in          = dest.dhc_in          ?? src.dhc_in;
+      dest.dhc_out         = dest.dhc_out         ?? src.dhc_out;
+      dest.dhe_in          = dest.dhe_in          ?? src.dhe_in;
+      dest.dhe_out         = dest.dhe_out         ?? src.dhe_out;
       dest.data_admin_fee  = dest.data_admin_fee  ?? src.data_admin_fee;
       dest.washing         = dest.washing         ?? src.washing;
       dest.repair          = dest.repair          ?? src.repair;

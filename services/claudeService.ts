@@ -519,5 +519,5 @@ export const extractDocumentData = async (
   }
 
   onProgress?.('Processing results...');
-  return deduplicateDocuments(allDocs);
+  return deduplicateByContainer(deduplicateDocuments(allDocs));
 };

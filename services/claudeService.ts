@@ -355,6 +355,70 @@ const buildSystemPrompt = (customInstructions: string[]): string => {
   return `${BASE_SYSTEM_PROMPT}\n\nADDITIONAL USER-DEFINED EXTRACTION RULES:\n${rules}`;
 };
 
+// For every Logistics Local Charges Report that has no matching Payment Voucher/GL,
+// synthesize one so the accounts team always sees their row.
+const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
+  const pvDocs = docs.filter(d => d.document_type === 'Payment Voucher/GL');
+
+  const pvKeys = new Set<string>();
+  for (const pv of pvDocs) {
+    const inv = pv.payment_voucher_details?.pss_invoice_number?.trim().toUpperCase();
+    const bl  = pv.payment_voucher_details?.bl_number?.trim().toUpperCase();
+    if (inv) pvKeys.add(`INV_${inv}`);
+    if (bl)  pvKeys.add(`BL_${bl}`);
+  }
+
+  const synthesized: DocumentData[] = [];
+  for (const doc of docs) {
+    if (doc.document_type !== 'Logistics Local Charges Report') continue;
+    const l = doc.logistics_local_charges;
+    if (!l) continue;
+
+    const inv = l.pss_invoice_number?.trim().toUpperCase();
+    const bl  = l.bl_number?.trim().toUpperCase();
+
+    const alreadyCovered =
+      (inv && pvKeys.has(`INV_${inv}`)) ||
+      (bl  && pvKeys.has(`BL_${bl}`));
+    if (alreadyCovered) continue;
+
+    // Build charges_summary from non-null logistics charge fields
+    const chargeMap: [string | null | undefined, string][] = [
+      [l.thc_amount,         'THC'],
+      [l.seal_fee,           'SEALS'],
+      [l.bl_fee,             'BL'],
+      [l.bl_printed_fee,     'PRINTED BL'],
+      [l.ens_ams_fee,        'ENS'],
+      [l.other_charges,      'OTHER'],
+    ];
+    const charges = chargeMap
+      .filter(([val]) => val && val.trim().length > 0)
+      .map(([, label]) => label)
+      .join(', ');
+
+    const pvEntry: DocumentData = {
+      ...doc,
+      document_type: 'Payment Voucher/GL',
+      logistics_local_charges: undefined,
+      payment_voucher_details: {
+        pss_invoice_number:    l.pss_invoice_number  ?? null,
+        carrier_invoice_number: null,
+        bl_number:             l.bl_number            ?? null,
+        payable_amount:        l.total_payable_amount ?? null,
+        total_payable_amount:  l.total_payable_amount ?? null,
+        charges_summary:       charges || null,
+      },
+    };
+
+    synthesized.push(pvEntry);
+    // Register so we don't double-synthesize if multiple LOG entries share same invoice/BL
+    if (inv) pvKeys.add(`INV_${inv}`);
+    if (bl)  pvKeys.add(`BL_${bl}`);
+  }
+
+  return [...docs, ...synthesized];
+};
+
 // Helper to remove duplicate documents
 const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
   const uniqueDocs = new Map<string, DocumentData>();
@@ -570,5 +634,5 @@ export const extractDocumentData = async (
   }
 
   onProgress?.('Processing results...');
-  return deduplicateByContainer(deduplicateDocuments(allDocs));
+  return deduplicateByContainer(deduplicateDocuments(ensurePaymentVouchers(allDocs)));
 };

@@ -282,17 +282,22 @@ function App() {
   }, [files, customRules]);
 
   const handleGenerateVouchers = async (docs: DocumentData[]) => {
-    const blob = await generateVoucherPdf(docs);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = docs.length === 1
-      ? `voucher_${docs[0].payment_voucher_details?.pss_invoice_number || 'export'}.pdf`
-      : 'payment_vouchers.pdf';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const blob = await generateVoucherPdf(docs);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = docs.length === 1
+        ? `voucher_${docs[0].payment_voucher_details?.pss_invoice_number || 'export'}.pdf`
+        : 'payment_vouchers.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to generate voucher PDF:', err);
+      alert('Failed to generate PDF. Please try again.');
+    }
   };
 
   const downloadReport = async () => {

@@ -33,7 +33,9 @@ function drawCheckbox(
   const size = 8;
   page.drawRectangle({ x, y, width: size, height: size, borderColor: BLACK, borderWidth: 0.8, color: WHITE });
   if (checked) {
-    page.drawText('✓', { x: x + 1, y: y + 1, size: fontSize - 1, font, color: BLACK });
+    // Draw a simple tick using two lines (avoids Unicode issues with standard fonts)
+    page.drawLine({ start: { x: x + 1, y: y + 3 }, end: { x: x + 3, y: y + 1 }, thickness: 1, color: BLACK });
+    page.drawLine({ start: { x: x + 3, y: y + 1 }, end: { x: x + 7, y: y + 7 }, thickness: 1, color: BLACK });
   }
   page.drawText(label, { x: x + size + 3, y: y + 1, size: fontSize, font, color: BLACK });
 }
@@ -232,7 +234,7 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   // Try to load the logo once
-  const logoBytes = await fetch('/Zhenghe Logistics Logo-02.png')
+  const logoBytes = await fetch('/Zhenghe%20Logistics%20Logo-02.png')
     .then(r => r.arrayBuffer())
     .catch(() => null);
 

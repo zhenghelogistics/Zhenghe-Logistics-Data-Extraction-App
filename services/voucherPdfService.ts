@@ -153,15 +153,27 @@ async function drawVoucherPage(
   drawCheckbox(page, chkX, chkY, currency === 'SGD', 'SGD', regularFont, 8);
   drawCheckbox(page, chkX + 42, chkY, currency === 'USD', 'USD', regularFont, 8);
 
-  // Parse charges into rows
-  const rawCharges = pv?.charges_summary || '';
-  const chargeLines: string[] = rawCharges
-    ? rawCharges.split(';').map(s => s.trim()).filter(Boolean)
-    : [''];
+  // Accounts PV row structure:
+  // Row 1: Payment Invoice number
+  // Row 2: BL number + PSS number — amount shown here
+  // Row 3: Invoice charges (THC/BL/SEAL etc.)
+  const carrierInv = pv?.carrier_invoice_number || '';
+  const blNum = pv?.bl_number || '';
+  const pssNum = pv?.pss_invoice_number || '';
+  const charges = pv?.charges_summary || '';
 
-  // Always at least 8 data rows for visual spacing
+  const blPssLine = [
+    blNum ? `BL. ${blNum}` : '',
+    pssNum ? `(#${pssNum})` : '',
+  ].filter(Boolean).join(' ');
+
+  const contentRows: { desc: string; amount?: string }[] = [];
+  if (carrierInv) contentRows.push({ desc: `Payment Inv.  ${carrierInv}` });
+  if (blPssLine)  contentRows.push({ desc: blPssLine, amount });
+  if (charges)    contentRows.push({ desc: charges });
+
   const MIN_ROWS = 8;
-  const dataRows = Math.max(chargeLines.length, MIN_ROWS);
+  const dataRows = Math.max(contentRows.length, MIN_ROWS);
 
   let currentY = tableTop - rowH;
 
@@ -171,18 +183,12 @@ async function drawVoucherPage(
     page.drawLine({ start: { x: tableLeft + colItem, y: currentY }, end: { x: tableLeft + colItem, y: rowY }, thickness: 0.5, color: NAVY });
     page.drawLine({ start: { x: tableRight - colAmt, y: currentY }, end: { x: tableRight - colAmt, y: rowY }, thickness: 0.5, color: NAVY });
 
-    // Item number
-    page.drawText(String(i + 1), { x: tableLeft + 18, y: rowY + 7, size: 9, font: regularFont, color: GREY });
-
-    // Description
-    if (i < chargeLines.length) {
-      const line = chargeLines[i];
-      page.drawText(line, { x: tableLeft + colItem + 8, y: rowY + 7, size: 9, font: regularFont, color: BLACK, maxWidth: colDesc - 16 });
-    }
-
-    // Amount — show on last charge row only
-    if (i === chargeLines.length - 1 && amount) {
-      page.drawText(amount, { x: tableRight - colAmt + 6, y: rowY + 7, size: 9, font: regularFont, color: BLACK });
+    if (i < contentRows.length) {
+      const row = contentRows[i];
+      page.drawText(row.desc, { x: tableLeft + colItem + 8, y: rowY + 7, size: 9, font: regularFont, color: BLACK, maxWidth: colDesc - 16 });
+      if (row.amount) {
+        page.drawText(row.amount, { x: tableRight - colAmt + 6, y: rowY + 7, size: 9, font: regularFont, color: BLACK });
+      }
     }
 
     currentY = rowY;

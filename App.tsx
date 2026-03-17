@@ -52,22 +52,20 @@ function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
-    const currentScripts = new Set(
-      Array.from(document.querySelectorAll<HTMLScriptElement>('script[src]')).map(s => s.src)
-    );
+    // Capture the path of the currently loaded main bundle (e.g. /assets/index-abc123.js)
+    const mainScript = document.querySelector<HTMLScriptElement>('script[src*="/assets/"]');
+    if (!mainScript) return;
+    const currentPath = new URL(mainScript.src).pathname;
+
     const check = async () => {
       try {
-        const res = await fetch('/', { cache: 'no-store' });
+        const res = await fetch(`/?_=${Date.now()}`, { cache: 'no-store' });
         const html = await res.text();
-        const parser = new DOMParser();
-        const parsed = parser.parseFromString(html, 'text/html');
-        const newSrcs = Array.from(parsed.querySelectorAll<HTMLScriptElement>('script[src]'))
-          .map(s => s.getAttribute('src') || '');
-        const hasNew = newSrcs.some(src => src && !Array.from(currentScripts).some(curr => curr.endsWith(src)));
-        if (hasNew) setUpdateAvailable(true);
+        // If the current script is no longer referenced in the latest HTML, a new deploy is live
+        if (!html.includes(currentPath)) setUpdateAvailable(true);
       } catch { /* ignore network errors */ }
     };
-    const id = setInterval(check, 5 * 60 * 1000); // check every 5 minutes
+    const id = setInterval(check, 10 * 60 * 1000); // check every 10 minutes
     return () => clearInterval(id);
   }, []);
 
@@ -416,7 +414,7 @@ function App() {
       {updateAvailable && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white text-center py-2 text-sm font-medium shadow-md">
           A new version is available.{' '}
-          <button onClick={() => window.location.reload()} className="underline font-semibold hover:text-blue-200">
+          <button onClick={() => { window.location.replace(window.location.pathname + '?_r=' + Date.now()); }} className="underline font-semibold hover:text-blue-200">
             Click here to refresh
           </button>
         </div>

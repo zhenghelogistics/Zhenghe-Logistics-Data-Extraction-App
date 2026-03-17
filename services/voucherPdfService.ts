@@ -70,11 +70,11 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
     page.drawText(autoDate, { x: 452, y: 714, size: 11, font: regular, color: BLACK });
 
-    // SGD / USD tick in table header checkbox (raised to align with □ boxes)
+    // SGD / USD tick in table header checkbox (moved right into the □ box)
     if (currency === 'SGD') {
-      drawTick(page, 452, 695);
+      drawTick(page, 462, 695);
     } else {
-      drawTick(page, 502, 695);
+      drawTick(page, 512, 695);
     }
 
     // Table data rows — baselines calibrated from horizontal line scan
@@ -94,24 +94,25 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       if (amount) page.drawText(amount, { x: amtX, y: rowYs[1], size: fontSize, font: regular, color: BLACK });
     }
 
-    // Row 7: Charges (THC/BL/SEAL etc.) — near bottom of data rows
+    // Row 6: Charges (THC/BL/SEAL etc.) — 1 row above the Total row
     if (charges) {
-      page.drawText(charges, { x: descX, y: rowYs[6], size: fontSize, font: regular, color: BLACK, maxWidth: 370 });
+      page.drawText(charges, { x: descX, y: rowYs[5], size: fontSize, font: regular, color: BLACK, maxWidth: 370 });
     }
 
-    // Total row (table): tick in □SGD or □USD — amount stays in Cash/Cheque section
+    // Total row (table): tick in □SGD or □USD at the "□SGD □USD Total" label row
     if (currency === 'SGD') {
-      drawTick(page, 452, rowYs[7]);
+      drawTick(page, 462, rowYs[6]);
     } else {
-      drawTick(page, 502, rowYs[7]);
+      drawTick(page, 512, rowYs[6]);
     }
 
-    // Cash / Cheque No. section: payment method on left, tick + total amount on right
-    if (paymentMethod) page.drawText(paymentMethod, { x: 158, y: 474, size: 11, font: regular, color: BLACK });
+    // Cash / Cheque No. section: fixed text on left, tick + total amount on right
+    const cashChequeText = paymentMethod || 'UOB SGD FAST / GIRO PAYMENT';
+    page.drawText(cashChequeText, { x: 158, y: 474, size: 11, font: regular, color: BLACK });
     if (currency === 'SGD') {
-      drawTick(page, 452, 474);
+      drawTick(page, 462, 474);
     } else {
-      drawTick(page, 502, 474);
+      drawTick(page, 512, 474);
     }
     if (total) page.drawText(total, { x: amtX, y: 474, size: 11, font: bold, color: BLACK });
   }

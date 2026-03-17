@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { extractDocumentData, validateDocumentData } from './services/claudeService';
 import { supabase, fetchDocuments, saveDocument, deleteDocument } from './services/supabase';
 import ResultsTable from './components/ResultsTable';
+import { generateVoucherPdf } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
@@ -279,6 +280,20 @@ function App() {
     addLog('Batch processing finished.');
     setIsProcessing(false);
   }, [files, customRules]);
+
+  const handleGenerateVouchers = async (docs: DocumentData[]) => {
+    const blob = await generateVoucherPdf(docs);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = docs.length === 1
+      ? `voucher_${docs[0].payment_voucher_details?.pss_invoice_number || 'export'}.pdf`
+      : 'payment_vouchers.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const downloadReport = async () => {
     const allDocuments: { data: DocumentData; filename: string }[] = [];
@@ -574,6 +589,24 @@ function App() {
                 Export
               </button>
 
+              {/* Export Vouchers PDF — only on Payment Voucher/GL tab */}
+              {activeTab === 'Payment Voucher/GL' && (() => {
+                const pvDocs = files.flatMap(f =>
+                  (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING)
+                    ? (f.data ?? []).filter(d => d.document_type === 'Payment Voucher/GL')
+                    : []
+                );
+                return pvDocs.length > 0 ? (
+                  <button
+                    onClick={() => handleGenerateVouchers(pvDocs)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+                  >
+                    <FileText size={14} />
+                    Export Vouchers PDF
+                  </button>
+                ) : null;
+              })()}
+
               {/* Logs */}
               <button
                 onClick={downloadLogs}
@@ -655,6 +688,7 @@ function App() {
               onUpdateIncoterm={handleIncotermUpdate}
               onDeleteFile={handleDeleteFile}
               onBulkDelete={handleBulkDelete}
+              onGenerateVoucher={handleGenerateVouchers}
               activeTab={activeTab}
               userRole={userRole}
             />

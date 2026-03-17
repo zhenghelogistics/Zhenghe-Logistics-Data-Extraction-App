@@ -257,7 +257,9 @@ Respond ONLY with valid JSON matching this exact structure:
         "bl_number": "string or null",
         "payable_amount": "string or null",
         "total_payable_amount": "string or null",
-        "charges_summary": "string or null"
+        "charges_summary": "string or null",
+        "payment_to": "string or null — the company name being paid (carrier/forwarder company, e.g. FR. MEYER'S SOHN (FAR EAST) PTE LTD)",
+        "payment_method": "string or null — payment method shown on document (e.g. FAST, CHEQUE, CASH, TT)"
       },
       "logistics_local_charges": {
         "bl_number": "string or null",
@@ -414,6 +416,8 @@ const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
         payable_amount:        l.total_payable_amount ?? null,
         total_payable_amount:  l.total_payable_amount ?? null,
         charges_summary:       charges || null,
+        payment_to:            l.carrier_forwarder    ?? null,
+        payment_method:        null,
       },
     };
 

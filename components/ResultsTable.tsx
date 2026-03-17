@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProcessedFile, FileStatus, DocumentData } from '../types';
 import { AppConfig } from '../config';
-import { CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Trash2 } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Trash2, FileText } from 'lucide-react';
 import { UserRole } from '../users';
 
 interface ResultsTableProps {
@@ -9,11 +9,12 @@ interface ResultsTableProps {
   onUpdateIncoterm: (fileId: string, docIndex: number, value: string) => void;
   onDeleteFile: (fileId: string) => void;
   onBulkDelete: (ids: string[]) => void;
+  onGenerateVoucher?: (docs: DocumentData[]) => void;
   activeTab: string;
   userRole: UserRole | null;
 }
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onDeleteFile, onBulkDelete, activeTab, userRole }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onDeleteFile, onBulkDelete, onGenerateVoucher, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -476,16 +477,28 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                       </td>
                     ))}
                     <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteFile(row.file.id);
-                        }}
-                        className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {activeTab === 'Payment Voucher/GL' && onGenerateVoucher && d && (
+                          <button
+                            type="button"
+                            title="Generate PDF voucher"
+                            onClick={(e) => { e.stopPropagation(); onGenerateVoucher([d]); }}
+                            className="text-slate-400 hover:text-blue-600 cursor-pointer transition-colors"
+                          >
+                            <FileText size={15} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteFile(row.file.id);
+                          }}
+                          className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </>
                 )}

@@ -455,7 +455,7 @@ function App() {
             </div>
             <div>
               <p className="text-white font-bold text-sm leading-none">Zhenghe</p>
-              <p className="text-slate-500 text-xs mt-0.5">Logistics Portal</p>
+              <p className="text-slate-500 text-xs mt-0.5">Pluckd</p>
             </div>
           </div>
         </div>

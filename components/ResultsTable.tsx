@@ -10,11 +10,12 @@ interface ResultsTableProps {
   onDeleteFile: (fileId: string) => void;
   onBulkDelete: (ids: string[]) => void;
   onGenerateVoucher?: (docs: DocumentData[]) => void;
+  isGeneratingPdf?: boolean;
   activeTab: string;
   userRole: UserRole | null;
 }
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onDeleteFile, onBulkDelete, onGenerateVoucher, activeTab, userRole }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onDeleteFile, onBulkDelete, onGenerateVoucher, isGeneratingPdf, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -482,10 +483,11 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                           <button
                             type="button"
                             title="Generate PDF voucher"
+                            disabled={isGeneratingPdf}
                             onClick={(e) => { e.stopPropagation(); onGenerateVoucher([d]); }}
-                            className="text-slate-400 hover:text-blue-600 cursor-pointer transition-colors"
+                            className="text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
                           >
-                            <FileText size={15} />
+                            {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
                           </button>
                         )}
                         <button

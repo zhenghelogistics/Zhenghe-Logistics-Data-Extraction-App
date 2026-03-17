@@ -51,6 +51,7 @@ function App() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   useEffect(() => {
     // Capture the path of the currently loaded main bundle (e.g. /assets/index-abc123.js)
@@ -282,6 +283,7 @@ function App() {
   }, [files, customRules]);
 
   const handleGenerateVouchers = async (docs: DocumentData[]) => {
+    setIsGeneratingPdf(true);
     try {
       const blob = await generateVoucherPdf(docs);
       const url = URL.createObjectURL(blob);
@@ -297,6 +299,8 @@ function App() {
     } catch (err) {
       console.error('Failed to generate voucher PDF:', err);
       alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -604,10 +608,11 @@ function App() {
                 return pvDocs.length > 0 ? (
                   <button
                     onClick={() => handleGenerateVouchers(pvDocs)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+                    disabled={isGeneratingPdf}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
-                    <FileText size={14} />
-                    Export Vouchers PDF
+                    {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                    {isGeneratingPdf ? 'Generating...' : 'Export Vouchers PDF'}
                   </button>
                 ) : null;
               })()}
@@ -694,6 +699,7 @@ function App() {
               onDeleteFile={handleDeleteFile}
               onBulkDelete={handleBulkDelete}
               onGenerateVoucher={handleGenerateVouchers}
+              isGeneratingPdf={isGeneratingPdf}
               activeTab={activeTab}
               userRole={userRole}
             />

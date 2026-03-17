@@ -450,12 +450,15 @@ function App() {
         {/* Brand */}
         <div className="px-4 py-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Ship size={16} className="text-white" />
-            </div>
+            <img
+              src="/pluckd.png"
+              alt="Pluckd"
+              className="h-8 w-auto object-contain flex-shrink-0"
+              style={{ filter: 'brightness(0) invert(1)' }}
+            />
             <div>
-              <p className="text-white font-bold text-sm leading-none">Zhenghe</p>
-              <p className="text-slate-500 text-xs mt-0.5">Pluckd</p>
+              <p className="text-white font-bold text-sm leading-none">Pluckd</p>
+              <p className="text-slate-500 text-xs mt-0.5">By Zhenghe Logistics</p>
             </div>
           </div>
         </div>

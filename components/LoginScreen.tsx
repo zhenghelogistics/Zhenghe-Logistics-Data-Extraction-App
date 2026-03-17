@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Ship, User, Lock, ArrowRight, AlertCircle, UserPlus } from 'lucide-react';
+import { User, Lock, ArrowRight, AlertCircle, UserPlus } from 'lucide-react';
 import { UserRole } from '../users';
 import { supabase } from '../services/supabase';
 
@@ -58,29 +58,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       >
         {/* Decorative Background Elements */}
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 to-blue-600" />
-        <motion.div 
-          animate={{ y: [0, -10, 0] }}
-          transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-          className="absolute -top-10 -right-10 text-blue-100 opacity-50"
-        >
-          <Ship size={180} />
-        </motion.div>
-
         {/* Header */}
         <div className="text-center relative z-10 mb-8">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-2xl mb-6 shadow-lg"
+            className="flex justify-center mb-4"
           >
-            <Ship size={36} className="text-white" />
+            <img src="/pluckd.png" alt="Pluckd" className="h-16 w-auto object-contain" />
           </motion.div>
-          <h1 className="text-3xl font-bold text-blue-900 mb-2 tracking-tight">
-            {isSignUp ? 'Join the Crew' : 'Welcome Aboard!'}
+          <p className="text-xs text-blue-400 font-medium tracking-widest uppercase mb-4">By Zhenghe Logistics</p>
+          <h1 className="text-2xl font-bold text-blue-900 mb-1 tracking-tight">
+            {isSignUp ? 'Create your account' : 'Welcome back'}
           </h1>
-          <p className="text-blue-500 font-medium">
-            {isSignUp ? 'Create your account to start' : 'Please log in to your station'}
+          <p className="text-blue-500 font-medium text-sm">
+            {isSignUp ? 'Sign up to get started' : 'Please log in to continue'}
           </p>
         </div>
 

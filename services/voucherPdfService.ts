@@ -48,9 +48,11 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     const pssNum     = pv?.pss_invoice_number || '';
     const charges    = pv?.charges_summary || '';
 
+    // pssNum may already carry a leading # (e.g. "#25122020") — don't double it
+    const pssDisplay = pssNum.startsWith('#') ? pssNum : (pssNum ? `#${pssNum}` : '');
     const blPssLine = [
-      blNum  ? `BL. ${blNum}`  : '',
-      pssNum ? `(#${pssNum})`  : '',
+      blNum       ? `BL. ${blNum}`       : '',
+      pssDisplay  ? `(${pssDisplay})`    : '',
     ].filter(Boolean).join(' ');
 
     // ── Field positions (calibrated to the ZHL Payment Voucher template) ──
@@ -65,11 +67,11 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     if (docDate) page.drawText(docDate, { x: 432, y: 697, size: 9, font: regular, color: BLACK });
 
     // SGD / USD tick in table header checkbox
-    // Template has □SGD □USD at approximately x=490/522, y=668
+    // Template has □SGD □USD at approximately x=490/522 — y raised to sit inside the header row
     if (currency === 'SGD') {
-      drawTick(page, 488, 665);
+      drawTick(page, 488, 678);
     } else {
-      drawTick(page, 521, 665);
+      drawTick(page, 521, 678);
     }
 
     // Table data rows — y positions for rows 1-8 (baseline)

@@ -55,29 +55,30 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       pssDisplay  ? `(${pssDisplay})`    : '',
     ].filter(Boolean).join(' ');
 
-    // ── Field positions (calibrated to the ZHL Payment Voucher template) ──
+    // ── Field positions (pixel-calibrated to the ZHL Payment Voucher template) ──
+    // Template image: 1104×790 px placed at pdf-lib x=23.04–552.96, y=430.8–810.0
+    // Conversion: x = 23.04 + px*0.48,  y = 810 - py*0.48
 
-    // Ref value (top-right)
-    if (ref) page.drawText(ref, { x: 388, y: 720, size: 10, font: regular, color: BLACK });
+    // Ref value (after "Ref:" label, top-right)
+    if (ref) page.drawText(ref, { x: 417, y: 745, size: 9, font: regular, color: BLACK });
 
-    // Payment To value
-    if (paymentTo) page.drawText(paymentTo, { x: 96, y: 697, size: 9, font: regular, color: BLACK, maxWidth: 290 });
+    // Payment To value (on Payment To underline)
+    if (paymentTo) page.drawText(paymentTo, { x: 102, y: 721, size: 9, font: regular, color: BLACK, maxWidth: 290 });
 
-    // Date value
-    if (docDate) page.drawText(docDate, { x: 432, y: 697, size: 9, font: regular, color: BLACK });
+    // Date value (on Date underline, same row as Payment To)
+    if (docDate) page.drawText(docDate, { x: 412, y: 721, size: 9, font: regular, color: BLACK });
 
-    // SGD / USD tick in table header checkbox
-    // Template has □SGD □USD at approximately x=490/522 — y raised to sit inside the header row
+    // SGD / USD tick in table header checkbox row (py≈260 in image)
     if (currency === 'SGD') {
-      drawTick(page, 488, 678);
+      drawTick(page, 452, 685);
     } else {
-      drawTick(page, 521, 678);
+      drawTick(page, 502, 685);
     }
 
-    // Table data rows — y positions for rows 1-8 (baseline)
-    const rowYs = [648, 626, 604, 582, 560, 538, 516, 494];
-    const descX  = 100;
-    const amtX   = 490;
+    // Table data rows — baselines calibrated from horizontal line scan
+    const rowYs = [651, 629, 607, 585, 563, 541, 517, 491];
+    const descX  = 105;
+    const amtX   = 479;
     const fontSize = 9;
 
     // Row 1: Payment Invoice number
@@ -96,17 +97,16 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       page.drawText(charges, { x: descX, y: rowYs[2], size: fontSize, font: regular, color: BLACK, maxWidth: 370 });
     }
 
-    // Total row — SGD/USD tick + amount
-    // Template total row checkboxes at approximately x=469/501, y=472
+    // Total amount + SGD/USD tick — in the Cash/Cheque row right column (py≈700)
     if (currency === 'SGD') {
-      drawTick(page, 469, 469);
+      drawTick(page, 452, 474);
     } else {
-      drawTick(page, 501, 469);
+      drawTick(page, 502, 474);
     }
-    if (total) page.drawText(total, { x: amtX, y: 472, size: fontSize, font: bold, color: BLACK });
+    if (total) page.drawText(total, { x: amtX, y: 474, size: fontSize, font: bold, color: BLACK });
 
-    // Cash / Cheque No. value
-    if (paymentMethod) page.drawText(paymentMethod, { x: 158, y: 447, size: 10, font: regular, color: BLACK });
+    // Cash / Cheque No. value (left side of same row)
+    if (paymentMethod) page.drawText(paymentMethod, { x: 158, y: 474, size: 9, font: regular, color: BLACK });
   }
 
   const bytes = await outputDoc.save();

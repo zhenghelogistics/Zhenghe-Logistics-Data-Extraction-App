@@ -59,27 +59,29 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     // Template image: 1104×790 px placed at pdf-lib x=23.04–552.96, y=430.8–810.0
     // Conversion: x = 23.04 + px*0.48,  y = 810 - py*0.48
 
-    // Ref value (after "Ref:" label, top-right)
-    if (ref) page.drawText(ref, { x: 417, y: 745, size: 9, font: regular, color: BLACK });
+    // Ref: left blank per accounts team preference
 
-    // Payment To value (on Payment To underline)
-    if (paymentTo) page.drawText(paymentTo, { x: 102, y: 721, size: 9, font: regular, color: BLACK, maxWidth: 290 });
+    // Payment To value — on the underline (y=714 puts text on the line)
+    if (paymentTo) page.drawText(paymentTo, { x: 102, y: 714, size: 11, font: regular, color: BLACK, maxWidth: 290 });
 
-    // Date value (on Date underline, same row as Payment To)
-    if (docDate) page.drawText(docDate, { x: 412, y: 721, size: 9, font: regular, color: BLACK });
+    // Date — "as of today" (auto-generated)
+    const today = new Date();
+    const autoDate = docDate ||
+      `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    page.drawText(autoDate, { x: 452, y: 714, size: 11, font: regular, color: BLACK });
 
-    // SGD / USD tick in table header checkbox row (py≈260 in image)
+    // SGD / USD tick in table header checkbox (raised to align with □ boxes)
     if (currency === 'SGD') {
-      drawTick(page, 452, 685);
+      drawTick(page, 452, 695);
     } else {
-      drawTick(page, 502, 685);
+      drawTick(page, 502, 695);
     }
 
     // Table data rows — baselines calibrated from horizontal line scan
     const rowYs = [651, 629, 607, 585, 563, 541, 517, 491];
     const descX  = 105;
     const amtX   = 479;
-    const fontSize = 9;
+    const fontSize = 11;
 
     // Row 1: Payment Invoice number
     if (carrierInv) {
@@ -92,21 +94,26 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       if (amount) page.drawText(amount, { x: amtX, y: rowYs[1], size: fontSize, font: regular, color: BLACK });
     }
 
-    // Row 3: Charges (THC/BL/SEAL etc.)
+    // Row 7: Charges (THC/BL/SEAL etc.) — near bottom of data rows
     if (charges) {
-      page.drawText(charges, { x: descX, y: rowYs[2], size: fontSize, font: regular, color: BLACK, maxWidth: 370 });
+      page.drawText(charges, { x: descX, y: rowYs[6], size: fontSize, font: regular, color: BLACK, maxWidth: 370 });
     }
 
-    // Total amount + SGD/USD tick — in the Cash/Cheque row right column (py≈700)
+    // Total row (table): tick in □SGD or □USD — amount stays in Cash/Cheque section
+    if (currency === 'SGD') {
+      drawTick(page, 452, rowYs[7]);
+    } else {
+      drawTick(page, 502, rowYs[7]);
+    }
+
+    // Cash / Cheque No. section: payment method on left, tick + total amount on right
+    if (paymentMethod) page.drawText(paymentMethod, { x: 158, y: 474, size: 11, font: regular, color: BLACK });
     if (currency === 'SGD') {
       drawTick(page, 452, 474);
     } else {
       drawTick(page, 502, 474);
     }
-    if (total) page.drawText(total, { x: amtX, y: 474, size: fontSize, font: bold, color: BLACK });
-
-    // Cash / Cheque No. value (left side of same row)
-    if (paymentMethod) page.drawText(paymentMethod, { x: 158, y: 474, size: 9, font: regular, color: BLACK });
+    if (total) page.drawText(total, { x: amtX, y: 474, size: 11, font: bold, color: BLACK });
   }
 
   const bytes = await outputDoc.save();

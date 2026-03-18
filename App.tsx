@@ -262,13 +262,10 @@ function App() {
     const add = (charges: Record<string, string>, k: string, v: string | null | undefined) => {
       if (v) charges[k] = v;
     };
-    const resolveBillingStatus = (charges: Record<string, string>): { billing_status: 'unbilled' | 'billed'; billed_at: string | null } => {
-      const keys = Object.keys(charges);
-      if (keys.length > 0 && keys.every(k => NON_BILLABLE_KEYS.has(k))) {
-        return { billing_status: 'billed', billed_at: new Date().toISOString() };
-      }
-      return { billing_status: 'unbilled', billed_at: null };
-    };
+    // Only track containers that have at least one extra-cost (billable) charge
+    const hasBillableCharge = (charges: Record<string, string>) =>
+      Object.keys(charges).some(k => !NON_BILLABLE_KEYS.has(k));
+
     for (const doc of dataList) {
       if (doc.document_type === 'Allied Report' && doc.allied_report) {
         const r = doc.allied_report;
@@ -279,8 +276,8 @@ function App() {
         add(charges, 'data_admin_fee', r.data_admin_fee);
         add(charges, 'washing', r.washing); add(charges, 'repair', r.repair);
         add(charges, 'detention', r.detention); add(charges, 'demurrage', r.demurrage);
-        const { billing_status, billed_at } = resolveBillingStatus(charges);
-        rows.push({ source_document_id: documentId, filename, report_type: 'Allied Report', container_number: r.container_booking_no ?? null, charges, charge_validations: {}, billing_status, billed_at, billing_remarks: null, container_date, is_archived: false, archive_label: null });
+        if (!hasBillableCharge(charges)) continue;
+        rows.push({ source_document_id: documentId, filename, report_type: 'Allied Report', container_number: r.container_booking_no ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null, container_date, is_archived: false, archive_label: null });
       }
       if (doc.document_type === 'CDAS Report' && doc.cdas_report) {
         const r = doc.cdas_report;
@@ -291,8 +288,8 @@ function App() {
         add(charges, 'data_admin_fee', r.data_admin_fee);
         add(charges, 'washing', r.washing); add(charges, 'repair', r.repair);
         add(charges, 'detention', r.detention); add(charges, 'demurrage', r.demurrage);
-        const { billing_status, billed_at } = resolveBillingStatus(charges);
-        rows.push({ source_document_id: documentId, filename, report_type: 'CDAS Report', container_number: r.container_number ?? null, charges, charge_validations: {}, billing_status, billed_at, billing_remarks: null, container_date, is_archived: false, archive_label: null });
+        if (!hasBillableCharge(charges)) continue;
+        rows.push({ source_document_id: documentId, filename, report_type: 'CDAS Report', container_number: r.container_number ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null, container_date, is_archived: false, archive_label: null });
       }
     }
     return rows;

@@ -128,14 +128,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
     setExpandedId(null);
   }, [view]);
 
-  const activeRecords = records.filter(r => !r.is_archived);
-  // A record is "effectively unbilled" only if it has at least one billable charge
-  // (records with only non-billable charges are auto-treated as billed)
-  const isEffectivelyUnbilled = (r: ContainerBillingRecord) =>
-    r.billing_status === 'unbilled' && billableCharges(r).length > 0;
+  // Only track containers with at least one extra-cost charge (detention, demurrage, washing, repair)
+  const isHitList = (r: ContainerBillingRecord) => billableCharges(r).length > 0;
+  const activeRecords = records.filter(r => !r.is_archived && isHitList(r));
+  const isEffectivelyUnbilled = (r: ContainerBillingRecord) => r.billing_status === 'unbilled';
   const unbilled = activeRecords.filter(isEffectivelyUnbilled);
   const billed   = activeRecords.filter(r => !isEffectivelyUnbilled(r));
-  const archived = records.filter(r => r.is_archived);
+  const archived = records.filter(r => r.is_archived && isHitList(r));
 
   // ── Toast
   const toast = (message: string, type: 'success' | 'error' = 'success') => {

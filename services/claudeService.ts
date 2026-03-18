@@ -79,11 +79,13 @@ CLASSIFICATION GUIDELINES:
 - WHY: Ensures the document appears in both Logistics Table AND Accounts Table.
 
 EXTRACTION RULES FOR "Payment Voucher/GL":
+- PAYMENT TO ('payment_to'): The company/beneficiary to whom payment is made. Take from the carrier's Tax Invoice letterhead (the issuing company name) or the "Beneficiary Name" on the invoice. Known mappings: MSC → 'MSC MEDITERRANEAN SHIPPING CO SA', ONE → 'OCEAN NETWORK EXPRESS PTE. LTD'. For others, use the full company name as printed.
 - PSS INVOICE NUMBER ('pss_invoice_number'): The invoice number stated ON the BL or associated with the BL/PO/Ocean Freight document. It typically appears next to a label like "Invoice:", "Invoice No:", or "Inv:". Format it as "#" followed by the number (e.g., "Invoice: 25091366" → "#25091366"). This number comes from the Invoice, PO, Ocean Freight, or BL document — NOT from the carrier's own invoice number.
 - CARRIER INVOICE NUMBER ('carrier_invoice_number'): The invoice number issued by the carrier/forwarder on their tax invoice (e.g., "SGD987.12"). This is a different number from PSS Invoice Number.
-- BL NUMBER ('bl_number'): Extract the BL/HBL number if present.
+- BL NUMBER ('bl_number'): Extract the BL/HBL number if present. Link each carrier invoice to its corresponding BL using the Booking Reference number — both the BL and its Tax Invoice share the same Booking Reference.
 - PAYABLE AMOUNT ('payable_amount'): Grand Total with currency (e.g., "250.00 SGD").
 - CHARGES SUMMARY ('charges_summary'): List the charge TYPES found in the tax invoice, comma-separated. Use these short forms for known charges: THC (Terminal Handling Charges), BL (BL Fee / Document Fee), SEALS (Seal Fee), O.F (Ocean Freight), ENS, AMS, SBL (Surrender of BL), PRINTED BL. For any OTHER charges not in this list, include them as they appear on the invoice (e.g., "FOOD GRADE", "FUMIGATION", "ISPS"). Example output: "THC, SEALS, BL, SBL, ENS, FOOD GRADE". Only include charges that are actually present in the document.
+- MULTI-INVOICE RULE: If a single PDF contains multiple separate Tax Invoices (different invoice numbers, different totals), create a SEPARATE Payment Voucher/GL entry for EACH invoice. Do not merge them into one.
 
 EXTRACTION RULES FOR "Logistics Local Charges Report":
 - A. BL NUMBER: Prefer the House BL (HBL) number (e.g., 'EGLV070500202135'). If no HBL exists, use the Master BL (MBL) number instead.

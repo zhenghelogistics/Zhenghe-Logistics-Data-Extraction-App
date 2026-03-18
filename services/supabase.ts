@@ -20,6 +20,10 @@ export interface DatabaseDocument {
   status: string;
   extracted_data: DocumentData[] | null;
   created_at: string;
+  billing_status?: 'unbilled' | 'billed';
+  billed_at?: string | null;
+  billing_remarks?: string | null;
+  charge_validations?: Record<string, boolean>;
 }
 
 // Fetch documents for the current user (RLS handles security, .eq is a safety net)
@@ -86,6 +90,22 @@ export const updateDocument = async (id: string, updates: Partial<DatabaseDocume
   }
 
   return data;
+};
+
+export const updateBilling = async (
+  id: string,
+  updates: {
+    billing_status?: 'unbilled' | 'billed';
+    billed_at?: string | null;
+    billing_remarks?: string | null;
+    charge_validations?: Record<string, boolean>;
+  }
+): Promise<void> => {
+  const { error } = await supabase
+    .from('documents')
+    .update(updates)
+    .eq('id', id);
+  if (error) throw new Error(error.message);
 };
 
 export const deleteDocument = async (id: string) => {

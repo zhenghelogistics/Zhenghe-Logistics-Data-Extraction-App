@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { extractDocumentData, validateDocumentData } from './services/claudeService';
 import { supabase, fetchDocuments, saveDocument, deleteDocument } from './services/supabase';
 import ResultsTable from './components/ResultsTable';
+import CrmBillingTab from './components/CrmBillingTab';
 import { generateVoucherPdf } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
@@ -15,7 +16,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import {
   Ship, User, LogOut, Upload, Zap, Download, FileText, Loader2,
   FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
-  Anchor, Package, ShoppingCart, Code2,
+  Anchor, Package, ShoppingCart, Code2, ClipboardList,
 } from 'lucide-react';
 
 const CUSTOM_RULES_STORAGE_KEY = 'zhenghe_custom_rules';
@@ -31,6 +32,7 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
   'Packing List': <Package size={15} />,
   'Purchase Order': <ShoppingCart size={15} />,
   'Developer Notes': <Code2 size={15} />,
+  'CRM Billing': <ClipboardList size={15} />,
 };
 
 function App() {
@@ -127,6 +129,10 @@ function App() {
           status: d.status as FileStatus,
           data: parsedData,
           uploadedAt: d.created_at,
+          billing_status: d.billing_status ?? 'unbilled',
+          billed_at: d.billed_at ?? null,
+          billing_remarks: d.billing_remarks ?? null,
+          charge_validations: (d.charge_validations as Record<string, boolean>) ?? {},
         };
       });
       setFiles(processedFiles);
@@ -281,6 +287,10 @@ function App() {
     addLog('Batch processing finished.');
     setIsProcessing(false);
   }, [files, customRules]);
+
+  const handleBillingUpdate = (fileId: string, updates: Partial<ProcessedFile>) => {
+    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...updates } : f));
+  };
 
   const handleGenerateVouchers = async (docs: DocumentData[]) => {
     setIsGeneratingPdf(true);
@@ -658,6 +668,8 @@ function App() {
 
           {activeTab === 'Developer Notes' ? (
             <DeveloperNotes />
+          ) : activeTab === 'CRM Billing' ? (
+            <CrmBillingTab files={files} onBillingUpdate={handleBillingUpdate} />
           ) : !hasFiles ? (
             /* ── Drag & Drop Upload Zone ── */
             <div

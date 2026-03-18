@@ -187,6 +187,11 @@ export interface ProcessedFile {
   validationErrors?: string[];
   uploadedAt?: string; // ISO string from Supabase created_at
   stage?: string; // Current extraction stage shown during processing
+  // CRM Billing fields
+  billing_status?: 'unbilled' | 'billed';
+  billed_at?: string | null;
+  billing_remarks?: string | null;
+  charge_validations?: Record<string, boolean>;
 }
 
 export enum FileStatus {

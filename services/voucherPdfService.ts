@@ -75,11 +75,11 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
     page.drawText(autoDate, { x: 447, y: 717, size: 10, font: regular, color: BLACK });
 
-    // Header row: □SGD left=492, □USD left=535, bottom=691
+    // Header row: □SGD left=484, □USD left=527, bottom=691
     if (currency === 'SGD') {
-      drawTick(page, 492, 691);
+      drawTick(page, 484, 691);
     } else {
-      drawTick(page, 535, 691);
+      drawTick(page, 527, 691);
     }
 
     // ── Table data rows ──
@@ -107,16 +107,16 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       }
     }
 
-    // Row 5: Charges summary (THC / BL / SEALS etc.)
+    // Row 4: Charges summary (THC / BL / SEALS etc.)
     if (charges) {
       page.drawText(charges, {
-        x: descX, y: rowYs[4], size: fontSize, font: regular, color: BLACK, maxWidth: 360,
+        x: descX, y: rowYs[3], size: fontSize, font: regular, color: BLACK, maxWidth: 360,
       });
     }
 
-    // ── Total row (last table row = rowYs[7]): □SGD □USD   Total  |  amount ──
-    // □SGD left=316, □USD left=351, baseline y=535
-    const totalY = 535;
+    // ── Total row (below data rows): □SGD □USD   Total  |  amount ──
+    // □SGD left=316, □USD left=351, baseline y=517
+    const totalY = 517;
     if (currency === 'SGD') {
       drawTick(page, 316, totalY);
     } else {

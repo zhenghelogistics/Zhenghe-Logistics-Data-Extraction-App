@@ -10,14 +10,15 @@ function stripCurrency(val: string | null | undefined): string {
 }
 
 function detectCurrency(val: string | null | undefined): 'SGD' | 'USD' {
+  // Check total_payable_amount first, then payable_amount
   if (val && /USD/i.test(val)) return 'USD';
   return 'SGD';
 }
 
-// Draw a tick inside an existing template checkbox at (x, y)
+// Draw a tick (✓) inside a template checkbox at bottom-left corner (x, y)
 function drawTick(page: ReturnType<PDFDocument['addPage']>, x: number, y: number) {
   page.drawLine({ start: { x: x + 1, y: y + 3 }, end: { x: x + 3, y: y + 1 }, thickness: 1.2, color: NAVY });
-  page.drawLine({ start: { x: x + 3, y: y + 1 }, end: { x: x + 8, y: y + 8 }, thickness: 1.2, color: NAVY });
+  page.drawLine({ start: { x: x + 3, y: y + 1 }, end: { x: x + 8, y: y + 7 }, thickness: 1.2, color: NAVY });
 }
 
 export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
@@ -35,11 +36,13 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     outputDoc.addPage(page);
 
     const pv = doc.payment_voucher_details;
-    const currency    = detectCurrency(pv?.payable_amount);
+
+    // Detect currency from total_payable_amount first, then payable_amount
+    const currencySource = pv?.total_payable_amount || pv?.payable_amount;
+    const currency    = detectCurrency(currencySource);
     const amount      = stripCurrency(pv?.payable_amount);
-    const total       = stripCurrency(pv?.total_payable_amount);
-    const ref         = pv?.pss_invoice_number || doc.metadata?.reference_number || '';
-    const paymentTo   = pv?.payment_to || doc.metadata?.parties?.consignee_buyer || '';
+    const total       = stripCurrency(pv?.total_payable_amount) || stripCurrency(pv?.payable_amount);
+    const paymentTo   = pv?.payment_to || doc.metadata?.parties?.shipper_supplier || '';
     const paymentMethod = pv?.payment_method || '';
     const docDate     = doc.metadata?.date || '';
 
@@ -48,73 +51,85 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     const pssNum     = pv?.pss_invoice_number || '';
     const charges    = pv?.charges_summary || '';
 
-    // pssNum may already carry a leading # (e.g. "#25122020") — don't double it
+    // pssNum may already carry a leading # — don't double it
     const pssDisplay = pssNum.startsWith('#') ? pssNum : (pssNum ? `#${pssNum}` : '');
     const blPssLine = [
-      blNum       ? `BL. ${blNum}`       : '',
-      pssDisplay  ? `(${pssDisplay})`    : '',
+      blNum      ? `BL. ${blNum}`    : '',
+      pssDisplay ? `(${pssDisplay})` : '',
     ].filter(Boolean).join(' ');
 
-    // ── Field positions (pixel-calibrated to the ZHL Payment Voucher template) ──
-    // Template image: 1104×790 px placed at pdf-lib x=23.04–552.96, y=430.8–810.0
-    // Conversion: x = 23.04 + px*0.48,  y = 810 - py*0.48
+    // ── Coordinates calibrated from ZHL Payment Voucher.pdf pixel analysis ──
+    // Page: A4 595.2 × 841.68 pts, origin bottom-left
+    // Positions verified by rendering template at 3x zoom and scanning navy pixel clusters
 
-    // Ref: left blank per accounts team preference
+    // Ref: intentionally left blank per accounts team
 
-    // Payment To value — on the underline (y=714 puts text on the line)
-    if (paymentTo) page.drawText(paymentTo, { x: 102, y: 714, size: 11, font: regular, color: BLACK, maxWidth: 290 });
+    // Payment To — baseline at y=714, starts just after "Payment To:" label
+    if (paymentTo) {
+      page.drawText(paymentTo, { x: 117, y: 714, size: 10, font: regular, color: BLACK, maxWidth: 285 });
+    }
 
-    // Date — "as of today" (auto-generated)
+    // Date — to the right of "Date:" label
     const today = new Date();
     const autoDate = docDate ||
       `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-    page.drawText(autoDate, { x: 452, y: 714, size: 11, font: regular, color: BLACK });
+    page.drawText(autoDate, { x: 447, y: 717, size: 10, font: regular, color: BLACK });
 
-    // SGD / USD tick in table header checkbox (moved right into the □ box)
+    // Header row: □SGD left=480, □USD left=522, bottom=691
     if (currency === 'SGD') {
-      drawTick(page, 462, 695);
+      drawTick(page, 480, 691);
     } else {
-      drawTick(page, 512, 695);
+      drawTick(page, 522, 691);
     }
 
-    // Table data rows — baselines calibrated from horizontal line scan
-    const rowYs = [651, 629, 607, 585, 563, 541, 517, 491];
-    const descX  = 105;
-    const amtX   = 479;
-    const fontSize = 11;
+    // ── Table data rows ──
+    // Baselines from pixel scan: row 1 confirmed at y=666 (from Acrobat annotation),
+    // spacing ~18.75pt, 8 rows total.
+    const rowYs = [666, 647, 628, 610, 591, 572, 553, 535];
+    const descX    = 107;   // description column left edge
+    const amtX     = 499;   // amount column left edge (confirmed from Acrobat annotation)
+    const fontSize = 10;
 
-    // Row 1: Payment Invoice number
+    // Row 1: Carrier invoice number
     if (carrierInv) {
-      page.drawText(`Payment Inv.  ${carrierInv}`, { x: descX, y: rowYs[0], size: fontSize, font: regular, color: BLACK, maxWidth: 370 });
+      page.drawText(`Payment Inv.  ${carrierInv}`, {
+        x: descX, y: rowYs[0], size: fontSize, font: regular, color: BLACK, maxWidth: 360,
+      });
     }
 
-    // Row 2: BL + PSS number — amount on this row
+    // Row 2: BL number + PSS invoice — amount in right column
     if (blPssLine) {
-      page.drawText(blPssLine, { x: descX, y: rowYs[1], size: fontSize, font: regular, color: BLACK, maxWidth: 370 });
-      if (amount) page.drawText(amount, { x: amtX, y: rowYs[1], size: fontSize, font: regular, color: BLACK });
+      page.drawText(blPssLine, {
+        x: descX, y: rowYs[1], size: fontSize, font: regular, color: BLACK, maxWidth: 360,
+      });
+      if (amount) {
+        page.drawText(amount, { x: amtX, y: rowYs[1], size: fontSize, font: regular, color: BLACK });
+      }
     }
 
-    // Row 6: Charges (THC/BL/SEAL etc.) — 1 row above the Total row
+    // Row 6: Charges summary (THC / BL / SEALS etc.)
     if (charges) {
-      page.drawText(charges, { x: descX, y: rowYs[5], size: fontSize, font: regular, color: BLACK, maxWidth: 370 });
+      page.drawText(charges, {
+        x: descX, y: rowYs[5], size: fontSize, font: regular, color: BLACK, maxWidth: 360,
+      });
     }
 
-    // Total row (table): tick in □SGD or □USD at the "□SGD □USD Total" label row
+    // ── Total row (last table row): □SGD □USD   Total  |  amount ──
+    // □SGD left=368, □USD left=402, baseline y=517
+    const totalY = 517;
     if (currency === 'SGD') {
-      drawTick(page, 462, rowYs[6]);
+      drawTick(page, 368, totalY);
     } else {
-      drawTick(page, 512, rowYs[6]);
+      drawTick(page, 402, totalY);
+    }
+    if (total) {
+      page.drawText(total, { x: amtX, y: totalY, size: fontSize, font: bold, color: BLACK });
     }
 
-    // Cash / Cheque No. section: fixed text on left, tick + total amount on right
+    // ── Cash / Cheque No. section ──
+    // Text-only field — no checkbox exists here in the template
     const cashChequeText = paymentMethod || 'UOB SGD FAST / GIRO PAYMENT';
-    page.drawText(cashChequeText, { x: 158, y: 474, size: 11, font: regular, color: BLACK });
-    if (currency === 'SGD') {
-      drawTick(page, 462, 474);
-    } else {
-      drawTick(page, 512, 474);
-    }
-    if (total) page.drawText(total, { x: amtX, y: 474, size: 11, font: bold, color: BLACK });
+    page.drawText(cashChequeText, { x: 164, y: 484, size: 10, font: regular, color: BLACK });
   }
 
   const bytes = await outputDoc.save();

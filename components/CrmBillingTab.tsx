@@ -720,6 +720,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
                 <tbody>
                   {filteredBilled.map((r, i) => {
                     const chargesStr = Object.entries(r.charges)
+                      .filter(([k]) => !NON_BILLABLE_KEYS.has(k))
                       .map(([k, v]) => `${CHARGE_LABELS[k] ?? k}: ${v}`).join(' · ') || '—';
                     return (
                       <tr key={r.id} className={`border-b border-slate-50 ${i % 2 !== 0 ? 'bg-slate-50/30' : ''}`}>

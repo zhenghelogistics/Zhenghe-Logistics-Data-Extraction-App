@@ -10,6 +10,7 @@ const getNestedValue = (obj: any, path: string) => {
 };
 
 // Document types that store their reference in type-specific fields, not metadata.reference_number
+// Also used to skip metadata.date validation (these types have their own date fields)
 const TYPES_WITHOUT_METADATA_REF = new Set([
   'Logistics Local Charges Report',
   'Payment Voucher/GL',
@@ -25,8 +26,9 @@ export const validateDocumentData = (dataList: DocumentData[]): string[] => {
   dataList.forEach((data, index) => {
     const prefix = `Doc ${index + 1} (${data.document_type}):`;
     AppConfig.validation.requiredFields.forEach((fieldPath) => {
-      // Skip metadata.reference_number for types that use their own ID fields
-      if (fieldPath === 'metadata.reference_number' && TYPES_WITHOUT_METADATA_REF.has(data.document_type)) return;
+      // Skip metadata.reference_number and metadata.date for types that use their own ID/date fields
+      if (TYPES_WITHOUT_METADATA_REF.has(data.document_type) &&
+          (fieldPath === 'metadata.reference_number' || fieldPath === 'metadata.date')) return;
       const value = getNestedValue(data, fieldPath);
       if (!value || (typeof value === "string" && value.trim() === "")) {
         allErrors.push(`${prefix} Missing ${fieldPath}`);

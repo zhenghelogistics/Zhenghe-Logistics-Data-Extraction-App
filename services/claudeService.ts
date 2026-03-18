@@ -302,7 +302,7 @@ Respond ONLY with valid JSON matching this exact structure:
       },
       "allied_report": {
         "container_booking_no": "string or null",
-        "invoice_date": "YYYY-MM-DD or null — the date printed on the Allied report",
+        "invoice_date": "YYYY-MM-DD or null — the Bill Date, Invoice Date, or transaction date printed on the Allied/depot report (convert any format like '25-Oct-2025' to YYYY-MM-DD)",
         "dhc_in": "string or null",
         "dhc_out": "string or null",
         "dhe_in": "string or null",
@@ -315,7 +315,7 @@ Respond ONLY with valid JSON matching this exact structure:
       },
       "cdas_report": {
         "container_number": "string or null",
-        "invoice_date": "YYYY-MM-DD or null — the report/transaction date printed on the CDAS report",
+        "invoice_date": "YYYY-MM-DD or null — the Bill Date, Invoice Date, or transaction date printed on the CDAS/depot report (convert any format like '25-Oct-2025' to YYYY-MM-DD)",
         "dhc_in": "string or null",
         "dhc_out": "string or null",
         "dhe_in": "string or null",

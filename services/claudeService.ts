@@ -374,6 +374,53 @@ const buildSystemPrompt = (customInstructions: string[], role?: string): string 
   return prompt;
 };
 
+// Hard post-processing for accounts role:
+// 1. Convert any LCR that Claude accidentally produced into a PV/GL entry.
+// 2. Strip document types that don't belong to accounts (OPD, Allied, CDAS, etc.)
+const enforceAccountsLane = (docs: DocumentData[]): DocumentData[] => {
+  const allowed = new Set(['Payment Voucher/GL', 'Bill of Lading']);
+  const result: DocumentData[] = [];
+
+  for (const doc of docs) {
+    if (doc.document_type === 'Logistics Local Charges Report') {
+      // Force-convert LCR → PV/GL so it appears in the accounts view
+      const l = doc.logistics_local_charges;
+      const chargeMap: [string | null | undefined, string][] = [
+        [l?.thc_amount,     'THC'],
+        [l?.seal_fee,       'SEALS'],
+        [l?.bl_fee,         'BL'],
+        [l?.bl_printed_fee, 'PRINTED BL'],
+        [l?.ens_ams_fee,    'ENS'],
+        [l?.other_charges,  'OTHER'],
+      ];
+      const charges = chargeMap
+        .filter(([val]) => val && (val as string).trim().length > 0)
+        .map(([, label]) => label)
+        .join(', ');
+
+      result.push({
+        ...doc,
+        document_type: 'Payment Voucher/GL',
+        logistics_local_charges: undefined,
+        payment_voucher_details: {
+          pss_invoice_number:     l?.pss_invoice_number   ?? null,
+          carrier_invoice_number: null,
+          bl_number:              l?.bl_number             ?? doc.metadata?.reference_number ?? null,
+          payable_amount:         l?.total_payable_amount  ?? null,
+          total_payable_amount:   l?.total_payable_amount  ?? null,
+          charges_summary:        charges || null,
+          payment_to:             l?.carrier_forwarder     ?? doc.metadata?.parties?.shipper_supplier ?? null,
+          payment_method:         null,
+        },
+      });
+    } else if (allowed.has(doc.document_type)) {
+      result.push(doc);
+    }
+    // Everything else (OPD, Allied, CDAS...) is silently dropped for accounts
+  }
+  return result;
+};
+
 // For every Logistics Local Charges Report that has no matching Payment Voucher/GL,
 // synthesize one so the accounts team always sees their row.
 const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
@@ -713,10 +760,15 @@ export const extractDocumentData = async (
   }
 
   onProgress?.('Processing results...');
-  // ensurePaymentVouchers synthesizes PV entries from LCRs as a fallback.
-  // Only relevant for accounts (or no-role fallback) — logistics/transport never need PVs synthesized.
-  const withPv = (role === 'logistics' || role === 'transport')
-    ? allDocs
-    : ensurePaymentVouchers(allDocs);
-  return deduplicateByContainer(deduplicateDocuments(withPv));
+  let processed: DocumentData[];
+  if (role === 'accounts') {
+    // Hard-enforce accounts lane: convert any stray LCRs to PV/GL, drop OPD/Allied/CDAS entirely
+    processed = enforceAccountsLane(allDocs);
+  } else if (role === 'logistics' || role === 'transport') {
+    processed = allDocs;
+  } else {
+    // No role: synthesize PVs from LCRs as a fallback
+    processed = ensurePaymentVouchers(allDocs);
+  }
+  return deduplicateByContainer(deduplicateDocuments(processed));
 };

@@ -33,6 +33,13 @@ const CHARGE_LABELS: Record<string, string> = {
   detention: 'Detention', demurrage: 'Demurrage',
 };
 
+// Charges that are non-billable — hidden from validation checkboxes
+const NON_BILLABLE_KEYS = new Set(['dhc_in', 'dhc_out', 'dhe_in', 'dhe_out', 'data_admin_fee']);
+
+function billableCharges(r: ContainerBillingRecord): [string, string][] {
+  return Object.entries(r.charges).filter(([k]) => !NON_BILLABLE_KEYS.has(k));
+}
+
 const AMBER = '#EF9F27';
 const GREEN = '#1D9E75';
 
@@ -121,8 +128,12 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
   }, [view]);
 
   const activeRecords = records.filter(r => !r.is_archived);
-  const unbilled = activeRecords.filter(r => r.billing_status === 'unbilled');
-  const billed   = activeRecords.filter(r => r.billing_status === 'billed');
+  // A record is "effectively unbilled" only if it has at least one billable charge
+  // (records with only non-billable charges are auto-treated as billed)
+  const isEffectivelyUnbilled = (r: ContainerBillingRecord) =>
+    r.billing_status === 'unbilled' && billableCharges(r).length > 0;
+  const unbilled = activeRecords.filter(isEffectivelyUnbilled);
+  const billed   = activeRecords.filter(r => !isEffectivelyUnbilled(r));
   const archived = records.filter(r => r.is_archived);
 
   // ── Toast
@@ -212,12 +223,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
   }, {});
 
   // ── Charge helpers
-  const allTicked = (r: ContainerBillingRecord) =>
-    Object.keys(r.charges).length > 0 &&
-    Object.keys(r.charges).every(k => r.charge_validations[k] === true);
+  const allTicked = (r: ContainerBillingRecord) => {
+    const keys = billableCharges(r).map(([k]) => k);
+    return keys.length === 0 || keys.every(k => r.charge_validations[k] === true);
+  };
 
   const checkedCount = (r: ContainerBillingRecord) =>
-    Object.keys(r.charges).filter(k => r.charge_validations[k] === true).length;
+    billableCharges(r).filter(([k]) => r.charge_validations[k] === true).length;
 
   // ── Selection
   const toggleSelect = (id: string) => setSelectedIds(prev => {
@@ -488,11 +500,11 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
                         {isExpanded && (
                           <tr className="bg-blue-50/20 border-b border-slate-100">
                             <td colSpan={8} className="px-6 py-5">
-                              {Object.keys(r.charges).length === 0 ? (
-                                <p className="text-sm text-slate-400 italic mb-4">No charges extracted — ready to bill immediately.</p>
+                              {billableCharges(r).length === 0 ? (
+                                <p className="text-sm text-slate-400 italic mb-4">No billable charges — ready to mark as billed.</p>
                               ) : (
                                 <div className="grid grid-cols-2 gap-2 mb-4">
-                                  {Object.entries(r.charges).map(([key, amount]) => {
+                                  {billableCharges(r).map(([key, amount]) => {
                                     const isTicked = r.charge_validations[key] === true;
                                     return (
                                       <label

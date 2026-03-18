@@ -339,13 +339,26 @@ const ROLE_SCOPE: Record<string, string> = {
   accounts: `
 
 TEAM SCOPE — ACCOUNTS TEAM (MANDATORY OVERRIDE):
-You are extracting for the accounts team. Follow these rules strictly:
-CRITICAL: This file may contain MANY Bills of Lading and Tax Invoices (sometimes 5–30+). You MUST scan EVERY page and extract EVERY distinct BL and Tax Invoice — do NOT stop after the first few. Missing entries is a critical error.
-1. ONLY extract documents of these types: "Bill of Lading" and "Payment Voucher/GL". All other types must be IGNORED.
-2. When you encounter a Tax Invoice, Freight Invoice, Debit Note, or Credit Note from a carrier/forwarder: classify it as "Payment Voucher/GL" ONLY. Do NOT create a "Logistics Local Charges Report" entry for it.
-3. OVERRIDE the Merge Rule: Do NOT merge BL + Tax Invoice into a single LCR entry. Keep the BL as "Bill of Lading". Classify the Tax Invoice separately as "Payment Voucher/GL".
-4. IGNORE completely: Outward Permit Declarations, Allied Reports, CDAS Reports — do not extract these at all.
-5. MULTI-INVOICE: If multiple Tax Invoices exist (different invoice numbers/totals), create a SEPARATE "Payment Voucher/GL" entry for EACH invoice number. All invoices must appear in your output.`,
+You are extracting for the accounts team. Use EXACTLY these two document_type values — nothing else:
+
+A) "Bill of Lading" — for actual BL documents only.
+B) "Payment Voucher/GL" — for ANY of the following: Tax Invoice, Freight Invoice, Debit Note, Credit Note, or any carrier/forwarder invoice. These are NOT ignored — they MUST be extracted as "Payment Voucher/GL".
+
+MAPPING TABLE (follow exactly):
+- Bill of Lading → document_type: "Bill of Lading"
+- Tax Invoice → document_type: "Payment Voucher/GL"
+- Freight Invoice → document_type: "Payment Voucher/GL"
+- Debit Note → document_type: "Payment Voucher/GL"
+- Credit Note → document_type: "Payment Voucher/GL"
+- Outward Permit Declaration → SKIP entirely, do not extract
+- Allied Report → SKIP entirely, do not extract
+- CDAS Report → SKIP entirely, do not extract
+- Logistics Local Charges Report → DO NOT USE this type, use "Payment Voucher/GL" instead
+
+CRITICAL RULES:
+1. Do NOT merge a BL and a Tax Invoice into one entry. Extract them as two SEPARATE entries.
+2. If there are multiple Tax Invoices (different invoice numbers), create a SEPARATE "Payment Voucher/GL" entry for EACH one.
+3. This file may contain 5–30+ BLs and Tax Invoices. Scan EVERY page. Extract ALL of them.`,
 
   logistics: `
 

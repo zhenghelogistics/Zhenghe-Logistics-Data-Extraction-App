@@ -288,9 +288,50 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
   });
   const filteredAll = activeRecords.filter(r => matchesSearch(r, searchQuery));
 
-  // ── Summary stats
-  const totalUnbilledDemurrage = unbilled.reduce((sum, r) => sum + parseAmount(r.charges['demurrage']), 0);
-  const totalUnbilledDetention = unbilled.reduce((sum, r) => sum + parseAmount(r.charges['detention']), 0);
+  // ── Summary filters
+  const [summaryDatePreset, setSummaryDatePreset] = useState<string>('all');
+  const [summaryCustomFrom, setSummaryCustomFrom] = useState('');
+  const [summaryCustomTo,   setSummaryCustomTo]   = useState('');
+
+  const BILLABLE_CHARGE_KEYS = ['demurrage', 'detention', 'washing', 'repair'] as const;
+  const [summaryChargeFilter, setSummaryChargeFilter] = useState<Set<string>>(
+    new Set(BILLABLE_CHARGE_KEYS)
+  );
+  const toggleSummaryCharge = (key: string) => {
+    setSummaryChargeFilter(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const summaryDateRange = (() => {
+    const today = new Date();
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const firstOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+    const lastOfMonth  = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    switch (summaryDatePreset) {
+      case 'this_month':  return { from: fmt(firstOfMonth(today)), to: fmt(today) };
+      case 'last_month': { const lm = new Date(today.getFullYear(), today.getMonth() - 1, 1); return { from: fmt(firstOfMonth(lm)), to: fmt(lastOfMonth(lm)) }; }
+      case 'last_3m': { const d = new Date(today); d.setMonth(d.getMonth() - 3); return { from: fmt(d), to: fmt(today) }; }
+      case 'last_6m': { const d = new Date(today); d.setMonth(d.getMonth() - 6); return { from: fmt(d), to: fmt(today) }; }
+      case 'this_year':  return { from: `${today.getFullYear()}-01-01`, to: fmt(today) };
+      case 'custom':     return { from: summaryCustomFrom, to: summaryCustomTo };
+      default:           return { from: '', to: '' };
+    }
+  })();
+
+  const summaryFilteredActive = activeRecords.filter(r => {
+    const { from, to } = summaryDateRange;
+    if (from || to) {
+      const d = r.container_date || r.created_at.split('T')[0];
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
+    }
+    return true;
+  });
+  const summaryUnbilled = summaryFilteredActive.filter(isEffectivelyUnbilled);
+  const summaryBilled   = summaryFilteredActive.filter(r => !isEffectivelyUnbilled(r));
 
   // ── Shared search bar
   const SearchBar = ({ placeholder }: { placeholder: string }) => (
@@ -726,31 +767,84 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
       {/* ── SUMMARY ───────────────────────────────────────────────────────────── */}
       {view === 'summary' && (
         <div className="space-y-6">
+          {/* Summary filters */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <select
+              value={summaryDatePreset}
+              onChange={e => setSummaryDatePreset(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+            >
+              <option value="all">All time</option>
+              <option value="this_month">This month</option>
+              <option value="last_month">Last month</option>
+              <option value="last_3m">Last 3 months</option>
+              <option value="last_6m">Last 6 months</option>
+              <option value="this_year">This year</option>
+              <option value="custom">Custom range…</option>
+            </select>
+            {summaryDatePreset === 'custom' && (
+              <>
+                <input type="date" value={summaryCustomFrom} onChange={e => setSummaryCustomFrom(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                <span className="text-slate-400 text-sm">→</span>
+                <input type="date" value={summaryCustomTo} onChange={e => setSummaryCustomTo(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+              </>
+            )}
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-xs text-slate-400 mr-1">Charges:</span>
+              {BILLABLE_CHARGE_KEYS.map(key => (
+                <button
+                  key={key}
+                  onClick={() => toggleSummaryCharge(key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                    summaryChargeFilter.has(key)
+                      ? 'bg-slate-800 text-white border-slate-800'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                  }`}
+                >
+                  {CHARGE_LABELS[key]}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Active stats */}
           <div>
             <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Active Records</h3>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
                 <p className="text-xs text-slate-500 mb-1">Unbilled</p>
-                <p className="text-2xl font-bold text-amber-600">{unbilled.length}</p>
+                <p className="text-2xl font-bold text-amber-600">{summaryUnbilled.length}</p>
                 <p className="text-xs text-slate-400 mt-0.5">containers</p>
               </div>
               <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
                 <p className="text-xs text-slate-500 mb-1">Billed</p>
-                <p className="text-2xl font-bold text-emerald-600">{billed.length}</p>
+                <p className="text-2xl font-bold text-emerald-600">{summaryBilled.length}</p>
                 <p className="text-xs text-slate-400 mt-0.5">containers</p>
               </div>
-              <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm">
-                <p className="text-xs text-slate-500 mb-1">Unbilled Demurrage</p>
-                <p className="text-xl font-bold text-red-600">SGD {totalUnbilledDemurrage.toFixed(2)}</p>
-                <p className="text-xs text-slate-400 mt-0.5">outstanding</p>
-              </div>
-              <div className="bg-white rounded-xl border border-orange-100 p-4 shadow-sm">
-                <p className="text-xs text-slate-500 mb-1">Unbilled Detention</p>
-                <p className="text-xl font-bold text-orange-600">SGD {totalUnbilledDetention.toFixed(2)}</p>
-                <p className="text-xs text-slate-400 mt-0.5">outstanding</p>
-              </div>
             </div>
+            {summaryChargeFilter.size > 0 && (
+              <div className={`grid gap-3 grid-cols-${Math.min(summaryChargeFilter.size, 4)}`}>
+                {BILLABLE_CHARGE_KEYS.filter(k => summaryChargeFilter.has(k)).map(key => {
+                  const total = summaryUnbilled.reduce((s, r) => s + parseAmount(r.charges[key]), 0);
+                  const colors: Record<string, { border: string; text: string }> = {
+                    demurrage: { border: 'border-red-100',    text: 'text-red-600' },
+                    detention: { border: 'border-orange-100', text: 'text-orange-600' },
+                    washing:   { border: 'border-blue-100',   text: 'text-blue-600' },
+                    repair:    { border: 'border-purple-100', text: 'text-purple-600' },
+                  };
+                  const c = colors[key] ?? { border: 'border-slate-100', text: 'text-slate-700' };
+                  return (
+                    <div key={key} className={`bg-white rounded-xl border ${c.border} p-4 shadow-sm`}>
+                      <p className="text-xs text-slate-500 mb-1">Unbilled {CHARGE_LABELS[key]}</p>
+                      <p className={`text-xl font-bold ${c.text}`}>SGD {total.toFixed(2)}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">outstanding</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Archive section */}

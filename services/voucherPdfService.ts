@@ -107,10 +107,10 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       }
     }
 
-    // Row 6: Charges summary (THC / BL / SEALS etc.)
+    // Row 5: Charges summary (THC / BL / SEALS etc.)
     if (charges) {
       page.drawText(charges, {
-        x: descX, y: rowYs[5], size: fontSize, font: regular, color: BLACK, maxWidth: 360,
+        x: descX, y: rowYs[4], size: fontSize, font: regular, color: BLACK, maxWidth: 360,
       });
     }
 

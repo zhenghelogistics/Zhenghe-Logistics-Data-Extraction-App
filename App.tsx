@@ -225,6 +225,7 @@ function App() {
       const result = await deleteDocument(id);
       if (result.success) {
         setFiles(prev => prev.filter(f => f.id !== id));
+        setContainerRecords(prev => prev.map(r => r.source_document_id === id ? { ...r, source_document_id: null } : r));
         addLog(`Deleted file ${id}`);
       } else {
         addLog(`Error deleting ${id}: ${result.message}`);
@@ -239,6 +240,8 @@ function App() {
     const result = await deleteDocument(id);
     if (result.success) {
       setFiles(prev => prev.filter(f => f.id !== id));
+      // Detach CRM records from the deleted document — keep them, just orphan the source link
+      setContainerRecords(prev => prev.map(r => r.source_document_id === id ? { ...r, source_document_id: null } : r));
       addLog(`Success: ${result.message}`);
     } else {
       addLog(`Error: ${result.message}`);

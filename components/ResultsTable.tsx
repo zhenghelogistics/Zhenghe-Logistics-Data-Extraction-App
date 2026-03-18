@@ -58,7 +58,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
   });
 
   // Helper to render status badge
-  const renderStatusBadge = (status: FileStatus) => {
+  const renderStatusBadge = (status: FileStatus, validationErrors?: string[]) => {
     switch (status) {
       case FileStatus.COMPLETED:
         return (
@@ -69,9 +69,12 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
         );
       case FileStatus.WARNING:
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <span
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 cursor-help"
+            title={validationErrors && validationErrors.length > 0 ? validationErrors.join('\n') : 'Extraction completed with warnings'}
+          >
             <AlertTriangle size={14} className="mr-1" />
-            Warning
+            Warning {validationErrors && validationErrors.length > 0 && `(${validationErrors.length})`}
           </span>
         );
       case FileStatus.PROCESSING:
@@ -286,7 +289,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                         {file.file.name}
                       </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm">
-                        {renderStatusBadge(file.status as FileStatus)}
+                        {renderStatusBadge(file.status as FileStatus, file.validationErrors)}
                       </td>
                       <td className="px-3 py-3.5 text-sm text-slate-500 max-w-xs">
                         {file.status === FileStatus.ERROR
@@ -396,7 +399,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                  </td>
                  <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{file.file.name}</td>
                  <td className="whitespace-nowrap px-3 py-3.5 text-sm">
-                   {renderStatusBadge(file.status as FileStatus)}
+                   {renderStatusBadge(file.status as FileStatus, file.validationErrors)}
                  </td>
                  <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
                     <button

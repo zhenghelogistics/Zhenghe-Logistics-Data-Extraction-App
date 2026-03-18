@@ -115,12 +115,12 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     }
 
     // ── Total row (last table row = rowYs[7]): □SGD □USD   Total  |  amount ──
-    // □SGD left=325, □USD left=360, baseline y=535
+    // □SGD left=316, □USD left=351, baseline y=535
     const totalY = 535;
     if (currency === 'SGD') {
-      drawTick(page, 325, totalY);
+      drawTick(page, 316, totalY);
     } else {
-      drawTick(page, 360, totalY);
+      drawTick(page, 351, totalY);
     }
     if (total) {
       page.drawText(total, { x: amtX, y: totalY, size: fontSize, font: bold, color: BLACK });

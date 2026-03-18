@@ -338,11 +338,12 @@ const ROLE_SCOPE: Record<string, string> = {
 
 TEAM SCOPE — ACCOUNTS TEAM (MANDATORY OVERRIDE):
 You are extracting for the accounts team. Follow these rules strictly:
+CRITICAL: This file may contain MANY Bills of Lading and Tax Invoices (sometimes 5–30+). You MUST scan EVERY page and extract EVERY distinct BL and Tax Invoice — do NOT stop after the first few. Missing entries is a critical error.
 1. ONLY extract documents of these types: "Bill of Lading" and "Payment Voucher/GL". All other types must be IGNORED.
 2. When you encounter a Tax Invoice, Freight Invoice, Debit Note, or Credit Note from a carrier/forwarder: classify it as "Payment Voucher/GL" ONLY. Do NOT create a "Logistics Local Charges Report" entry for it.
 3. OVERRIDE the Merge Rule: Do NOT merge BL + Tax Invoice into a single LCR entry. Keep the BL as "Bill of Lading". Classify the Tax Invoice separately as "Payment Voucher/GL".
 4. IGNORE completely: Outward Permit Declarations, Allied Reports, CDAS Reports — do not extract these at all.
-5. MULTI-INVOICE: If multiple Tax Invoices exist (different invoice numbers/totals), create a separate "Payment Voucher/GL" entry for each one.`,
+5. MULTI-INVOICE: If multiple Tax Invoices exist (different invoice numbers/totals), create a SEPARATE "Payment Voucher/GL" entry for EACH invoice number. All invoices must appear in your output.`,
 
   logistics: `
 
@@ -691,7 +692,10 @@ export const extractDocumentData = async (
   };
 
   onProgress?.('Reading PDF...');
-  const chunks = await splitPdfIntoChunks(file, 50);
+  // Accounts docs can have many BL+Invoice pairs per file — use smaller chunks so
+  // each API call has ~3-5 documents rather than 20+, avoiding output token truncation.
+  const chunkSize = role === 'accounts' ? 15 : 50;
+  const chunks = await splitPdfIntoChunks(file, chunkSize);
 
   const allDocs: DocumentData[] = [];
   for (let i = 0; i < chunks.length; i++) {

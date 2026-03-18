@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { extractDocumentData, validateDocumentData } from './services/claudeService';
 import {
   supabase, fetchDocuments, saveDocument, deleteDocument,
-  fetchContainerBilling, insertContainerBillingRows, ContainerBillingRecord,
+  fetchContainerBilling, insertContainerBillingRows, deleteContainerBilling, ContainerBillingRecord,
 } from './services/supabase';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
@@ -247,6 +247,9 @@ function App() {
     setFileToDelete(null);
   };
 
+  // Charge keys that are non-billable (depot handling fees the transport team doesn't bill for)
+  const NON_BILLABLE_KEYS = new Set(['dhc_in', 'dhc_out', 'dhe_in', 'dhe_out', 'data_admin_fee']);
+
   const extractContainerRows = (
     dataList: DocumentData[],
     filename: string,
@@ -256,7 +259,15 @@ function App() {
     const add = (charges: Record<string, string>, k: string, v: string | null | undefined) => {
       if (v) charges[k] = v;
     };
+    const resolveBillingStatus = (charges: Record<string, string>): { billing_status: 'unbilled' | 'billed'; billed_at: string | null } => {
+      const keys = Object.keys(charges);
+      if (keys.length > 0 && keys.every(k => NON_BILLABLE_KEYS.has(k))) {
+        return { billing_status: 'billed', billed_at: new Date().toISOString() };
+      }
+      return { billing_status: 'unbilled', billed_at: null };
+    };
     for (const doc of dataList) {
+      const container_date = doc.metadata?.date ?? null;
       if (doc.document_type === 'Allied Report' && doc.allied_report) {
         const r = doc.allied_report;
         const charges: Record<string, string> = {};
@@ -265,15 +276,8 @@ function App() {
         add(charges, 'data_admin_fee', r.data_admin_fee);
         add(charges, 'washing', r.washing); add(charges, 'repair', r.repair);
         add(charges, 'detention', r.detention); add(charges, 'demurrage', r.demurrage);
-        rows.push({ source_document_id: documentId, filename, report_type: 'Allied Report', container_number: r.container_booking_no ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null });
-      }
-      if (doc.document_type === 'CDAC Report' && doc.cdac_report) {
-        const r = doc.cdac_report;
-        const charges: Record<string, string> = {};
-        add(charges, 'dhc', r.dhc); add(charges, 'repair', r.repair);
-        add(charges, 'detention', r.detention); add(charges, 'demurage', r.demurage);
-        add(charges, 'admin_fees', r.admin_fees); add(charges, 'washing', r.washing);
-        rows.push({ source_document_id: documentId, filename, report_type: 'CDAC Report', container_number: r.container_number ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null });
+        const { billing_status, billed_at } = resolveBillingStatus(charges);
+        rows.push({ source_document_id: documentId, filename, report_type: 'Allied Report', container_number: r.container_booking_no ?? null, charges, charge_validations: {}, billing_status, billed_at, billing_remarks: null, container_date, is_archived: false, archive_label: null });
       }
       if (doc.document_type === 'CDAS Report' && doc.cdas_report) {
         const r = doc.cdas_report;
@@ -283,7 +287,8 @@ function App() {
         add(charges, 'data_admin_fee', r.data_admin_fee);
         add(charges, 'washing', r.washing); add(charges, 'repair', r.repair);
         add(charges, 'detention', r.detention); add(charges, 'demurrage', r.demurrage);
-        rows.push({ source_document_id: documentId, filename, report_type: 'CDAS Report', container_number: r.container_number ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null });
+        const { billing_status, billed_at } = resolveBillingStatus(charges);
+        rows.push({ source_document_id: documentId, filename, report_type: 'CDAS Report', container_number: r.container_number ?? null, charges, charge_validations: {}, billing_status, billed_at, billing_remarks: null, container_date, is_archived: false, archive_label: null });
       }
     }
     return rows;
@@ -357,6 +362,15 @@ function App() {
     setContainerRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
   };
 
+  const handleContainerRecordDelete = async (id: string) => {
+    try {
+      await deleteContainerBilling(id);
+      setContainerRecords(prev => prev.filter(r => r.id !== id));
+    } catch {
+      addLog(`Error deleting container billing record ${id}`);
+    }
+  };
+
   const handleGenerateVouchers = async (docs: DocumentData[]) => {
     setIsGeneratingPdf(true);
     try {
@@ -407,7 +421,6 @@ function App() {
         case 'Bill of Lading': headers = ['BL Number','Shipper','Consignee','Notify Party','Vessel','Voyage','POL','POD','Source File']; break;
         case 'Commercial Invoice': headers = ['Invoice Number','Supplier','Buyer','Incoterms','Total Amount','Currency','Date','Source File']; break;
         case 'Allied Report': headers = ['Container/Booking No','DHC In','DHC Out','DHE In','DHE Out','Data Admin Fee','Washing','Repair','Detention','Demurrage','Source File']; break;
-        case 'CDAC Report': headers = ['Container Number','Repair','Detention','Demurage','Admin Fees','Washing','DHC','Source File']; break;
         case 'CDAS Report': headers = ['Container Number','DHC In','DHC Out','DHE In','DHE Out','Data Admin Fee','Washing','Repair','Detention','Demurrage','Source File']; break;
         default: headers = ['Document Type','Reference Number','Date','Entity','Total Amount','Source File'];
       }
@@ -439,10 +452,6 @@ function App() {
           case 'Allied Report': {
             const ar = d.allied_report || {};
             return [safe(ar.container_booking_no),safe(ar.dhc_in),safe(ar.dhc_out),safe(ar.dhe_in),safe(ar.dhe_out),safe(ar.data_admin_fee),safe(ar.washing),safe(ar.repair),safe(ar.detention),safe(ar.demurrage),safe(filename)].join(',');
-          }
-          case 'CDAC Report': {
-            const cr = d.cdac_report || {};
-            return [safe(cr.container_number),safe(cr.repair),safe(cr.detention),safe(cr.demurage),safe(cr.admin_fees),safe(cr.washing),safe(cr.dhc),safe(filename)].join(',');
           }
           case 'CDAS Report': {
             const cs = d.cdas_report || {};
@@ -734,7 +743,7 @@ function App() {
           {activeTab === 'Developer Notes' ? (
             <DeveloperNotes />
           ) : activeTab === 'CRM Billing' ? (
-            <CrmBillingTab records={containerRecords} onRecordUpdate={handleContainerRecordUpdate} />
+            <CrmBillingTab records={containerRecords} onRecordUpdate={handleContainerRecordUpdate} onRecordDelete={handleContainerRecordDelete} />
           ) : !hasFiles ? (
             /* ── Drag & Drop Upload Zone ── */
             <div

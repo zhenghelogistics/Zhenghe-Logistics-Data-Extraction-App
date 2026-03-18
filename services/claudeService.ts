@@ -13,11 +13,9 @@ const getNestedValue = (obj: any, path: string) => {
 const TYPES_WITHOUT_METADATA_REF = new Set([
   'Logistics Local Charges Report',
   'Payment Voucher/GL',
-  'Transport Job',
   'Bill of Lading',
   'Outward Permit Declaration',
   'Allied Report',
-  'CDAC Report',
   'CDAS Report',
 ]);
 
@@ -68,11 +66,9 @@ CLASSIFICATION GUIDELINES:
 1. **"Logistics Local Charges Report"**: Any Tax Invoice, Freight Invoice, or Debit Note from a Carrier/Forwarder with logistics charges (THC, Seal Fee, BL Fee, etc.). Even if it references a BL number.
 2. **"Payment Voucher/GL"**: Any document requiring payment approval/recording.
 3. **"Outward Permit Declaration"**: Singapore Customs Outward Permit.
-4. **"Transport Job"**: Transport Job Sheet.
-5. **"Bill of Lading"**: ONLY a standalone Bill of Lading document itself — not an invoice that references one.
-6. **"Allied Report"**: An ALLIED Containers report listing container/booking numbers with associated charges (Repair, Detention, DHC In/Out, DHE In/Out, Washing, Data Admin Fee).
-7. **"CDAC Report"**: A CDAC (Container Depot) report listing container numbers with charges extracted from a "Depot Remark" column (Repair/Damage, Detention, Demurage, Admin Fee, Washing, DHC).
-8. **"CDAS Report"**: A "TRANSPORTER DAILY TRANSACTION REPORT" — has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each row = one container transaction. Charges are in the "Depot Remark" column as semicolon-separated pairs.
+4. **"Bill of Lading"**: ONLY a standalone Bill of Lading document itself — not an invoice that references one.
+5. **"Allied Report"**: An ALLIED Containers report listing container/booking numbers with associated charges (Repair, Detention, DHC In/Out, DHE In/Out, Washing, Data Admin Fee).
+6. **"CDAS Report"**: A "TRANSPORTER DAILY TRANSACTION REPORT" — has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each row = one container transaction. Charges are in the "Depot Remark" column as semicolon-separated pairs.
 
 **CRITICAL DUAL-ENTRY RULE**:
 - If you encounter a Tax Invoice or Freight Invoice:
@@ -169,16 +165,6 @@ EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
 - DESCRIPTION MATCH: Compare all four raw descriptions above. Do they all refer to the same item? Output "MATCH" or "MISMATCH - [which document differs]". Be strict.
 - COUNTRY OF ORIGIN: From PURCHASE ORDER item description field "Product Of Origin". Full country name in capitals e.g. "GERMANY".
 
-EXTRACTION RULES FOR "CDAC Report" (Transport Team):
-- DOCUMENT STRUCTURE: A CDAC report lists multiple container rows, each with a "Depot Remark" column containing charge descriptions. Create ONE separate CDAC Report entry for EACH container row.
-- CONTAINER NUMBER: The container number for this row (e.g. CAAU2548100, ONEU7673294, TLLU2603761).
-- REPAIR: Look for "REPAIR/DAMAGE" in the Depot Remark. Extract the dollar amount (e.g. "REPAIR/DAMAGE; $20.00" → "$20.00"). Null if not present.
-- DETENTION: Look for "DETENTION" in the Depot Remark. Extract the dollar amount (e.g. "DETENTION; $2290.00" → "$2290.00"). Null if not present.
-- DEMURAGE: Look for "DEMURAGE" in the Depot Remark. Extract the dollar amount (e.g. "DEMURAGE; $331.00" → "$331.00"). Null if not present.
-- ADMIN FEES: Look for "ADMIN FEE" in the Depot Remark. Extract the dollar amount (e.g. "ADMIN FEE; $5.00" → "$5.00"). Null if not present.
-- WASHING: Look for "WASHING" in the Depot Remark (e.g. "FB WATER WASHING"). Extract the dollar amount (e.g. "FB WATER WASHING; $20.00" → "$20.00"). Null if not present.
-- DHC: Look for "DHC IN", "DHC OUT", or "DEPOT HANDLING CHARGE" in the Depot Remark. Extract the dollar amount (e.g. "DHC IN; $75.00" → "$75.00", "DEPOT HANDLING CHARGE; $78.00" → "$78.00"). Null if not present.
-
 EXTRACTION RULES FOR "Allied Report" (Transport Team):
 - DOCUMENT STRUCTURE: This is a Receipts Journal. Each row in the summary table is ONE receipt for ONE charge type for ONE container. The SAME container number appears multiple times — once per charge type. The "Customer Type" column tells you the charge type.
 - CRITICAL: Read ONLY the summary table (the receipts journal grid at the start). Ignore all individual receipt pages that follow.
@@ -218,7 +204,7 @@ Respond ONLY with valid JSON matching this exact structure:
 {
   "documents": [
     {
-      "document_type": "string (one of: Bill of Lading, Commercial Invoice, Packing List, Purchase Order, Payment Voucher/GL, Container Report, Logistics Local Charges Report, Outward Permit Declaration, Transport Job, Allied Report, CDAC Report, Unknown)",
+      "document_type": "string (one of: Bill of Lading, Commercial Invoice, Packing List, Purchase Order, Payment Voucher/GL, Container Report, Logistics Local Charges Report, Outward Permit Declaration, Allied Report, CDAS Report, Unknown)",
       "metadata": {
         "reference_number": "string",
         "related_reference_number": "string or null",
@@ -310,14 +296,6 @@ Respond ONLY with valid JSON matching this exact structure:
         "description_match": "string or null",
         "country_of_origin": "string or null"
       },
-      "transport_job": {
-        "job_number": "string or null",
-        "customer": "string or null",
-        "pickup_location": "string or null",
-        "delivery_location": "string or null",
-        "container_number": "string or null",
-        "job_date": "string or null"
-      },
       "allied_report": {
         "container_booking_no": "string or null",
         "dhc_in": "string or null",
@@ -329,15 +307,6 @@ Respond ONLY with valid JSON matching this exact structure:
         "repair": "string or null",
         "detention": "string or null",
         "demurrage": "string or null"
-      },
-      "cdac_report": {
-        "container_number": "string or null",
-        "repair": "string or null",
-        "detention": "string or null",
-        "demurage": "string or null",
-        "admin_fees": "string or null",
-        "washing": "string or null",
-        "dhc": "string or null"
       },
       "cdas_report": {
         "container_number": "string or null",
@@ -547,6 +516,7 @@ const deduplicateByContainer = (docs: DocumentData[]): DocumentData[] => {
   const alliedDocs = docs.filter(d => d.document_type === 'Allied Report');
   const cdasDocs   = docs.filter(d => d.document_type === 'CDAS Report');
   const otherDocs  = docs.filter(d => d.document_type !== 'Allied Report' && d.document_type !== 'CDAS Report');
+  // Note: CDAC Report has been removed from the system
 
   const alliedMap = new Map<string, DocumentData>();
   for (const doc of alliedDocs) {

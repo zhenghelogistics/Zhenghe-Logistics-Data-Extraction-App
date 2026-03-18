@@ -113,15 +113,6 @@ export interface OutwardPermitDeclaration {
   country_of_origin?: string | null;
 }
 
-export interface TransportJob {
-  job_number?: string | null;
-  customer?: string | null;
-  pickup_location?: string | null;
-  delivery_location?: string | null;
-  container_number?: string | null;
-  job_date?: string | null;
-}
-
 export interface AlliedReport {
   container_booking_no?: string | null;
   dhc_in?: string | null;
@@ -133,16 +124,6 @@ export interface AlliedReport {
   repair?: string | null;
   detention?: string | null;
   demurrage?: string | null;
-}
-
-export interface CdacReport {
-  container_number?: string | null;
-  repair?: string | null;
-  detention?: string | null;
-  demurage?: string | null;
-  admin_fees?: string | null;
-  washing?: string | null;
-  dhc?: string | null;
 }
 
 export interface CdasReport {
@@ -167,9 +148,7 @@ export interface DocumentData {
   payment_voucher_details?: PaymentVoucherDetails;
   logistics_local_charges?: LogisticsLocalCharges;
   outward_permit_declaration?: OutwardPermitDeclaration;
-  transport_job?: TransportJob;
   allied_report?: AlliedReport;
-  cdac_report?: CdacReport;
   cdas_report?: CdasReport;
 }
 

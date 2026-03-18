@@ -154,13 +154,6 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case 'Gross Weight Amount': return data.outward_permit_declaration?.gross_weight_amount || '-';
       case 'Gross Weight Unit': return data.outward_permit_declaration?.gross_weight_unit || '-';
 
-      // Transport Job
-      case 'Job Number': return data.transport_job?.job_number || '-';
-      case 'Customer': return data.transport_job?.customer || '-';
-      case 'Pick-up': return data.transport_job?.pickup_location || '-';
-      case 'Delivery': return data.transport_job?.delivery_location || '-';
-      case 'Container #': return data.transport_job?.container_number || '-';
-
       // Allied Report
       case 'Container/Booking No': return data.allied_report?.container_booking_no || '-';
       case 'DHC In': return data.allied_report?.dhc_in || data.cdas_report?.dhc_in || '-';
@@ -168,17 +161,14 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case 'DHE In': return data.allied_report?.dhe_in || data.cdas_report?.dhe_in || '-';
       case 'DHE Out': return data.allied_report?.dhe_out || data.cdas_report?.dhe_out || '-';
       case 'Data Admin Fee': return data.allied_report?.data_admin_fee || data.cdas_report?.data_admin_fee || '-';
-      case 'Repair': return data.allied_report?.repair || data.cdas_report?.repair || data.cdac_report?.repair || '-';
-      case 'Detention': return data.allied_report?.detention || data.cdas_report?.detention || data.cdac_report?.detention || '-';
+      case 'Repair': return data.allied_report?.repair || data.cdas_report?.repair || '-';
+      case 'Detention': return data.allied_report?.detention || data.cdas_report?.detention || '-';
       case 'Demurrage': return data.allied_report?.demurrage || data.cdas_report?.demurrage || '-';
-      case 'Washing': return data.allied_report?.washing || data.cdas_report?.washing || data.cdac_report?.washing || '-';
+      case 'Washing': return data.allied_report?.washing || data.cdas_report?.washing || '-';
 
-      // CDAC Report
-      case 'Container Number': return data.cdac_report?.container_number || data.cdas_report?.container_number || '-';
-      case 'Demurage': return data.cdac_report?.demurage || '-';
-      case 'Admin Fees': return data.cdac_report?.admin_fees || '-';
-      case 'DHC': return data.cdac_report?.dhc || '-';
-      
+      // CDAS Report container number
+      case 'Container Number': return data.cdas_report?.container_number || '-';
+
       // Bill of Lading Specifics
       // BL Number is already handled above in Payment Voucher section
       case 'Shipper': return data.metadata?.parties?.shipper_supplier || '-';

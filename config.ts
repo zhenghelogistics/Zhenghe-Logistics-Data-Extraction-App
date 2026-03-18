@@ -29,8 +29,8 @@ export const AppConfig = {
       defaultTab: 'Logistics Local Charges Report'
     },
     transport: {
-      allowedTypes: ['All Files', 'Transport Job', 'Allied Report', 'CDAC Report', 'CDAS Report', 'CRM Billing'],
-      defaultTab: 'Transport Job'
+      allowedTypes: ['All Files', 'Allied Report', 'CDAS Report', 'CRM Billing'],
+      defaultTab: 'Allied Report'
     }
   },
   // Define columns for different views
@@ -58,9 +58,6 @@ export const AppConfig = {
         'Final Destination (Port Code)', 'Vessel Name', 'Voyage',
         'HS code', 'Description', 'Net Weight', 'Value Amount', 'Value Currency', 'Total Outer Pack Qty', 'Total Outer Pack Unit', 'Gross Weight Amount', 'Gross Weight Unit'
       ]
-    },
-    'Transport Job': {
-      columns: ['Job Number', 'Customer', 'Pick-up', 'Delivery', 'Container #', 'Date']
     },
     'Commercial Invoice': {
       columns: ['Invoice #', 'Supplier', 'Buyer', 'Incoterms', 'Total Amount', 'Currency'],

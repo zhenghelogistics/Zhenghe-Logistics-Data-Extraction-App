@@ -123,6 +123,9 @@ export interface ContainerBillingRecord {
   billed_at: string | null;
   billing_remarks: string | null;
   created_at: string;
+  container_date: string | null;
+  is_archived: boolean;
+  archive_label: string | null;
 }
 
 export const fetchContainerBilling = async (): Promise<ContainerBillingRecord[]> => {
@@ -157,6 +160,19 @@ export const updateContainerBilling = async (
   updates: Partial<Pick<ContainerBillingRecord, 'billing_status' | 'billed_at' | 'billing_remarks' | 'charge_validations'>>
 ): Promise<void> => {
   const { error } = await supabase.from('container_billing').update(updates).eq('id', id);
+  if (error) throw new Error(error.message);
+};
+
+export const deleteContainerBilling = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('container_billing').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+};
+
+export const archiveContainerBilling = async (ids: string[], label: string): Promise<void> => {
+  const { error } = await supabase
+    .from('container_billing')
+    .update({ is_archived: true, archive_label: label })
+    .in('id', ids);
   if (error) throw new Error(error.message);
 };
 

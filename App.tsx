@@ -324,15 +324,16 @@ function App() {
             id: savedDoc?.id || f.id,
           } : f
         ));
-        // Auto-insert container billing rows (duplicates silently ignored)
+        // Auto-insert container billing rows, then refresh full list to catch any upsert conflicts
         if (savedDoc?.id) {
           const containerRows = extractContainerRows(dataList, fileWrapper.file.name, savedDoc.id);
+          addLog(`Extracted ${containerRows.length} container row(s) for ${fileWrapper.file.name}.`);
           if (containerRows.length > 0) {
             const inserted = await insertContainerBillingRows(containerRows);
-            if (inserted.length > 0) {
-              setContainerRecords(prev => [...inserted, ...prev]);
-              addLog(`Added ${inserted.length} container billing record(s) for ${fileWrapper.file.name}.`);
-            }
+            addLog(`Inserted ${inserted.length} new container billing record(s) for ${fileWrapper.file.name}.`);
+            // Always refresh the full list — handles duplicates that were silently skipped
+            const refreshed = await fetchContainerBilling();
+            setContainerRecords(refreshed);
           }
         }
       } catch (error) {

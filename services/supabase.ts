@@ -140,18 +140,40 @@ export const fetchContainerBilling = async (): Promise<ContainerBillingRecord[]>
   return (data || []) as ContainerBillingRecord[];
 };
 
-// Upsert rows — duplicate (user_id, filename, container_number, report_type) is silently ignored
+// Insert new container billing rows, skipping any that already exist for the same filename+container+report_type
 export const insertContainerBillingRows = async (
   rows: Omit<ContainerBillingRecord, 'id' | 'user_id' | 'created_at'>[]
 ): Promise<ContainerBillingRecord[]> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
-  const withUser = rows.map(r => ({ ...r, user_id: user.id }));
+
+  // Fetch existing rows for this filename to detect duplicates without relying on a DB constraint
+  const filenames = [...new Set(rows.map(r => r.filename))];
+  const { data: existing } = await supabase
+    .from('container_billing')
+    .select('filename, container_number, report_type')
+    .eq('user_id', user.id)
+    .in('filename', filenames);
+
+  const existingSet = new Set(
+    (existing || []).map(e => `${e.filename}|${e.container_number ?? ''}|${e.report_type}`)
+  );
+
+  const newRows = rows.filter(r =>
+    !existingSet.has(`${r.filename}|${r.container_number ?? ''}|${r.report_type}`)
+  );
+
+  if (newRows.length === 0) return [];
+
+  const withUser = newRows.map(r => ({ ...r, user_id: user.id }));
   const { data, error } = await supabase
     .from('container_billing')
-    .upsert(withUser, { onConflict: 'user_id,filename,container_number,report_type', ignoreDuplicates: true })
+    .insert(withUser)
     .select();
-  if (error) { console.error('Error inserting container billing:', error); return []; }
+  if (error) {
+    console.error('Error inserting container billing:', error);
+    throw new Error(error.message);
+  }
   return (data || []) as ContainerBillingRecord[];
 };
 

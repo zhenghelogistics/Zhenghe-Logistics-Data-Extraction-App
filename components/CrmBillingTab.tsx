@@ -99,6 +99,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [datePreset, setDatePreset] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [revertConfirm, setRevertConfirm] = useState<string | null>(null);
@@ -240,15 +241,48 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
     return allSel ? new Set() : new Set(list.map(r => r.id));
   });
 
+  // ── Date preset → dateFrom / dateTo
+  const resolvedDateRange = (() => {
+    const today = new Date();
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const firstOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+    const lastOfMonth  = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    switch (datePreset) {
+      case 'this_month': {
+        return { from: fmt(firstOfMonth(today)), to: fmt(today) };
+      }
+      case 'last_month': {
+        const lm = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return { from: fmt(firstOfMonth(lm)), to: fmt(lastOfMonth(lm)) };
+      }
+      case 'last_3m': {
+        const d = new Date(today); d.setMonth(d.getMonth() - 3);
+        return { from: fmt(d), to: fmt(today) };
+      }
+      case 'last_6m': {
+        const d = new Date(today); d.setMonth(d.getMonth() - 6);
+        return { from: fmt(d), to: fmt(today) };
+      }
+      case 'this_year': {
+        return { from: `${today.getFullYear()}-01-01`, to: fmt(today) };
+      }
+      case 'custom':
+        return { from: dateFrom, to: dateTo };
+      default:
+        return { from: '', to: '' };
+    }
+  })();
+
   // ── Filtered lists
   const filteredUnbilled = unbilled.filter(r => matchesSearch(r, searchQuery));
   const filteredBilled = billed.filter(r => {
     if (!matchesSearch(r, searchQuery)) return false;
-    if (dateFrom || dateTo) {
+    const { from, to } = resolvedDateRange;
+    if (from || to) {
       const d = r.billed_at?.split('T')[0];
       if (!d) return false;
-      if (dateFrom && d < dateFrom) return false;
-      if (dateTo && d > dateTo) return false;
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
     }
     return true;
   });
@@ -579,15 +613,32 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
             <SearchBar placeholder="Search billed records…" />
-            <input
-              type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
-            <span className="text-slate-400 text-sm">→</span>
-            <input
-              type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
+            <select
+              value={datePreset}
+              onChange={e => setDatePreset(e.target.value)}
+              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+            >
+              <option value="all">All time</option>
+              <option value="this_month">This month</option>
+              <option value="last_month">Last month</option>
+              <option value="last_3m">Last 3 months</option>
+              <option value="last_6m">Last 6 months</option>
+              <option value="this_year">This year</option>
+              <option value="custom">Custom range…</option>
+            </select>
+            {datePreset === 'custom' && (
+              <>
+                <input
+                  type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+                <span className="text-slate-400 text-sm">→</span>
+                <input
+                  type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              </>
+            )}
             <button
               disabled={selectedIds.size === 0}
               onClick={() => triggerCSVDownload(filteredBilled.filter(r => selectedIds.has(r.id)), 'billed_selected.csv')}

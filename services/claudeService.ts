@@ -70,10 +70,12 @@ CLASSIFICATION GUIDELINES:
 5. **"Allied Report"**: An ALLIED Containers report listing container/booking numbers with associated charges (Repair, Detention, DHC In/Out, DHE In/Out, Washing, Data Admin Fee).
 6. **"CDAS Report"**: A "TRANSPORTER DAILY TRANSACTION REPORT" — has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each row = one container transaction. Charges are in the "Depot Remark" column as semicolon-separated pairs.
 
-**CRITICAL DUAL-ENTRY RULE**:
-- If you encounter a Tax Invoice or Freight Invoice:
+**CRITICAL DUAL-ENTRY RULE — MANDATORY, NO EXCEPTIONS**:
+- ANY Tax Invoice, Freight Invoice, Debit Note, or Credit Note from a carrier/forwarder MUST produce TWO entries:
   1. Entry 1: Type = 'Logistics Local Charges Report'. Extract all logistics line items.
   2. Entry 2: Type = 'Payment Voucher/GL'. Extract payment details.
+- This applies regardless of what other document types are in the same file (BL, OPD, etc.).
+- If you only create ONE entry for an invoice, you are WRONG. Always create BOTH.
 - WHY: Ensures the document appears in both Logistics Table AND Accounts Table.
 
 EXTRACTION RULES FOR "Payment Voucher/GL":
@@ -354,10 +356,11 @@ const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
   for (const doc of docs) {
     if (doc.document_type !== 'Logistics Local Charges Report') continue;
     const l = doc.logistics_local_charges;
-    if (!l) continue;
+    // Do NOT skip if l is null — still synthesize a PV using metadata as fallback
 
-    const inv = l.pss_invoice_number?.trim().toUpperCase();
-    const bl  = l.bl_number?.trim().toUpperCase();
+    const inv = l?.pss_invoice_number?.trim().toUpperCase();
+    const bl  = l?.bl_number?.trim().toUpperCase()
+              || doc.metadata?.reference_number?.trim().toUpperCase();
 
     const alreadyCovered =
       (inv && pvKeys.has(`INV_${inv}`)) ||
@@ -366,12 +369,12 @@ const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
 
     // Build charges_summary from non-null logistics charge fields
     const chargeMap: [string | null | undefined, string][] = [
-      [l.thc_amount,         'THC'],
-      [l.seal_fee,           'SEALS'],
-      [l.bl_fee,             'BL'],
-      [l.bl_printed_fee,     'PRINTED BL'],
-      [l.ens_ams_fee,        'ENS'],
-      [l.other_charges,      'OTHER'],
+      [l?.thc_amount,         'THC'],
+      [l?.seal_fee,           'SEALS'],
+      [l?.bl_fee,             'BL'],
+      [l?.bl_printed_fee,     'PRINTED BL'],
+      [l?.ens_ams_fee,        'ENS'],
+      [l?.other_charges,      'OTHER'],
     ];
     const charges = chargeMap
       .filter(([val]) => val && val.trim().length > 0)
@@ -383,14 +386,14 @@ const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
       document_type: 'Payment Voucher/GL',
       logistics_local_charges: undefined,
       payment_voucher_details: {
-        pss_invoice_number:    l.pss_invoice_number  ?? null,
+        pss_invoice_number:     l?.pss_invoice_number   ?? null,
         carrier_invoice_number: null,
-        bl_number:             l.bl_number            ?? null,
-        payable_amount:        l.total_payable_amount ?? null,
-        total_payable_amount:  l.total_payable_amount ?? null,
-        charges_summary:       charges || null,
-        payment_to:            l.carrier_forwarder    ?? null,
-        payment_method:        null,
+        bl_number:              l?.bl_number             ?? doc.metadata?.reference_number ?? null,
+        payable_amount:         l?.total_payable_amount  ?? null,
+        total_payable_amount:   l?.total_payable_amount  ?? null,
+        charges_summary:        charges || null,
+        payment_to:             l?.carrier_forwarder     ?? doc.metadata?.parties?.shipper_supplier ?? null,
+        payment_method:         null,
       },
     };
 

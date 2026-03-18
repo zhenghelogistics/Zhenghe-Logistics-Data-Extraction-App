@@ -334,31 +334,96 @@ Respond ONLY with valid JSON matching this exact structure:
   ]
 }`;
 
-// Role-specific extraction scope overrides — appended after the base prompt
+// Dedicated system prompt for accounts role — no merge rules, no LCR, no dual-entry rule.
+// This replaces BASE_SYSTEM_PROMPT entirely for accounts users.
+const ACCOUNTS_SYSTEM_PROMPT = `You are a Senior Accounts Data Controller extracting documents for the accounts team.
+
+YOUR CRITICAL MISSION:
+1. SCAN EVERY SINGLE PAGE. Do not stop early. The file may contain 5–30+ Bills of Lading and Tax Invoices.
+2. IDENTIFY DOCUMENT BOUNDARIES: Detect where one document ends and the next begins.
+3. KEEP DOCUMENTS SEPARATE: A Bill of Lading and a Tax Invoice that share a BL reference number are TWO SEPARATE entries. NEVER merge them.
+4. EXTRACT ALL: Create a separate entry for EACH distinct document found.
+
+DOCUMENT TYPES — USE EXACTLY THESE TWO, NOTHING ELSE:
+- "Bill of Lading": for the actual BL/HBL/MBL shipping document itself.
+- "Payment Voucher/GL": for ANY carrier/forwarder invoice — Tax Invoice, Freight Invoice, Debit Note, Credit Note. These are always "Payment Voucher/GL", never anything else.
+
+DO NOT USE these types — they do not exist for accounts: Logistics Local Charges Report, Outward Permit Declaration, Allied Report, CDAS Report.
+
+EXTRACTION RULES FOR "Payment Voucher/GL":
+- PAYMENT TO ('payment_to'): Company name from the carrier's invoice letterhead (the issuing company). Known: MSC → 'MSC MEDITERRANEAN SHIPPING CO SA', ONE → 'OCEAN NETWORK EXPRESS PTE. LTD'. For others, use the full name as printed.
+- PSS INVOICE NUMBER ('pss_invoice_number'): The internal PSS invoice number linked to the BL (e.g. "Invoice: 25091366" → "#25091366"). NOT the carrier's own invoice number.
+- CARRIER INVOICE NUMBER ('carrier_invoice_number'): The invoice number issued by the carrier on their tax invoice.
+- BL NUMBER ('bl_number'): The BL/HBL number referenced on the invoice.
+- PAYABLE AMOUNT ('payable_amount'): Grand total with currency (e.g. "250.00 SGD").
+- TOTAL PAYABLE AMOUNT ('total_payable_amount'): Same as payable amount.
+- CHARGES SUMMARY ('charges_summary'): Charge types present, comma-separated. Short forms: THC, BL, SEALS, O.F, ENS, AMS, SBL, PRINTED BL. Include other charges as printed.
+- PAYMENT METHOD ('payment_method'): e.g. FAST, CHEQUE, CASH, TT — if shown on document.
+- MULTI-INVOICE: If there are multiple Tax Invoices (different invoice numbers/totals), create a SEPARATE "Payment Voucher/GL" entry for EACH one.
+
+EXTRACTION RULES FOR "Bill of Lading":
+- Extract shipper, consignee, notify party, vessel name, voyage, POL, POD, BL number, container numbers, date.
+
+IMPORTANT:
+- If a value is not found, return null. Do NOT guess.
+
+Respond ONLY with valid JSON matching this exact structure:
+{
+  "documents": [
+    {
+      "document_type": "string (Bill of Lading or Payment Voucher/GL only)",
+      "metadata": {
+        "reference_number": "string",
+        "related_reference_number": "string or null",
+        "date": "YYYY-MM-DD",
+        "currency": "string or null",
+        "incoterms": "string or null",
+        "parties": {
+          "shipper_supplier": "string or null",
+          "consignee_buyer": "string or null",
+          "notify_party": "string or null"
+        }
+      },
+      "logistics_details": {
+        "vessel_name": "string or null",
+        "voyage_number": "string or null",
+        "port_of_loading": "string or null",
+        "port_of_discharge": "string or null",
+        "container_numbers": ["string"],
+        "marks_and_numbers": "string or null"
+      },
+      "financials": {
+        "total_amount": "number or null",
+        "total_tax_amount": "number or null",
+        "line_item_charges": [{"description": "string", "amount": "number"}]
+      },
+      "cargo_details": {
+        "total_gross_weight": "number or null",
+        "total_net_weight": "number or null",
+        "total_packages": "number or null",
+        "weight_unit": "string or null",
+        "line_items": []
+      },
+      "payment_voucher_details": {
+        "pss_invoice_number": "string or null",
+        "carrier_invoice_number": "string or null",
+        "bl_number": "string or null",
+        "payable_amount": "string or null",
+        "total_payable_amount": "string or null",
+        "charges_summary": "string or null",
+        "payment_to": "string or null",
+        "payment_method": "string or null"
+      },
+      "logistics_local_charges": null,
+      "outward_permit_declaration": null,
+      "allied_report": null,
+      "cdas_report": null
+    }
+  ]
+}`;
+
+// Role-specific extraction scope overrides — appended after the base prompt (not used for accounts)
 const ROLE_SCOPE: Record<string, string> = {
-  accounts: `
-
-TEAM SCOPE — ACCOUNTS TEAM (MANDATORY OVERRIDE):
-You are extracting for the accounts team. Use EXACTLY these two document_type values — nothing else:
-
-A) "Bill of Lading" — for actual BL documents only.
-B) "Payment Voucher/GL" — for ANY of the following: Tax Invoice, Freight Invoice, Debit Note, Credit Note, or any carrier/forwarder invoice. These are NOT ignored — they MUST be extracted as "Payment Voucher/GL".
-
-MAPPING TABLE (follow exactly):
-- Bill of Lading → document_type: "Bill of Lading"
-- Tax Invoice → document_type: "Payment Voucher/GL"
-- Freight Invoice → document_type: "Payment Voucher/GL"
-- Debit Note → document_type: "Payment Voucher/GL"
-- Credit Note → document_type: "Payment Voucher/GL"
-- Outward Permit Declaration → SKIP entirely, do not extract
-- Allied Report → SKIP entirely, do not extract
-- CDAS Report → SKIP entirely, do not extract
-- Logistics Local Charges Report → DO NOT USE this type, use "Payment Voucher/GL" instead
-
-CRITICAL RULES:
-1. Do NOT merge a BL and a Tax Invoice into one entry. Extract them as two SEPARATE entries.
-2. If there are multiple Tax Invoices (different invoice numbers), create a SEPARATE "Payment Voucher/GL" entry for EACH one.
-3. This file may contain 5–30+ BLs and Tax Invoices. Scan EVERY page. Extract ALL of them.`,
 
   logistics: `
 
@@ -376,10 +441,10 @@ You are extracting for the transport team. Follow these rules strictly:
 2. IGNORE completely: Bill of Lading, Tax Invoices, Logistics Local Charges Reports, Payment Vouchers, Outward Permit Declarations.`,
 };
 
-// Build final prompt with optional user-defined custom instructions and role scope
+// Build final prompt. Accounts role gets its own clean prompt — no merge/dual-entry rules.
 const buildSystemPrompt = (customInstructions: string[], role?: string): string => {
-  let prompt = BASE_SYSTEM_PROMPT;
-  if (role && ROLE_SCOPE[role]) prompt += ROLE_SCOPE[role];
+  let prompt = role === 'accounts' ? ACCOUNTS_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
+  if (role && role !== 'accounts' && ROLE_SCOPE[role]) prompt += ROLE_SCOPE[role];
   if (customInstructions.length > 0) {
     const rules = customInstructions.map((rule, i) => `${i + 1}. ${rule}`).join("\n");
     prompt += `\n\nADDITIONAL USER-DEFINED EXTRACTION RULES:\n${rules}`;

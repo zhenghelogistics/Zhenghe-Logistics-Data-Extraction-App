@@ -1,6 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { extractDocumentData, validateDocumentData } from './services/claudeService';
-import { supabase, fetchDocuments, saveDocument, deleteDocument } from './services/supabase';
+import {
+  supabase, fetchDocuments, saveDocument, deleteDocument,
+  fetchContainerBilling, insertContainerBillingRows, ContainerBillingRecord,
+} from './services/supabase';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
 import { generateVoucherPdf } from './services/voucherPdfService';
@@ -50,6 +53,7 @@ function App() {
     } catch { return []; }
   });
 
+  const [containerRecords, setContainerRecords] = useState<ContainerBillingRecord[]>([]);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -137,6 +141,10 @@ function App() {
       });
       setFiles(processedFiles);
       addLog(`Loaded ${docs.length} documents from database.`);
+
+      const containerRows = await fetchContainerBilling();
+      setContainerRecords(containerRows);
+      addLog(`Loaded ${containerRows.length} container billing records.`);
     };
     loadDocs();
   }, [userRole]);
@@ -239,6 +247,48 @@ function App() {
     setFileToDelete(null);
   };
 
+  const extractContainerRows = (
+    dataList: DocumentData[],
+    filename: string,
+    documentId: string
+  ): Omit<ContainerBillingRecord, 'id' | 'user_id' | 'created_at'>[] => {
+    const rows: Omit<ContainerBillingRecord, 'id' | 'user_id' | 'created_at'>[] = [];
+    const add = (charges: Record<string, string>, k: string, v: string | null | undefined) => {
+      if (v) charges[k] = v;
+    };
+    for (const doc of dataList) {
+      if (doc.document_type === 'Allied Report' && doc.allied_report) {
+        const r = doc.allied_report;
+        const charges: Record<string, string> = {};
+        add(charges, 'dhc_in', r.dhc_in); add(charges, 'dhc_out', r.dhc_out);
+        add(charges, 'dhe_in', r.dhe_in); add(charges, 'dhe_out', r.dhe_out);
+        add(charges, 'data_admin_fee', r.data_admin_fee);
+        add(charges, 'washing', r.washing); add(charges, 'repair', r.repair);
+        add(charges, 'detention', r.detention); add(charges, 'demurrage', r.demurrage);
+        rows.push({ source_document_id: documentId, filename, report_type: 'Allied Report', container_number: r.container_booking_no ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null });
+      }
+      if (doc.document_type === 'CDAC Report' && doc.cdac_report) {
+        const r = doc.cdac_report;
+        const charges: Record<string, string> = {};
+        add(charges, 'dhc', r.dhc); add(charges, 'repair', r.repair);
+        add(charges, 'detention', r.detention); add(charges, 'demurage', r.demurage);
+        add(charges, 'admin_fees', r.admin_fees); add(charges, 'washing', r.washing);
+        rows.push({ source_document_id: documentId, filename, report_type: 'CDAC Report', container_number: r.container_number ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null });
+      }
+      if (doc.document_type === 'CDAS Report' && doc.cdas_report) {
+        const r = doc.cdas_report;
+        const charges: Record<string, string> = {};
+        add(charges, 'dhc_in', r.dhc_in); add(charges, 'dhc_out', r.dhc_out);
+        add(charges, 'dhe_in', r.dhe_in); add(charges, 'dhe_out', r.dhe_out);
+        add(charges, 'data_admin_fee', r.data_admin_fee);
+        add(charges, 'washing', r.washing); add(charges, 'repair', r.repair);
+        add(charges, 'detention', r.detention); add(charges, 'demurrage', r.demurrage);
+        rows.push({ source_document_id: documentId, filename, report_type: 'CDAS Report', container_number: r.container_number ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null });
+      }
+    }
+    return rows;
+  };
+
   const processFiles = useCallback(async () => {
     setIsProcessing(true);
     addLog('Starting batch processing...');
@@ -269,6 +319,17 @@ function App() {
             id: savedDoc?.id || f.id,
           } : f
         ));
+        // Auto-insert container billing rows (duplicates silently ignored)
+        if (savedDoc?.id) {
+          const containerRows = extractContainerRows(dataList, fileWrapper.file.name, savedDoc.id);
+          if (containerRows.length > 0) {
+            const inserted = await insertContainerBillingRows(containerRows);
+            if (inserted.length > 0) {
+              setContainerRecords(prev => [...inserted, ...prev]);
+              addLog(`Added ${inserted.length} container billing record(s) for ${fileWrapper.file.name}.`);
+            }
+          }
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         setFiles(prev => prev.map(f =>
@@ -290,6 +351,10 @@ function App() {
 
   const handleBillingUpdate = (fileId: string, updates: Partial<ProcessedFile>) => {
     setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...updates } : f));
+  };
+
+  const handleContainerRecordUpdate = (id: string, updates: Partial<ContainerBillingRecord>) => {
+    setContainerRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
   };
 
   const handleGenerateVouchers = async (docs: DocumentData[]) => {
@@ -669,7 +734,7 @@ function App() {
           {activeTab === 'Developer Notes' ? (
             <DeveloperNotes />
           ) : activeTab === 'CRM Billing' ? (
-            <CrmBillingTab files={files} onBillingUpdate={handleBillingUpdate} />
+            <CrmBillingTab records={containerRecords} onRecordUpdate={handleContainerRecordUpdate} />
           ) : !hasFiles ? (
             /* ── Drag & Drop Upload Zone ── */
             <div

@@ -41,7 +41,7 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     const ref         = pv?.pss_invoice_number || doc.metadata?.reference_number || '';
     const paymentTo   = pv?.payment_to || doc.metadata?.parties?.consignee_buyer || '';
     const paymentMethod = pv?.payment_method || '';
-    const docDate     = doc.metadata?.document_date || '';
+    const docDate     = doc.metadata?.date || '';
 
     const carrierInv = pv?.carrier_invoice_number || '';
     const blNum      = pv?.bl_number || '';

@@ -108,6 +108,58 @@ export const updateBilling = async (
   if (error) throw new Error(error.message);
 };
 
+// ── Container Billing ──────────────────────────────────────────────────────────
+
+export interface ContainerBillingRecord {
+  id: string;
+  user_id: string;
+  source_document_id: string | null;
+  filename: string;
+  report_type: string;
+  container_number: string | null;
+  charges: Record<string, string>;
+  charge_validations: Record<string, boolean>;
+  billing_status: 'unbilled' | 'billed';
+  billed_at: string | null;
+  billing_remarks: string | null;
+  created_at: string;
+}
+
+export const fetchContainerBilling = async (): Promise<ContainerBillingRecord[]> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from('container_billing')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('Error fetching container billing:', error); return []; }
+  return (data || []) as ContainerBillingRecord[];
+};
+
+// Upsert rows — duplicate (user_id, filename, container_number, report_type) is silently ignored
+export const insertContainerBillingRows = async (
+  rows: Omit<ContainerBillingRecord, 'id' | 'user_id' | 'created_at'>[]
+): Promise<ContainerBillingRecord[]> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const withUser = rows.map(r => ({ ...r, user_id: user.id }));
+  const { data, error } = await supabase
+    .from('container_billing')
+    .upsert(withUser, { onConflict: 'user_id,filename,container_number,report_type', ignoreDuplicates: true })
+    .select();
+  if (error) { console.error('Error inserting container billing:', error); return []; }
+  return (data || []) as ContainerBillingRecord[];
+};
+
+export const updateContainerBilling = async (
+  id: string,
+  updates: Partial<Pick<ContainerBillingRecord, 'billing_status' | 'billed_at' | 'billing_remarks' | 'charge_validations'>>
+): Promise<void> => {
+  const { error } = await supabase.from('container_billing').update(updates).eq('id', id);
+  if (error) throw new Error(error.message);
+};
+
 export const deleteDocument = async (id: string) => {
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
   if (!isUUID) return { success: true, message: "Local file removed" };

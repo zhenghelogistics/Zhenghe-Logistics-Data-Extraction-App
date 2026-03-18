@@ -1,5 +1,5 @@
-import { DocumentData, ExtractionResponse } from "../types";
-import { AppConfig } from "../config";
+import { DocumentData, ExtractionResponse } from "./types";
+import { AppConfig } from "./config";
 
 // Helper to access nested properties safely with dot notation
 const getNestedValue = (obj: any, path: string) => {

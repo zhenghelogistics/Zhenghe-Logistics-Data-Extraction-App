@@ -115,6 +115,7 @@ export interface OutwardPermitDeclaration {
 
 export interface AlliedReport {
   container_booking_no?: string | null;
+  invoice_date?: string | null;
   dhc_in?: string | null;
   dhc_out?: string | null;
   dhe_in?: string | null;
@@ -128,6 +129,7 @@ export interface AlliedReport {
 
 export interface CdasReport {
   container_number?: string | null;
+  invoice_date?: string | null;
   dhc_in?: string | null;
   dhc_out?: string | null;
   dhe_in?: string | null;

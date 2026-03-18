@@ -170,6 +170,7 @@ EXTRACTION RULES FOR "Allied Report" (Transport Team):
 - CRITICAL: Read ONLY the summary table (the receipts journal grid at the start). Ignore all individual receipt pages that follow.
 - GROUP BY CONTAINER: For each unique Container/Booking No, create ONE Allied Report entry collecting all its charges across all rows.
 - EXAMPLE: Container CMAU7642286 appears in rows for "DATA ADMIN FEE (IN)" ($5), "DHE IN" ($4), "DHC IN" ($80), and "REPAIR" ($21.35) — these all merge into ONE entry: dhc_in=80, dhe_in=4, data_admin_fee=5, repair=21.35.
+- INVOICE DATE: Extract the report/invoice date printed at the top of the document (e.g. the "Date:" field or "Statement Date"). Format as YYYY-MM-DD. Also set metadata.date to this same value.
 - DHC IN: The amount from any row where Customer Type is "DHC IN" for this container (e.g. "80.00"). Null if not present.
 - DHC OUT: The amount from any row where Customer Type is "DHC OUT" for this container. Null if not present.
 - DHE IN: The amount from any row where Customer Type is "DHE IN" for this container (e.g. "4.00"). Null if not present.
@@ -183,6 +184,7 @@ EXTRACTION RULES FOR "Allied Report" (Transport Team):
 EXTRACTION RULES FOR "CDAS Report" (Transport Team):
 - DOCUMENT STRUCTURE: This is a "TRANSPORTER DAILY TRANSACTION REPORT". It has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each section has a transaction table.
 - ONE ENTRY PER ROW: Each row in a section table = ONE container. Create ONE CDAS Report entry per row across ALL sections.
+- INVOICE DATE: Extract the report/transaction date printed at the top of the document (e.g. "Date:", "Report Date:", or the date shown in the report header). Format as YYYY-MM-DD. Apply the SAME date to every entry from this report. Also set metadata.date to this same value.
 - CONTAINER NUMBER: From the "Container Number" column.
 - DEPOT REMARK PARSING: The "Depot Remark" column contains semicolon-separated charge pairs like "CHARGE NAME; $AMOUNT". Parse each pair to fill the correct field:
   - "DHC IN" or "DHC" or "DEPOT HANDLING CHARGE" (no OUT) → dhc_in
@@ -298,6 +300,7 @@ Respond ONLY with valid JSON matching this exact structure:
       },
       "allied_report": {
         "container_booking_no": "string or null",
+        "invoice_date": "YYYY-MM-DD or null — the date printed on the Allied report",
         "dhc_in": "string or null",
         "dhc_out": "string or null",
         "dhe_in": "string or null",
@@ -310,6 +313,7 @@ Respond ONLY with valid JSON matching this exact structure:
       },
       "cdas_report": {
         "container_number": "string or null",
+        "invoice_date": "YYYY-MM-DD or null — the report/transaction date printed on the CDAS report",
         "dhc_in": "string or null",
         "dhc_out": "string or null",
         "dhe_in": "string or null",
@@ -501,6 +505,7 @@ const splitPdfIntoChunks = async (file: File, chunkSize = 10): Promise<{ base64:
 // appears in multiple sections (e.g. IN section + OUT section). This function
 // consolidates them deterministically — first non-null value wins per field.
 const mergeChargeFields = (dest: any, src: any) => {
+  dest.invoice_date   = dest.invoice_date   ?? src.invoice_date;
   dest.dhc_in         = dest.dhc_in         ?? src.dhc_in;
   dest.dhc_out        = dest.dhc_out        ?? src.dhc_out;
   dest.dhe_in         = dest.dhe_in         ?? src.dhe_in;

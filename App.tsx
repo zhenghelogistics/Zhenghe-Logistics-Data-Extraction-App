@@ -267,9 +267,9 @@ function App() {
       return { billing_status: 'unbilled', billed_at: null };
     };
     for (const doc of dataList) {
-      const container_date = doc.metadata?.date ?? null;
       if (doc.document_type === 'Allied Report' && doc.allied_report) {
         const r = doc.allied_report;
+        const container_date = r.invoice_date ?? doc.metadata?.date ?? null;
         const charges: Record<string, string> = {};
         add(charges, 'dhc_in', r.dhc_in); add(charges, 'dhc_out', r.dhc_out);
         add(charges, 'dhe_in', r.dhe_in); add(charges, 'dhe_out', r.dhe_out);
@@ -281,6 +281,7 @@ function App() {
       }
       if (doc.document_type === 'CDAS Report' && doc.cdas_report) {
         const r = doc.cdas_report;
+        const container_date = r.invoice_date ?? doc.metadata?.date ?? null;
         const charges: Record<string, string> = {};
         add(charges, 'dhc_in', r.dhc_in); add(charges, 'dhc_out', r.dhc_out);
         add(charges, 'dhe_in', r.dhe_in); add(charges, 'dhe_out', r.dhe_out);

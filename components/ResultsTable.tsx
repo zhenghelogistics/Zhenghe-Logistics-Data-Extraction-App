@@ -17,6 +17,7 @@ interface ResultsTableProps {
 
 const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onDeleteFile, onBulkDelete, onGenerateVoucher, isGeneratingPdf, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [errorPopover, setErrorPopover] = useState<{ fileId: string; errors: string[] } | null>(null);
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -58,7 +59,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
   });
 
   // Helper to render status badge
-  const renderStatusBadge = (status: FileStatus, validationErrors?: string[]) => {
+  const renderStatusBadge = (status: FileStatus, validationErrors?: string[], fileId?: string) => {
     switch (status) {
       case FileStatus.COMPLETED:
         return (
@@ -69,13 +70,18 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
         );
       case FileStatus.WARNING:
         return (
-          <span
-            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 cursor-help"
-            title={validationErrors && validationErrors.length > 0 ? validationErrors.join('\n') : 'Extraction completed with warnings'}
+          <button
+            type="button"
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 cursor-pointer hover:bg-yellow-200 transition-colors"
+            onClick={() => {
+              if (fileId && validationErrors && validationErrors.length > 0) {
+                setErrorPopover(prev => prev?.fileId === fileId ? null : { fileId, errors: validationErrors });
+              }
+            }}
           >
             <AlertTriangle size={14} className="mr-1" />
             Warning {validationErrors && validationErrors.length > 0 && `(${validationErrors.length})`}
-          </span>
+          </button>
         );
       case FileStatus.PROCESSING:
         return (
@@ -289,7 +295,22 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                         {file.file.name}
                       </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm">
-                        {renderStatusBadge(file.status as FileStatus, file.validationErrors)}
+                        <div className="relative inline-block">
+                          {renderStatusBadge(file.status as FileStatus, file.validationErrors, file.id)}
+                          {errorPopover?.fileId === file.id && (
+                            <div className="absolute z-50 left-0 top-full mt-1 w-80 bg-white border border-yellow-200 rounded-lg shadow-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-yellow-800">Extraction warnings</span>
+                                <button type="button" onClick={() => setErrorPopover(null)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                              </div>
+                              <ul className="space-y-1">
+                                {errorPopover.errors.map((e, i) => (
+                                  <li key={i} className="text-xs text-slate-700 bg-yellow-50 rounded px-2 py-1">{e}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3.5 text-sm text-slate-500 max-w-xs">
                         {file.status === FileStatus.ERROR
@@ -399,7 +420,22 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                  </td>
                  <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{file.file.name}</td>
                  <td className="whitespace-nowrap px-3 py-3.5 text-sm">
-                   {renderStatusBadge(file.status as FileStatus, file.validationErrors)}
+                   <div className="relative inline-block">
+                     {renderStatusBadge(file.status as FileStatus, file.validationErrors, file.id)}
+                     {errorPopover?.fileId === file.id && (
+                       <div className="absolute z-50 left-0 top-full mt-1 w-80 bg-white border border-yellow-200 rounded-lg shadow-lg p-3">
+                         <div className="flex items-center justify-between mb-2">
+                           <span className="text-xs font-semibold text-yellow-800">Extraction warnings</span>
+                           <button type="button" onClick={() => setErrorPopover(null)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                         </div>
+                         <ul className="space-y-1">
+                           {errorPopover.errors.map((e, i) => (
+                             <li key={i} className="text-xs text-slate-700 bg-yellow-50 rounded px-2 py-1">{e}</li>
+                           ))}
+                         </ul>
+                       </div>
+                     )}
+                   </div>
                  </td>
                  <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
                     <button

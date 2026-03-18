@@ -170,7 +170,7 @@ EXTRACTION RULES FOR "Allied Report" (Transport Team):
 - CRITICAL: Read ONLY the summary table (the receipts journal grid at the start). Ignore all individual receipt pages that follow.
 - GROUP BY CONTAINER: For each unique Container/Booking No, create ONE Allied Report entry collecting all its charges across all rows.
 - EXAMPLE: Container CMAU7642286 appears in rows for "DATA ADMIN FEE (IN)" ($5), "DHE IN" ($4), "DHC IN" ($80), and "REPAIR" ($21.35) — these all merge into ONE entry: dhc_in=80, dhe_in=4, data_admin_fee=5, repair=21.35.
-- INVOICE DATE: Extract the report/invoice date printed at the top of the document (e.g. the "Date:" field or "Statement Date"). Format as YYYY-MM-DD. Also set metadata.date to this same value.
+- INVOICE DATE: Extract the date from the "Date" column on the far right of ANY row in the summary table (all rows share the same report date). The format on the document is DD/MM/YYYY HH:MM — convert to YYYY-MM-DD (e.g. "12/11/2025 08:46" → "2025-11-12"). Use this same date for ALL containers extracted from this report. Also set metadata.date to this same value.
 - DHC IN: The amount from any row where Customer Type is "DHC IN" for this container (e.g. "80.00"). Null if not present.
 - DHC OUT: The amount from any row where Customer Type is "DHC OUT" for this container. Null if not present.
 - DHE IN: The amount from any row where Customer Type is "DHE IN" for this container (e.g. "4.00"). Null if not present.
@@ -184,7 +184,7 @@ EXTRACTION RULES FOR "Allied Report" (Transport Team):
 EXTRACTION RULES FOR "CDAS Report" (Transport Team):
 - DOCUMENT STRUCTURE: This is a "TRANSPORTER DAILY TRANSACTION REPORT". It has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each section has a transaction table.
 - ONE ENTRY PER ROW: Each row in a section table = ONE container. Create ONE CDAS Report entry per row across ALL sections.
-- INVOICE DATE: Extract the report/transaction date printed at the top of the document (e.g. "Date:", "Report Date:", or the date shown in the report header). Format as YYYY-MM-DD. Apply the SAME date to every entry from this report. Also set metadata.date to this same value.
+- INVOICE DATE: Extract the date from the "Bill Date" column in each row (e.g. "5-Nov-2025"). All rows in the same report share the same Bill Date — use it for every container entry. Convert to YYYY-MM-DD (e.g. "5-Nov-2025" → "2025-11-05"). Also set metadata.date to this same value.
 - CONTAINER NUMBER: From the "Container Number" column.
 - DEPOT REMARK PARSING: The "Depot Remark" column contains semicolon-separated charge pairs like "CHARGE NAME; $AMOUNT". Parse each pair to fill the correct field:
   - "DHC IN" or "DHC" or "DEPOT HANDLING CHARGE" (no OUT) → dhc_in

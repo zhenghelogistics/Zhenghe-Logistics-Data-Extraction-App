@@ -711,7 +711,8 @@ const deduplicateByContainer = (docs: DocumentData[]): DocumentData[] => {
 
 const extractFromChunk = async (
   base64: string,
-  systemPrompt: string
+  systemPrompt: string,
+  role?: string
 ): Promise<DocumentData[]> => {
   const client = new Anthropic({
     apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || "",
@@ -734,7 +735,9 @@ const extractFromChunk = async (
               },
               {
                 type: "text",
-                text: "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object.",
+                text: role === 'accounts'
+                  ? "This PDF contains Bills of Lading AND Tax Invoices. Extract EACH as a SEPARATE entry. Every page labeled 'TAX INVOICE' or 'ORIGINAL' from a carrier (MSC, ONE, etc.) is a separate Payment Voucher/GL — do NOT merge it into the BL entry. Return valid JSON only. No explanation, no markdown."
+                  : "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object.",
               },
             ],
           },
@@ -831,7 +834,7 @@ export const extractDocumentData = async (
       : 'Sending to Claude';
     onProgress?.(`${label}...`);
     const result = await withBackoff(
-      () => extractFromChunk(chunks[i].base64, systemPrompt),
+      () => extractFromChunk(chunks[i].base64, systemPrompt, role),
       label
     );
     allDocs.push(...result);

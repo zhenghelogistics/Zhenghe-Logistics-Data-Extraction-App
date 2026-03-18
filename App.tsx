@@ -309,7 +309,7 @@ function App() {
       try {
         const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage) => {
           setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage } : f));
-        });
+        }, userRole ?? undefined);
         const validationErrors = validateDocumentData(dataList);
         const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
         if (validationErrors.length > 0) {

@@ -332,13 +332,43 @@ Respond ONLY with valid JSON matching this exact structure:
   ]
 }`;
 
-// Build final prompt with optional user-defined custom instructions
-const buildSystemPrompt = (customInstructions: string[]): string => {
-  if (customInstructions.length === 0) return BASE_SYSTEM_PROMPT;
-  const rules = customInstructions
-    .map((rule, i) => `${i + 1}. ${rule}`)
-    .join("\n");
-  return `${BASE_SYSTEM_PROMPT}\n\nADDITIONAL USER-DEFINED EXTRACTION RULES:\n${rules}`;
+// Role-specific extraction scope overrides — appended after the base prompt
+const ROLE_SCOPE: Record<string, string> = {
+  accounts: `
+
+TEAM SCOPE — ACCOUNTS TEAM (MANDATORY OVERRIDE):
+You are extracting for the accounts team. Follow these rules strictly:
+1. ONLY extract documents of these types: "Bill of Lading" and "Payment Voucher/GL". All other types must be IGNORED.
+2. When you encounter a Tax Invoice, Freight Invoice, Debit Note, or Credit Note from a carrier/forwarder: classify it as "Payment Voucher/GL" ONLY. Do NOT create a "Logistics Local Charges Report" entry for it.
+3. OVERRIDE the Merge Rule: Do NOT merge BL + Tax Invoice into a single LCR entry. Keep the BL as "Bill of Lading". Classify the Tax Invoice separately as "Payment Voucher/GL".
+4. IGNORE completely: Outward Permit Declarations, Allied Reports, CDAS Reports — do not extract these at all.
+5. MULTI-INVOICE: If multiple Tax Invoices exist (different invoice numbers/totals), create a separate "Payment Voucher/GL" entry for each one.`,
+
+  logistics: `
+
+TEAM SCOPE — LOGISTICS TEAM (MANDATORY OVERRIDE):
+You are extracting for the logistics team. Follow these rules strictly:
+1. ONLY extract documents of these types: "Logistics Local Charges Report" and "Outward Permit Declaration". All other types must be IGNORED.
+2. When you encounter a Tax Invoice or Freight Invoice: classify it as "Logistics Local Charges Report" ONLY. Do NOT create a "Payment Voucher/GL" entry.
+3. IGNORE completely: standalone Bill of Lading pages, Allied Reports, CDAS Reports — do not extract these at all.`,
+
+  transport: `
+
+TEAM SCOPE — TRANSPORT TEAM (MANDATORY OVERRIDE):
+You are extracting for the transport team. Follow these rules strictly:
+1. ONLY extract documents of these types: "Allied Report" and "CDAS Report". All other types must be IGNORED.
+2. IGNORE completely: Bill of Lading, Tax Invoices, Logistics Local Charges Reports, Payment Vouchers, Outward Permit Declarations.`,
+};
+
+// Build final prompt with optional user-defined custom instructions and role scope
+const buildSystemPrompt = (customInstructions: string[], role?: string): string => {
+  let prompt = BASE_SYSTEM_PROMPT;
+  if (role && ROLE_SCOPE[role]) prompt += ROLE_SCOPE[role];
+  if (customInstructions.length > 0) {
+    const rules = customInstructions.map((rule, i) => `${i + 1}. ${rule}`).join("\n");
+    prompt += `\n\nADDITIONAL USER-DEFINED EXTRACTION RULES:\n${rules}`;
+  }
+  return prompt;
 };
 
 // For every Logistics Local Charges Report that has no matching Payment Voucher/GL,
@@ -633,9 +663,10 @@ const extractFromChunk = async (
 export const extractDocumentData = async (
   file: File,
   customInstructions: string[] = [],
-  onProgress?: (stage: string) => void
+  onProgress?: (stage: string) => void,
+  role?: string
 ): Promise<DocumentData[]> => {
-  const systemPrompt = buildSystemPrompt(customInstructions);
+  const systemPrompt = buildSystemPrompt(customInstructions, role);
 
   // Exponential backoff with jitter — waits only when rate limited, not blindly
   const withBackoff = async (fn: () => Promise<DocumentData[]>, chunkLabel: string): Promise<DocumentData[]> => {
@@ -676,5 +707,10 @@ export const extractDocumentData = async (
   }
 
   onProgress?.('Processing results...');
-  return deduplicateByContainer(deduplicateDocuments(ensurePaymentVouchers(allDocs)));
+  // ensurePaymentVouchers synthesizes PV entries from LCRs as a fallback.
+  // Only relevant for accounts (or no-role fallback) — logistics/transport never need PVs synthesized.
+  const withPv = (role === 'logistics' || role === 'transport')
+    ? allDocs
+    : ensurePaymentVouchers(allDocs);
+  return deduplicateByContainer(deduplicateDocuments(withPv));
 };

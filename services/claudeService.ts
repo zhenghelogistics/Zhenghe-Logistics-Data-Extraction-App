@@ -637,25 +637,42 @@ export const extractDocumentData = async (
 ): Promise<DocumentData[]> => {
   const systemPrompt = buildSystemPrompt(customInstructions);
 
+  // Exponential backoff with jitter — waits only when rate limited, not blindly
+  const withBackoff = async (fn: () => Promise<DocumentData[]>, chunkLabel: string): Promise<DocumentData[]> => {
+    const maxAttempts = 6;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        const isRateLimit = err?.status === 429 || /rate.limit|too many/i.test(err?.message ?? '');
+        if (!isRateLimit || attempt === maxAttempts - 1) throw err;
+        // base: 2^attempt seconds (1, 2, 4, 8, 16…) + random jitter up to 1s
+        const base = Math.pow(2, attempt) * 1000;
+        const jitter = Math.random() * 1000;
+        const wait = Math.round((base + jitter) / 1000);
+        for (let s = wait; s > 0; s--) {
+          onProgress?.(`${chunkLabel} — rate limited, retrying in ${s}s...`);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    }
+    return [];
+  };
+
   onProgress?.('Reading PDF...');
-  const chunks = await splitPdfIntoChunks(file, 20);
+  const chunks = await splitPdfIntoChunks(file, 50);
 
   const allDocs: DocumentData[] = [];
   for (let i = 0; i < chunks.length; i++) {
-    onProgress?.(chunks.length > 1
-      ? `Sending to Claude (${i + 1} of ${chunks.length} pages)...`
-      : 'Sending to Claude...'
+    const label = chunks.length > 1
+      ? `Sending to Claude (batch ${i + 1} of ${chunks.length})`
+      : 'Sending to Claude';
+    onProgress?.(`${label}...`);
+    const result = await withBackoff(
+      () => extractFromChunk(chunks[i].base64, systemPrompt),
+      label
     );
-    const result = await extractFromChunk(chunks[i].base64, systemPrompt);
     allDocs.push(...result);
-
-    if (i < chunks.length - 1) {
-      // Count down the 30s rate limit wait so users know it's not stuck
-      for (let s = 30; s > 0; s--) {
-        onProgress?.(`Rate limit — waiting ${s}s before next page...`);
-        await new Promise(r => setTimeout(r, 1000));
-      }
-    }
   }
 
   onProgress?.('Processing results...');

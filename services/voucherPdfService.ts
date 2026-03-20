@@ -45,19 +45,24 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
     // ── Fill form fields by name — no coordinate guessing ──
+    const setField = (name: string, value: string, fontSize = 9) => {
+      const field = form.getTextField(name);
+      field.setFontSize(fontSize);
+      field.setText(value);
+    };
 
-    if (paymentTo)           form.getTextField('Payment To').setText(paymentTo);
-    form.getTextField('Date').setText(autoDate);
+    if (paymentTo)           setField('Payment To', paymentTo);
+    setField('Date', autoDate);
 
-    if (carrierInv)          form.getTextField('row1_desc').setText(`Payment Inv.  ${carrierInv}`);
-    if (blPssLine)           form.getTextField('row2_desc').setText(blPssLine);
-    if (blPssLine && amount) form.getTextField('SGD USDRow2').setText(amount);
-    if (charges)             form.getTextField('charges').setText(charges);
+    if (carrierInv)          setField('row1_desc', `Payment Inv.  ${carrierInv}`);
+    if (blPssLine)           setField('row2_desc', blPssLine);
+    if (blPssLine && amount) setField('SGD USDRow2', amount);
+    if (charges)             setField('charges', charges);
 
     // 'SGD  USD Total' has a double space — exact field name from Acrobat
-    if (total) form.getTextField('SGD  USD Total').setText(total);
+    if (total) setField('SGD  USD Total', total);
 
-    form.getTextField('CASH CHEQUE No').setText(paymentMethod || 'UOB SGD FAST / GIRO PAYMENT');
+    setField('CASH CHEQUE No', paymentMethod || 'UOB SGD FAST / GIRO PAYMENT');
 
     // Currency checkboxes share their name between header row and total row,
     // so one check() call ticks both simultaneously.

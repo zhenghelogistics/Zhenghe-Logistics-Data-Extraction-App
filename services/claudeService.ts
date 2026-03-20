@@ -362,7 +362,7 @@ EXTRACTION RULES FOR "Payment Voucher/GL":
 - TOTAL PAYABLE AMOUNT ('total_payable_amount'): Same as payable amount.
 - CHARGES SUMMARY ('charges_summary'): Charge types present, comma-separated. Short forms: THC, BL, SEALS, O.F, ENS, AMS, SBL, PRINTED BL. Include other charges as printed.
 - PAYMENT METHOD ('payment_method'): e.g. FAST, CHEQUE, CASH, TT — if shown on document.
-- MULTI-INVOICE RULE: Always create ONE separate "Payment Voucher/GL" entry per invoice. Do NOT merge invoices together even if they are from the same supplier.
+- MULTI-INVOICE RULE: CRITICAL — Output exactly ONE separate "Payment Voucher/GL" entry per Tax Invoice number found in the PDF. If you see invoice PWT260300134 and invoice PWT260300201, that is TWO invoices → output TWO entries. Count the distinct invoice numbers and output that exact number of entries. NEVER combine multiple invoice numbers into one entry's carrier_invoice_number field. NEVER sum amounts across invoices. Each entry must have exactly one carrier_invoice_number, one bl_number, one payable_amount.
 
 EXTRACTION RULES FOR "Bill of Lading":
 - Extract shipper, consignee, notify party, vessel name, voyage, POL, POD, BL number, container numbers, date.
@@ -828,7 +828,7 @@ const extractFromChunk = async (
               {
                 type: "text",
                 text: role === 'accounts'
-                  ? "This PDF contains Bills of Lading AND Tax Invoices. Extract EACH as a SEPARATE entry. Every page labeled 'TAX INVOICE' or 'ORIGINAL' from a carrier (MSC, ONE, etc.) is a separate Payment Voucher/GL — do NOT merge it into the BL entry. Return valid JSON only. No explanation, no markdown."
+                  ? "This PDF contains Bills of Lading AND Tax Invoices. You MUST output one separate JSON entry per Tax Invoice number — if there are 2 tax invoices, output 2 entries; if there are 3, output 3 entries. Each entry gets exactly one carrier_invoice_number. Do NOT combine invoice numbers. Do NOT sum amounts. Do NOT merge entries. Return valid JSON only. No explanation, no markdown."
                   : "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object.",
               },
             ],

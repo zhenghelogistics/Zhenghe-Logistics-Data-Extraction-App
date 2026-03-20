@@ -87,7 +87,10 @@ EXTRACTION RULES FOR "Payment Voucher/GL":
 - BL NUMBER ('bl_number'): Extract the BL/HBL number if present. Link each carrier invoice to its corresponding BL using the Booking Reference number — both the BL and its Tax Invoice share the same Booking Reference.
 - PAYABLE AMOUNT ('payable_amount'): Grand Total with currency (e.g., "250.00 SGD").
 - CHARGES SUMMARY ('charges_summary'): List the charge TYPES found in the tax invoice, comma-separated. Use these short forms for known charges: THC (Terminal Handling Charges), BL (BL Fee / Document Fee), SEALS (Seal Fee), O.F (Ocean Freight), ENS, AMS, SBL (Surrender of BL), PRINTED BL. For any OTHER charges not in this list, include them as they appear on the invoice (e.g., "FOOD GRADE", "FUMIGATION", "ISPS"). Example output: "THC, SEALS, BL, SBL, ENS, FOOD GRADE". Only include charges that are actually present in the document.
-- MULTI-INVOICE RULE: If a single PDF contains multiple separate Tax Invoices (different invoice numbers, different totals), create a SEPARATE Payment Voucher/GL entry for EACH invoice. Do not merge them into one.
+- MULTI-INVOICE RULE:
+  * If multiple invoices are from DIFFERENT suppliers/carriers (different payment_to), create a SEPARATE Payment Voucher/GL entry for each supplier.
+  * If multiple invoices are from the SAME supplier/carrier (same payment_to), merge them into ONE Payment Voucher/GL entry: set carrier_invoice_number to all invoice numbers comma-separated, set total_payable_amount to the combined total, and populate bl_entries as an array — one entry per BL with its bl_number, pss_invoice_number, and individual amount.
+  * Example bl_entries: [{"bl_number": "PWTNYC231618", "pss_invoice_number": "#26030346", "amount": "665.98 SGD"}, {"bl_number": "PWTNYC231815", "pss_invoice_number": "#26030351", "amount": "605.35 SGD"}]
 
 EXTRACTION RULES FOR "Logistics Local Charges Report":
 - A. BL NUMBER: When the document explicitly labels BOTH an "Ocean Bill of Lading" (or "Master BL" / "MBL") AND a "House Bill of Lading" (or "HBL" / "Shipment No"), always use the Ocean/Master BL number — this means the forwarder is using a Master BL arrangement and the Ocean BL is the primary reference. If only one BL number is present (regardless of label), use that. If the document shows a forwarder-issued HBL without any separate Ocean BL field, use the HBL.

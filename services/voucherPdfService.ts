@@ -12,7 +12,7 @@ function detectCurrency(val: string | null | undefined): 'SGD' | 'USD' {
 }
 
 export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
-  const templateBytes = await fetch('/ZHL%20Payment%20Voucher_Form.pdf').then(r => r.arrayBuffer());
+  const templateBytes = await fetch('/ZHL_Payment_Voucher_Updated.pdf').then(r => r.arrayBuffer());
   const outputDoc = await PDFDocument.create();
 
   for (const doc of docs) {
@@ -61,10 +61,27 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     if (paymentTo)           setField('Payment To', paymentTo);
     setField('Date', autoDate);
 
-    if (carrierInv)          setField('row1_desc', `Payment Inv.  ${carrierInv}`);
-    if (blPssLine)           setField('row2_desc', blPssLine);
-    if (blPssLine && amount) setField('SGD USDRow2', amount);
-    if (charges)             setField('charges', charges);
+    if (carrierInv) setField('row1_desc', `Payment Inv.  ${carrierInv}`);
+
+    if (pv?.bl_entries && pv.bl_entries.length > 0) {
+      // Combined PV: populate one row per BL entry (rows 2–6)
+      pv.bl_entries.forEach((entry, i) => {
+        const rowNum = i + 2;
+        if (rowNum > 6) return;
+        const pssDisp = entry.pss_invoice_number
+          ? (entry.pss_invoice_number.startsWith('#') ? entry.pss_invoice_number : `#${entry.pss_invoice_number}`)
+          : '';
+        const blLine = [entry.bl_number ? `BL. ${entry.bl_number}` : '', pssDisp ? `(${pssDisp})` : ''].filter(Boolean).join(' ');
+        if (blLine) setField(`row${rowNum}_desc`, blLine);
+        if (entry.amount) setField(`SGD USDRow${rowNum}`, stripCurrency(entry.amount));
+      });
+    } else {
+      // Single BL
+      if (blPssLine) setField('row2_desc', blPssLine);
+      if (blPssLine && amount) setField('SGD USDRow2', amount);
+    }
+
+    if (charges) setField('charges', charges);
 
     // 'SGD  USD Total' has a double space — exact field name from Acrobat
     if (total) setField('SGD  USD Total', total);

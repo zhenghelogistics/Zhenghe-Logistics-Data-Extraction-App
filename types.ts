@@ -49,6 +49,12 @@ export interface CargoDetails {
   line_items?: CargoItem[];
 }
 
+export interface BLEntry {
+  bl_number?: string | null;
+  pss_invoice_number?: string | null;
+  amount?: string | null;
+}
+
 export interface PaymentVoucherDetails {
   pss_invoice_number?: string | null;
   carrier_invoice_number?: string | null;
@@ -58,6 +64,7 @@ export interface PaymentVoucherDetails {
   charges_summary?: string | null;
   payment_to?: string | null;
   payment_method?: string | null;
+  bl_entries?: BLEntry[] | null;
 }
 
 export interface LogisticsLocalCharges {

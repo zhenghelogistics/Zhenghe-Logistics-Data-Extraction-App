@@ -90,7 +90,7 @@ EXTRACTION RULES FOR "Payment Voucher/GL":
 - MULTI-INVOICE RULE: If a single PDF contains multiple separate Tax Invoices (different invoice numbers, different totals), create a SEPARATE Payment Voucher/GL entry for EACH invoice. Do not merge them into one.
 
 EXTRACTION RULES FOR "Logistics Local Charges Report":
-- A. BL NUMBER: Prefer the House BL (HBL) number (e.g., 'EGLV070500202135'). If no HBL exists, use the Master BL (MBL) number instead.
+- A. BL NUMBER: When the document explicitly labels BOTH an "Ocean Bill of Lading" (or "Master BL" / "MBL") AND a "House Bill of Lading" (or "HBL" / "Shipment No"), always use the Ocean/Master BL number — this means the forwarder is using a Master BL arrangement and the Ocean BL is the primary reference. If only one BL number is present (regardless of label), use that. If the document shows a forwarder-issued HBL without any separate Ocean BL field, use the HBL.
 - B. CARRIER / FORWARDER: Look at the LETTERHEAD or ISSUING COMPANY NAME on the invoice, freight note, or BL document — do not rely solely on the BL number. Known mappings: MSC → 'MSC MEDITERRANEAN SHIPPING CO SA', ONE → 'OCEAN NETWORK EXPRESS PTE. LTD'. For all others, extract the FULL COMPANY NAME as printed on the document. If a forwarder issued their invoice using an MBL, use the forwarder name from their invoice letterhead.
 - C. PSS INVOICE NUMBER: Invoice number on the BL.
 - D. FREIGHT TERM: 'PREPAID' if ocean freight charges exist, else 'COLLECT'.

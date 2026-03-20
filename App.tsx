@@ -639,7 +639,7 @@ function App() {
             <LogOut size={13} />
             Sign Out
           </button>
-          <p className="px-3 pb-2 text-slate-600 text-[10px]">build 93136e4</p>
+          <p className="px-3 pb-2 text-slate-600 text-[10px]">build {__COMMIT_HASH__}</p>
         </div>
       </aside>
 

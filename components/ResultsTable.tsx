@@ -7,6 +7,7 @@ import { UserRole } from '../users';
 interface ResultsTableProps {
   files: ProcessedFile[];
   onUpdateIncoterm: (fileId: string, docIndex: number, value: string) => void;
+  onUpdateFreightTerm: (fileId: string, docIndex: number, value: string) => void;
   onDeleteFile: (fileId: string) => void;
   onBulkDelete: (ids: string[]) => void;
   onGenerateVoucher?: (docs: DocumentData[]) => void;
@@ -15,7 +16,7 @@ interface ResultsTableProps {
   userRole: UserRole | null;
 }
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onDeleteFile, onBulkDelete, onGenerateVoucher, isGeneratingPdf, activeTab, userRole }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, isGeneratingPdf, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorPopover, setErrorPopover] = useState<{ fileId: string; errors: string[] } | null>(null);
 
@@ -116,7 +117,20 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case 'A. BL NUMBER': return data.logistics_local_charges?.bl_number || data.metadata?.reference_number || '-';
       case 'B. CARRIER / FORWARDER': return data.logistics_local_charges?.carrier_forwarder || '-';
       case 'C. PSS INVOICE NUMBER': return data.logistics_local_charges?.pss_invoice_number || '-';
-      case 'D. FREIGHT TERM': return data.logistics_local_charges?.freight_term || '-';
+      case 'D. FREIGHT TERM': {
+        const currentFreightTerm = data.logistics_local_charges?.freight_term || '';
+        return (
+          <select
+            value={currentFreightTerm}
+            onChange={(e) => onUpdateFreightTerm(fileId, docIndex, e.target.value)}
+            className="block w-28 rounded-md border-0 py-1 pl-2 pr-6 text-xs text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-xs sm:leading-6"
+          >
+            <option value="">Select</option>
+            <option value="PREPAID">PREPAID</option>
+            <option value="COLLECT">COLLECT</option>
+          </select>
+        );
+      }
       case 'E. PLACE OF DESTINATION': return data.logistics_local_charges?.place_of_destination || '-';
       case 'F. CNTR TYPE': return data.logistics_local_charges?.container_type || '-';
       case 'G. CONTAINER QTY': return data.logistics_local_charges?.container_qty || '-';

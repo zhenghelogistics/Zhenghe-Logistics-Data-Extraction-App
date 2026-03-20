@@ -214,6 +214,20 @@ function App() {
     }));
   };
 
+  const handleFreightTermUpdate = (id: string, docIndex: number, newFreightTerm: string) => {
+    setFiles(prev => prev.map(f => {
+      if (f.id !== id || !f.data) return f;
+      const newData = [...f.data];
+      if (newData[docIndex]) {
+        newData[docIndex] = {
+          ...newData[docIndex],
+          logistics_local_charges: { ...newData[docIndex].logistics_local_charges, freight_term: newFreightTerm },
+        };
+      }
+      return { ...f, data: newData };
+    }));
+  };
+
   const handleDeleteFile = (id: string) => {
     setFileToDelete(id);
     setDeleteModalOpen(true);
@@ -787,6 +801,7 @@ function App() {
             <ResultsTable
               files={files}
               onUpdateIncoterm={handleIncotermUpdate}
+              onUpdateFreightTerm={handleFreightTermUpdate}
               onDeleteFile={handleDeleteFile}
               onBulkDelete={handleBulkDelete}
               onGenerateVoucher={handleGenerateVouchers}

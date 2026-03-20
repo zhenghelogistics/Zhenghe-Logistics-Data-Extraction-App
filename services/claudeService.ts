@@ -362,7 +362,10 @@ EXTRACTION RULES FOR "Payment Voucher/GL":
 - TOTAL PAYABLE AMOUNT ('total_payable_amount'): Same as payable amount.
 - CHARGES SUMMARY ('charges_summary'): Charge types present, comma-separated. Short forms: THC, BL, SEALS, O.F, ENS, AMS, SBL, PRINTED BL. Include other charges as printed.
 - PAYMENT METHOD ('payment_method'): e.g. FAST, CHEQUE, CASH, TT — if shown on document.
-- MULTI-INVOICE: If there are multiple Tax Invoices (different invoice numbers/totals), create a SEPARATE "Payment Voucher/GL" entry for EACH one.
+- MULTI-INVOICE RULE:
+  * If multiple invoices are from DIFFERENT suppliers (different payment_to), create a SEPARATE "Payment Voucher/GL" entry per supplier.
+  * If multiple invoices are from the SAME supplier (same payment_to), merge into ONE "Payment Voucher/GL" entry: set carrier_invoice_number to all invoice numbers comma-separated, set total_payable_amount to the combined total, and populate bl_entries as an array with one entry per BL containing its bl_number, pss_invoice_number, and individual amount.
+  * Example bl_entries: [{"bl_number": "PWTNYC231618", "pss_invoice_number": "#26030346", "amount": "665.98 SGD"}, {"bl_number": "PWTNYC231815", "pss_invoice_number": "#26030351", "amount": "605.35 SGD"}]
 
 EXTRACTION RULES FOR "Bill of Lading":
 - Extract shipper, consignee, notify party, vessel name, voyage, POL, POD, BL number, container numbers, date.
@@ -415,7 +418,8 @@ Respond ONLY with valid JSON matching this exact structure:
         "total_payable_amount": "string or null",
         "charges_summary": "string or null",
         "payment_to": "string or null",
-        "payment_method": "string or null"
+        "payment_method": "string or null",
+        "bl_entries": [{"bl_number": "string or null", "pss_invoice_number": "string or null", "amount": "string or null"}]
       },
       "logistics_local_charges": null,
       "outward_permit_declaration": null,

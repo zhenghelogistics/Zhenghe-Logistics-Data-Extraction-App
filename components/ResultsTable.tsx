@@ -470,9 +470,12 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
             {displayRows.map((row) => {
               const uniqueKey = `${row.file.id}-${row.docIndex}`;
               const d = row.data;
+              const blEntries = activeTab === 'Payment Voucher/GL' ? (d.payment_voucher_details?.bl_entries ?? []) : [];
+              const isCombined = blEntries.length > 1;
 
               return (
-              <tr key={uniqueKey} className={`hover:bg-slate-50 transition-colors ${selectedIds.has(row.file.id) ? 'bg-red-50' : ''}`}>
+              <React.Fragment key={uniqueKey}>
+              <tr className={`transition-colors ${selectedIds.has(row.file.id) ? 'bg-red-50' : isCombined ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-slate-50'}`}>
                 <td className="px-3 py-3.5 pl-4">
                   <input
                     type="checkbox"
@@ -548,6 +551,30 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                   </>
                 )}
               </tr>
+              {/* Child rows for each BL entry in a combined PV */}
+              {isCombined && blEntries.map((entry, ei) => (
+                <tr key={`${uniqueKey}-entry-${ei}`} className="bg-blue-50/40 hover:bg-blue-100/50 border-l-2 border-blue-300">
+                  <td className="px-3 py-2 pl-4" />
+                  {/* PSS's Invoice # */}
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-500 pl-8">
+                    <span className="text-blue-400 mr-1">↳</span>
+                    {entry.pss_invoice_number || '-'}
+                  </td>
+                  {/* Carrier/Forwarder Inv # — not on individual entry */}
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">-</td>
+                  {/* BL Number */}
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-500">{entry.bl_number || '-'}</td>
+                  {/* Payable Amount */}
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-500">{entry.amount || '-'}</td>
+                  {/* Total Payable Amount — same as amount at entry level */}
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">-</td>
+                  {/* Charges — not at entry level */}
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">-</td>
+                  {/* Actions — empty */}
+                  <td />
+                </tr>
+              ))}
+              </React.Fragment>
             )})}
           </tbody>
         </table>

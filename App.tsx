@@ -40,6 +40,8 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
 
 function App() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const isAdmin = userId === import.meta.env.VITE_ADMIN_USER_ID;
   const [files, setFiles] = useState<ProcessedFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -106,6 +108,7 @@ function App() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        setUserId(session.user.id);
         const storedRole = localStorage.getItem('userRole') as UserRole;
         setUserRole(storedRole || UserRole.LOGISTICS);
       }
@@ -612,6 +615,23 @@ function App() {
               <p className="text-slate-600 text-xs">Active session</p>
             </div>
           </div>
+          {isAdmin && (
+            <div className="flex gap-1 px-1 mb-1">
+              {([UserRole.ACCOUNTS, UserRole.LOGISTICS, UserRole.TRANSPORT] as UserRole[]).map(role => (
+                <button
+                  key={role}
+                  onClick={() => { setUserRole(role); localStorage.setItem('userRole', role); }}
+                  className={`flex-1 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+                    userRole === role
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {role === UserRole.ACCOUNTS ? 'Acct' : role === UserRole.LOGISTICS ? 'Log' : 'Tpt'}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-slate-300 text-xs transition-colors cursor-pointer"

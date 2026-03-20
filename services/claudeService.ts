@@ -1,7 +1,7 @@
 import { PDFDocument } from "pdf-lib";
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
-import { DocumentData, ExtractionResponse } from "../types";
+import { DocumentData, ExtractionResponse, BLEntry } from "../types";
 import { AppConfig } from "../config";
 
 // Helper to access nested properties safely with dot notation
@@ -506,6 +506,94 @@ const enforceAccountsLane = (docs: DocumentData[]): DocumentData[] => {
   return result;
 };
 
+// Post-processing merge for accounts role:
+// Group all Payment Voucher/GL entries by supplier (payment_to). When multiple invoices
+// in the same file come from the same supplier, merge them into one combined PV with
+// a bl_entries array and a summed total_payable_amount. This is the definitive rule:
+// one PDF = one PV per supplier, always.
+const mergeSameSupplierPVs = (docs: DocumentData[]): DocumentData[] => {
+  const pvDocs   = docs.filter(d => d.document_type === 'Payment Voucher/GL');
+  const otherDocs = docs.filter(d => d.document_type !== 'Payment Voucher/GL');
+
+  // Group by normalised payment_to
+  const grouped = new Map<string, DocumentData[]>();
+  for (const doc of pvDocs) {
+    const key = doc.payment_voucher_details?.payment_to
+      ? doc.payment_voucher_details.payment_to.trim().toUpperCase()
+      : `__unknown_${Math.random()}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(doc);
+  }
+
+  const mergedPVs: DocumentData[] = [];
+  for (const group of grouped.values()) {
+    if (group.length === 1) {
+      mergedPVs.push(group[0]);
+      continue;
+    }
+
+    // Multiple PVs from the same supplier — collapse into one
+    const base = group[0];
+    const pv   = base.payment_voucher_details;
+
+    // All carrier invoice numbers, comma-separated
+    const allInvNums = group
+      .map(d => d.payment_voucher_details?.carrier_invoice_number)
+      .filter(Boolean)
+      .join(', ');
+
+    // Build bl_entries: one entry per source document
+    const blEntries: BLEntry[] = group.map(d => ({
+      bl_number:          d.payment_voucher_details?.bl_number          ?? null,
+      pss_invoice_number: d.payment_voucher_details?.pss_invoice_number ?? null,
+      amount:             d.payment_voucher_details?.payable_amount      ?? null,
+    }));
+
+    // Detect currency from any payable_amount string (default SGD)
+    const currencyStr = group
+      .map(d => d.payment_voucher_details?.payable_amount ?? '')
+      .find(s => /USD/i.test(s)) ? 'USD' : 'SGD';
+
+    // Sum numeric totals; keep the raw string if parsing fails
+    let totalStr: string | null = null;
+    const numericTotal = group.reduce((sum, d) => {
+      const raw = d.payment_voucher_details?.payable_amount
+                || d.payment_voucher_details?.total_payable_amount
+                || '';
+      const num = parseFloat(raw.replace(/[^0-9.]/g, ''));
+      return sum + (isNaN(num) ? 0 : num);
+    }, 0);
+    if (numericTotal > 0) {
+      totalStr = `${numericTotal.toFixed(2)} ${currencyStr}`;
+    }
+
+    // Merge charges_summary: union of all unique charge types
+    const allCharges = [
+      ...new Set(
+        group
+          .map(d => d.payment_voucher_details?.charges_summary ?? '')
+          .join(',')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+      ),
+    ].join(', ');
+
+    mergedPVs.push({
+      ...base,
+      payment_voucher_details: {
+        ...pv,
+        carrier_invoice_number: allInvNums  || pv?.carrier_invoice_number || null,
+        total_payable_amount:   totalStr    ?? pv?.total_payable_amount    ?? null,
+        charges_summary:        allCharges  || pv?.charges_summary         || null,
+        bl_entries: blEntries,
+      },
+    });
+  }
+
+  return [...otherDocs, ...mergedPVs];
+};
+
 // For every Logistics Local Charges Report that has no matching Payment Voucher/GL,
 // synthesize one so the accounts team always sees their row.
 const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
@@ -852,6 +940,9 @@ export const extractDocumentData = async (
   if (role === 'accounts') {
     // Hard-enforce accounts lane: convert any stray LCRs to PV/GL, drop OPD/Allied/CDAS entirely
     processed = enforceAccountsLane(allDocs);
+    // Definitive rule: one PDF = one PV per supplier, always.
+    // Merge same-supplier PV/GL entries in code so this never depends on Claude following instructions.
+    processed = mergeSameSupplierPVs(processed);
   } else if (role === 'logistics' || role === 'transport') {
     processed = allDocs;
   } else {

@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, TextAlignment } from 'pdf-lib';
 import type { DocumentData } from '../types';
 
 function stripCurrency(val: string | null | undefined): string {
@@ -48,6 +48,13 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     const setField = (name: string, value: string, fontSize = 9) => {
       const field = form.getTextField(name);
       field.setFontSize(fontSize);
+      field.setAlignment(TextAlignment.Left);
+      // Shrink field height to just fit the text so it sits on the form line
+      // instead of floating in the middle of a tall field box.
+      for (const widget of field.acroField.getWidgets()) {
+        const r = widget.getRectangle();
+        widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
+      }
       field.setText(value);
     };
 

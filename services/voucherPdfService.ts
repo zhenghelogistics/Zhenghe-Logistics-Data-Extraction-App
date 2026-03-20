@@ -45,7 +45,7 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
     // ── Fill form fields by name — no coordinate guessing ──
-    const setField = (name: string, value: string, fontSize = 9) => {
+    const setField = (name: string, value: string, fontSize = 10.5) => {
       const field = form.getTextField(name);
       field.setFontSize(fontSize);
       field.setAlignment(TextAlignment.Left);

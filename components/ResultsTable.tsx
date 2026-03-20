@@ -570,8 +570,36 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">-</td>
                   {/* Charges — not at entry level */}
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">-</td>
-                  {/* Actions — empty */}
-                  <td />
+                  {/* Actions — individual voucher download */}
+                  <td className="whitespace-nowrap px-3 py-2 text-right">
+                    {onGenerateVoucher && (
+                      <button
+                        type="button"
+                        title={`Download voucher for ${entry.pss_invoice_number || entry.bl_number || 'this entry'}`}
+                        disabled={isGeneratingPdf}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Synthesise a single-BL doc from the parent, overriding with this entry's fields
+                          const singleDoc: DocumentData = {
+                            ...d,
+                            payment_voucher_details: {
+                              ...d.payment_voucher_details,
+                              carrier_invoice_number: entry.pss_invoice_number || null,
+                              bl_number: entry.bl_number || null,
+                              pss_invoice_number: entry.pss_invoice_number || null,
+                              payable_amount: entry.amount || null,
+                              total_payable_amount: entry.amount || null,
+                              bl_entries: null,
+                            },
+                          };
+                          onGenerateVoucher([singleDoc]);
+                        }}
+                        className="text-blue-300 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                      >
+                        {isGeneratingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               </React.Fragment>

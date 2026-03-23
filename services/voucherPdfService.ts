@@ -1,6 +1,23 @@
 import { PDFDocument, TextAlignment } from 'pdf-lib';
 import type { DocumentData } from '../types';
 
+function shortenInvoiceList(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+  if (parts.length <= 1) return raw;
+  let prefix = parts[0];
+  for (let i = 1; i < parts.length; i++) {
+    while (prefix.length > 0 && !parts[i].startsWith(prefix)) {
+      prefix = prefix.slice(0, -1);
+    }
+  }
+  // Only shorten if prefix is long enough to be a real series (not coincidental overlap)
+  // and all suffixes are at least 2 chars
+  if (prefix.length < 8) return raw;
+  if (parts.some(p => p.slice(prefix.length).length < 2)) return raw;
+  return [parts[0], ...parts.slice(1).map(p => p.slice(prefix.length))].join(', ');
+}
+
 function stripCurrency(val: string | null | undefined): string {
   if (!val) return '';
   return val.replace(/SGD\s*/gi, '').replace(/USD\s*/gi, '').trim();
@@ -61,7 +78,7 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     if (paymentTo)           setField('Payment To', paymentTo);
     setField('Date', autoDate);
 
-    if (carrierInv) setField('row1_desc', `Payment Inv.  ${carrierInv}`, 9.5);
+    if (carrierInv) setField('row1_desc', `Payment Inv.  ${shortenInvoiceList(carrierInv)}`, 9.5);
 
     if (pv?.bl_entries && pv.bl_entries.length > 0) {
       // Combined PV: populate one row per BL entry (rows 2–6)

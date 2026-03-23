@@ -39,10 +39,7 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
       const field = form.getTextField(name);
       field.setFontSize(fontSize);
       field.setAlignment(TextAlignment.Left);
-      for (const widget of field.acroField.getWidgets()) {
-        const r = widget.getRectangle();
-        widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
-      }
+      // Do NOT resize the rectangle — CDAS template fields are already correctly sized
       field.setText(value);
     } catch { /* field not in template — skip */ }
   };

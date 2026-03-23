@@ -28,6 +28,104 @@ function detectCurrency(val: string | null | undefined): 'SGD' | 'USD' {
   return 'SGD';
 }
 
+export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob> {
+  const templateBytes = await fetch('/ZHL_Payment_Voucher_CDAS.pdf').then(r => r.arrayBuffer());
+  const outputDoc = await PDFDocument.create();
+  const templateDoc = await PDFDocument.load(templateBytes);
+  const form = templateDoc.getForm();
+
+  const setField = (name: string, value: string, fontSize = 11.5) => {
+    try {
+      const field = form.getTextField(name);
+      field.setFontSize(fontSize);
+      field.setAlignment(TextAlignment.Left);
+      for (const widget of field.acroField.getWidgets()) {
+        const r = widget.getRectangle();
+        widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
+      }
+      field.setText(value);
+    } catch { /* field not in template — skip */ }
+  };
+
+  const parse = (v: string | null | undefined) => parseFloat(v?.replace(/[^0-9.]/g, '') || '0') || 0;
+
+  // Aggregate all CDAS entries by charge type
+  type ContainerEntry = { container: string; amount: number };
+  let dhcTotal = 0;
+  let adminTotal = 0;
+  let washingTotal = 0;
+  const washingEntries: ContainerEntry[] = [];
+  let repairTotal = 0;
+  const repairEntries: ContainerEntry[] = [];
+  let detentionTotal = 0;
+  const detentionEntries: ContainerEntry[] = [];
+  let demurrageTotal = 0;
+  const demurrageEntries: ContainerEntry[] = [];
+
+  for (const doc of docs) {
+    const c = doc.cdas_report;
+    if (!c) continue;
+    // DHC + DHE lumped together, no container breakdown
+    dhcTotal   += parse(c.dhc_in) + parse(c.dhc_out) + parse(c.dhe_in) + parse(c.dhe_out);
+    // Admin fee lump, no breakdown
+    adminTotal += parse(c.data_admin_fee);
+    // Washing: per-container amount shown
+    const w = parse(c.washing);
+    if (w > 0) { washingTotal += w; if (c.container_number) washingEntries.push({ container: c.container_number, amount: w }); }
+    // Repair: per-container amount shown
+    const r = parse(c.repair);
+    if (r > 0) { repairTotal += r; if (c.container_number) repairEntries.push({ container: c.container_number, amount: r }); }
+    // Detention: per-container amount shown
+    const det = parse(c.detention);
+    if (det > 0) { detentionTotal += det; if (c.container_number) detentionEntries.push({ container: c.container_number, amount: det }); }
+    // Demurrage: per-container amount shown
+    const dem = parse(c.demurrage);
+    if (dem > 0) { demurrageTotal += dem; if (c.container_number) demurrageEntries.push({ container: c.container_number, amount: dem }); }
+  }
+
+  const containerDetail = (entries: ContainerEntry[]) =>
+    entries.map(e => `${e.container} $${e.amount}/-`).join(', ');
+
+  const rows: { desc: string; amount: number }[] = [];
+  if (dhcTotal > 0)        rows.push({ desc: 'DHC', amount: dhcTotal });
+  if (adminTotal > 0)      rows.push({ desc: 'ADMIN FEE', amount: adminTotal });
+  if (washingTotal > 0)    rows.push({ desc: washingEntries.length ? `WASHING - ${containerDetail(washingEntries)}` : 'WASHING', amount: washingTotal });
+  if (repairTotal > 0)     rows.push({ desc: repairEntries.length ? `REPAIR - ${containerDetail(repairEntries)}` : 'REPAIR', amount: repairTotal });
+  if (detentionTotal > 0)  rows.push({ desc: detentionEntries.length ? `DETENTION - ${containerDetail(detentionEntries)}` : 'DETENTION', amount: detentionTotal });
+  if (demurrageTotal > 0)  rows.push({ desc: demurrageEntries.length ? `DEMURRAGE - ${containerDetail(demurrageEntries)}` : 'DEMURRAGE', amount: demurrageTotal });
+
+  const grandTotal = rows.reduce((s, r) => s + r.amount, 0);
+
+  // Date: YYYY-MM-DD → "17 MARCH 2026"
+  const rawDate = docs[0]?.cdas_report?.invoice_date || docs[0]?.metadata?.date || '';
+  const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const dateDisplay = rawDate
+    ? (() => { const [y, m, d] = rawDate.split('-'); return `${parseInt(d)} ${MONTHS[parseInt(m) - 1]} ${y}`; })()
+    : '';
+
+  setField('ref', ''); // ZHL internal batch ref — blank, fill manually
+  setField('Payment To', 'CDAS LOGISTICS ALLIANCE LTD');
+  setField('Date', dateDisplay);
+  setField('CASH CHEQUE No', 'CIMB - GIRO');
+
+  rows.forEach((row, i) => {
+    const rowNum = i + 1;
+    if (rowNum > 6) return;
+    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 45 ? 9 : 11.5);
+    setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
+  });
+
+  setField('SGD  USD Total', grandTotal.toFixed(2));
+  try { form.getCheckBox('sgd_check').check(); } catch { /* skip */ }
+
+  form.flatten();
+  const [page] = await outputDoc.copyPages(templateDoc, [0]);
+  outputDoc.addPage(page);
+
+  const bytes = await outputDoc.save();
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
 export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
   const templateBytes = await fetch('/ZHL_Payment_Voucher_Updated.pdf').then(r => r.arrayBuffer());
   const outputDoc = await PDFDocument.create();

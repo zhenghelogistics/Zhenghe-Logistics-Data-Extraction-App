@@ -6,7 +6,7 @@ import {
 } from './services/supabase';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
-import { generateVoucherPdf } from './services/voucherPdfService';
+import { generateVoucherPdf, generateCDASVoucherPdf } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
@@ -390,6 +390,26 @@ function App() {
     }
   };
 
+  const handleGenerateCDASVoucher = async (docs: DocumentData[]) => {
+    setIsGeneratingPdf(true);
+    try {
+      const blob = await generateCDASVoucherPdf(docs);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cdas_payment_voucher.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to generate CDAS voucher PDF:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const handleGenerateVouchers = async (docs: DocumentData[]) => {
     setIsGeneratingPdf(true);
     try {
@@ -721,6 +741,25 @@ function App() {
                 <Download size={14} />
                 Export
               </button>
+
+              {/* Export CDAS Voucher PDF — only on CDAS Report tab */}
+              {activeTab === 'CDAS Report' && (() => {
+                const cdasDocs = files.flatMap(f =>
+                  (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING)
+                    ? (f.data ?? []).filter(d => d.document_type === 'CDAS Report')
+                    : []
+                );
+                return cdasDocs.length > 0 ? (
+                  <button
+                    onClick={() => handleGenerateCDASVoucher(cdasDocs)}
+                    disabled={isGeneratingPdf}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                    {isGeneratingPdf ? 'Generating...' : 'Export CDAS Voucher'}
+                  </button>
+                ) : null;
+              })()}
 
               {/* Export Vouchers PDF — only on Payment Voucher/GL tab */}
               {activeTab === 'Payment Voucher/GL' && (() => {

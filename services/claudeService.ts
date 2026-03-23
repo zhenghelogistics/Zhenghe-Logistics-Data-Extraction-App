@@ -81,7 +81,7 @@ CLASSIFICATION GUIDELINES:
 - WHY: Ensures the document appears in both Logistics Table AND Accounts Table.
 
 EXTRACTION RULES FOR "Payment Voucher/GL":
-- PAYMENT TO ('payment_to'): The company/beneficiary to whom payment is made. Take from the carrier's Tax Invoice letterhead (the issuing company name) or the "Beneficiary Name" on the invoice. Known mappings: MSC → 'MSC MEDITERRANEAN SHIPPING CO SA', ONE → 'OCEAN NETWORK EXPRESS PTE. LTD'. For others, use the full company name as printed.
+- PAYMENT TO ('payment_to'): The company/beneficiary to whom payment is made. Take from the carrier's Tax Invoice letterhead (the issuing company name) or the "Beneficiary Name" on the invoice. Known mappings: MSC → 'MSC MEDITERRANEAN SHIPPING CO SA', ONE → 'OCEAN NETWORK EXPRESS PTE. LTD', OOCL → 'OOCL (SINGAPORE) PTE LTD'. For others, use the full company name as printed.
 - PSS INVOICE NUMBER ('pss_invoice_number'): The invoice number stated ON the BL or associated with the BL/PO/Ocean Freight document. It typically appears next to a label like "Invoice:", "Invoice No:", or "Inv:". Format it as "#" followed by the number (e.g., "Invoice: 25091366" → "#25091366"). This number comes from the Invoice, PO, Ocean Freight, or BL document — NOT from the carrier's own invoice number.
 - CARRIER INVOICE NUMBER ('carrier_invoice_number'): The invoice number issued by the carrier/forwarder on their tax invoice (e.g., "SGD987.12"). This is a different number from PSS Invoice Number.
 - BL NUMBER ('bl_number'): Extract the BL/HBL number if present. Link each carrier invoice to its corresponding BL using the Booking Reference number — both the BL and its Tax Invoice share the same Booking Reference.
@@ -354,7 +354,7 @@ DOCUMENT TYPES — USE EXACTLY THESE TWO, NOTHING ELSE:
 DO NOT USE these types — they do not exist for accounts: Logistics Local Charges Report, Outward Permit Declaration, Allied Report, CDAS Report.
 
 EXTRACTION RULES FOR "Payment Voucher/GL":
-- PAYMENT TO ('payment_to'): Company name from the carrier's invoice letterhead (the issuing company). Known: MSC → 'MSC MEDITERRANEAN SHIPPING CO SA', ONE → 'OCEAN NETWORK EXPRESS PTE. LTD'. For others, use the full name as printed.
+- PAYMENT TO ('payment_to'): Company name from the carrier's invoice letterhead (the issuing company). Known: MSC → 'MSC MEDITERRANEAN SHIPPING CO SA', ONE → 'OCEAN NETWORK EXPRESS PTE. LTD', OOCL → 'OOCL (SINGAPORE) PTE LTD'. For others, use the full name as printed.
 - PSS INVOICE NUMBER ('pss_invoice_number'): The internal PSS invoice number linked to the BL (e.g. "Invoice: 25091366" → "#25091366"). NOT the carrier's own invoice number.
 - CARRIER INVOICE NUMBER ('carrier_invoice_number'): The invoice number issued by the carrier on their tax invoice.
 - BL NUMBER ('bl_number'): The BL/HBL number referenced on the invoice.

@@ -156,8 +156,7 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     ].filter(Boolean).join(' ');
 
     const today = new Date();
-    const autoDate = docDate ||
-      `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    const autoDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
     // ── Fill form fields by name — no coordinate guessing ──
     const setField = (name: string, value: string, fontSize = 11.5) => {

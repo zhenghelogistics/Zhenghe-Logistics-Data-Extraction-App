@@ -917,6 +917,86 @@ const extractFromChunk = async (
   return [];
 };
 
+// After the main extraction + merge, some bl_entries may still have null
+// pss_invoice_number because the text appeared in a different chunk.
+// This sends ONE targeted Claude query over the full file asking specifically
+// for the missing PSS numbers, then patches the results.
+const enrichMissingPSSNumbers = async (
+  docs: DocumentData[],
+  file: File,
+  onProgress?: (stage: string) => void,
+): Promise<DocumentData[]> => {
+  type Missing = { bl_number: string; carrier_invoice_number: string };
+  const missing: Missing[] = [];
+
+  for (const doc of docs) {
+    if (doc.document_type !== 'Payment Voucher/GL') continue;
+    const entries = doc.payment_voucher_details?.bl_entries ?? [];
+    const carrierParts = (doc.payment_voucher_details?.carrier_invoice_number ?? '').split(',').map(s => s.trim());
+    entries.forEach((entry, i) => {
+      if (!entry.pss_invoice_number && entry.bl_number) {
+        missing.push({ bl_number: entry.bl_number, carrier_invoice_number: carrierParts[i] || carrierParts[0] || '' });
+      }
+    });
+  }
+
+  if (missing.length === 0) return docs;
+
+  onProgress?.('Filling in missing PSS numbers...');
+  console.log(`[ZHL] enrichMissingPSSNumbers: querying for ${missing.length} BL(s):`, missing.map(m => m.bl_number).join(', '));
+
+  try {
+    const base64 = await fileToBase64(file);
+    const client = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || '', dangerouslyAllowBrowser: true });
+
+    const listLines = missing.map(m =>
+      `- BL ${m.bl_number}${m.carrier_invoice_number ? ` (carrier invoice ${m.carrier_invoice_number})` : ''}`
+    ).join('\n');
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 512,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+          {
+            type: 'text',
+            text: `For each Bill of Lading below, find the PSS or SI invoice number that Zhenghe / PSS Logistics stamped or printed on the invoice page. These numbers often start with # (e.g. #25101630).
+
+${listLines}
+
+Return ONLY a JSON object — BL number as key, PSS/SI number (or null) as value:
+{"MEDUUD123456": "#25101234", "MEDUUD999999": null}`,
+          },
+        ],
+      }],
+    });
+
+    const raw = response.content[0].type === 'text' ? response.content[0].text : '';
+    const pssMap: Record<string, string | null> = JSON.parse(jsonrepair(raw.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim()));
+    console.log('[ZHL] enrichMissingPSSNumbers result:', pssMap);
+
+    return docs.map(doc => {
+      if (doc.document_type !== 'Payment Voucher/GL') return doc;
+      const entries = doc.payment_voucher_details?.bl_entries;
+      if (!entries) return doc;
+      let changed = false;
+      const patched: BLEntry[] = entries.map(entry => {
+        if (entry.pss_invoice_number || !entry.bl_number) return entry;
+        const found = pssMap[entry.bl_number] ?? pssMap[entry.bl_number.trim().toUpperCase()] ?? null;
+        if (!found) return entry;
+        changed = true;
+        return { ...entry, pss_invoice_number: found };
+      });
+      return changed ? { ...doc, payment_voucher_details: { ...doc.payment_voucher_details, bl_entries: patched } } : doc;
+    });
+  } catch (err) {
+    console.warn('[ZHL] enrichMissingPSSNumbers failed — returning docs unchanged', err);
+    return docs;
+  }
+};
+
 export const extractDocumentData = async (
   file: File,
   customInstructions: string[] = [],
@@ -985,6 +1065,8 @@ export const extractDocumentData = async (
     logDocs(`After enforceAccountsLane (${processed.length} docs)`, processed, '#3b82f6');
     processed = mergeSameSupplierPVs(processed);
     logDocs(`After mergeSameSupplierPVs (${processed.length} docs)`, processed, '#8b5cf6');
+    processed = await enrichMissingPSSNumbers(processed, file, onProgress);
+    logDocs(`After enrichMissingPSSNumbers (${processed.length} docs)`, processed, '#f43f5e');
   } else if (role === 'logistics' || role === 'transport') {
     processed = allDocs;
   } else {

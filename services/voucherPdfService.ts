@@ -30,7 +30,7 @@ function detectCurrency(val: string | null | undefined): 'SGD' | 'USD' {
 
 export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob> {
   const templateBytes = await fetch('/ZHL_Payment_Voucher_CDAS.pdf').then(r => r.arrayBuffer());
-  const outputDoc = await PDFDocument.create();
+  // Load directly — do not copy to a new doc so AcroForm is preserved (editable in Acrobat)
   const templateDoc = await PDFDocument.load(templateBytes);
   const form = templateDoc.getForm();
 
@@ -118,20 +118,15 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   setField('SGD  USD Total', grandTotal.toFixed(2));
   try { form.getCheckBox('sgd_check').check(); } catch { /* skip */ }
 
-  // Do not flatten — keeps form fields editable in Acrobat
-  const [page] = await outputDoc.copyPages(templateDoc, [0]);
-  outputDoc.addPage(page);
-
-  const bytes = await outputDoc.save();
+  // Save templateDoc directly — preserves AcroForm so fields remain editable in Acrobat
+  const bytes = await templateDoc.save();
   return new Blob([bytes], { type: 'application/pdf' });
 }
 
 export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
   const templateBytes = await fetch('/ZHL_Payment_Voucher_Updated.pdf').then(r => r.arrayBuffer());
-  const outputDoc = await PDFDocument.create();
 
-  for (const doc of docs) {
-    // Load a fresh copy of the form template for each voucher
+  const fillTemplate = async (doc: DocumentData): Promise<PDFDocument> => {
     const templateDoc = await PDFDocument.load(templateBytes);
     const form = templateDoc.getForm();
 
@@ -142,8 +137,6 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     const amount        = stripCurrency(pv?.payable_amount);
     const total         = stripCurrency(pv?.total_payable_amount) || stripCurrency(pv?.payable_amount);
     const paymentTo     = pv?.payment_to || doc.metadata?.parties?.shipper_supplier || '';
-    const paymentMethod = pv?.payment_method || '';
-    const docDate       = doc.metadata?.date || '';
     const carrierInv    = pv?.carrier_invoice_number || '';
     const blNum         = pv?.bl_number || '';
     const pssNum        = pv?.pss_invoice_number || '';
@@ -210,9 +203,23 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       form.getCheckBox('usd_check').check();
     }
 
-    // Do not flatten — keeps form fields editable in Acrobat
+    return templateDoc;
+  };
 
-    const [page] = await outputDoc.copyPages(templateDoc, [0]);
+  if (docs.length === 1) {
+    // Single PV: save templateDoc directly — AcroForm preserved, fully editable in Acrobat
+    const filled = await fillTemplate(docs[0]);
+    const bytes = await filled.save();
+    return new Blob([bytes], { type: 'application/pdf' });
+  }
+
+  // Multiple PVs: merge pages into one PDF.
+  // copyPages does not transfer AcroForm so fields become static,
+  // but the multi-page layout is correct.
+  const outputDoc = await PDFDocument.create();
+  for (const doc of docs) {
+    const filled = await fillTemplate(doc);
+    const [page] = await outputDoc.copyPages(filled, [0]);
     outputDoc.addPage(page);
   }
 

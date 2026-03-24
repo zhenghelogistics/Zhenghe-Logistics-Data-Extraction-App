@@ -21,7 +21,7 @@ export const AppConfig = {
   // Role Configuration
   roles: {
     accounts: {
-      allowedTypes: ['All Files', 'Payment Voucher/GL', 'Bill of Lading'],
+      allowedTypes: ['All Files', 'Payment Voucher/GL'],
       defaultTab: 'Payment Voucher/GL'
     },
     logistics: {

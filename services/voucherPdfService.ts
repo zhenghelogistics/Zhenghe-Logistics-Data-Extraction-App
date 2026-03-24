@@ -171,7 +171,7 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     if (paymentTo)           setField('Payment To', paymentTo);
     setField('Date', autoDate);
 
-    if (carrierInv) setField('row1_desc', `Payment Inv.  ${shortenInvoiceList(carrierInv)}`, 10);
+    if (carrierInv) setField('row1_desc', `Payment Inv.  ${shortenInvoiceList(carrierInv)}`);
 
     if (pv?.bl_entries && pv.bl_entries.length > 0) {
       // Combined PV: populate one row per BL entry (rows 2–6)

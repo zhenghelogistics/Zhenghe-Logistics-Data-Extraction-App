@@ -29,7 +29,7 @@ function detectCurrency(val: string | null | undefined): 'SGD' | 'USD' {
 }
 
 export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob> {
-  const templateBytes = await fetch('/ZHL_Payment_Voucher_CDAS.pdf').then(r => r.arrayBuffer());
+  const templateBytes = await fetch('/ZHL_Payment_Voucher_CDASUPDATED.pdf').then(r => r.arrayBuffer());
   // Load directly — do not copy to a new doc so AcroForm is preserved (editable in Acrobat)
   const templateDoc = await PDFDocument.load(templateBytes);
   const form = templateDoc.getForm();
@@ -131,7 +131,7 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
 }
 
 export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Blob> {
-  const templateBytes = await fetch('/ZHL_Payment_Voucher_ALLIED.pdf').then(r => r.arrayBuffer());
+  const templateBytes = await fetch('/ZHL_Payment_Voucher_ALLIEDUPDTAED.pdf').then(r => r.arrayBuffer());
   const templateDoc = await PDFDocument.load(templateBytes);
   const form = templateDoc.getForm();
 

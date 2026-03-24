@@ -51,10 +51,12 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
           widget.setRectangle({ x: r.x, y: r.y - extra, width: r.width, height: newHeight });
         }
       } else {
-        // Normal row — pin height to sit flush on the form line
+        // Normal row — centre field vertically within the original row height
         for (const widget of field.acroField.getWidgets()) {
           const r = widget.getRectangle();
-          widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
+          const h = fontSize + 4;
+          const centredY = r.y + (r.height - h) / 2;
+          widget.setRectangle({ x: r.x, y: centredY, width: r.width, height: h });
         }
       }
 

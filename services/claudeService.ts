@@ -828,7 +828,7 @@ const extractFromChunk = async (
               {
                 type: "text",
                 text: role === 'accounts'
-                  ? "This PDF contains Bills of Lading AND Tax Invoices. You MUST output one separate JSON entry per Tax Invoice number — if there are 2 tax invoices, output 2 entries; if there are 3, output 3 entries. Each entry gets exactly one carrier_invoice_number. Do NOT combine invoice numbers. Do NOT sum amounts. Do NOT merge entries. Return valid JSON only. No explanation, no markdown."
+                  ? "This PDF may contain Bills of Lading, Tax Invoices/Freight Invoices, AND Customs Permits or Outward Permits. STEP 1: Scan EVERY page. STEP 2: For each Tax Invoice or Freight Invoice page found (carrier letterhead, charge table, Amount Due), output one 'Payment Voucher/GL' entry with that invoice number. STEP 3: For each BL page, output one 'Bill of Lading' entry. STEP 4: Completely ignore Customs Permit / Outward Permit pages. A single PDF with 1 BL + 1 Tax Invoice must produce 2 entries. Do NOT combine invoice numbers. Do NOT sum amounts. Return valid JSON only. No explanation, no markdown."
                   : "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object.",
               },
             ],

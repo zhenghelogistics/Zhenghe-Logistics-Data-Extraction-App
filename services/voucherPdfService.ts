@@ -1,4 +1,4 @@
-import { PDFDocument, TextAlignment } from 'pdf-lib';
+import { PDFDocument, StandardFonts, TextAlignment } from 'pdf-lib';
 import type { DocumentData } from '../types';
 
 function shortenInvoiceList(raw: string | null | undefined): string {
@@ -118,8 +118,9 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   setField('SGD  USD Total', grandTotal.toFixed(2));
   try { form.getCheckBox('sgd_check').check(); } catch { /* skip */ }
 
-  // Generate appearance streams so filled values are visible without flattening
-  form.updateFieldAppearances();
+  // Embed a standard font so appearance streams render in all PDF viewers
+  const font = await templateDoc.embedFont(StandardFonts.Helvetica);
+  form.updateFieldAppearances(font);
 
   // Save templateDoc directly — preserves AcroForm so fields remain editable in Acrobat
   const bytes = await templateDoc.save();
@@ -206,8 +207,9 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       form.getCheckBox('usd_check').check();
     }
 
-    // Generate appearance streams so filled values are visible without flattening
-    form.updateFieldAppearances();
+    // Embed a standard font so appearance streams render in all PDF viewers
+    const font = await templateDoc.embedFont(StandardFonts.Helvetica);
+    form.updateFieldAppearances(font);
 
     return templateDoc;
   };

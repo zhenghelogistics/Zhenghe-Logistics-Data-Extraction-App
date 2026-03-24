@@ -543,29 +543,46 @@ const mergeSameSupplierPVs = (docs: DocumentData[]): DocumentData[] => {
       .filter(Boolean)
       .join(', ');
 
-    // Build bl_entries: one entry per source document
-    const blEntries: BLEntry[] = group.map(d => ({
-      bl_number:          d.payment_voucher_details?.bl_number          ?? null,
-      pss_invoice_number: d.payment_voucher_details?.pss_invoice_number ?? null,
-      amount:             d.payment_voucher_details?.payable_amount      ?? null,
-    }));
+    // Build bl_entries: expand existing bl_entries arrays first, fall back to top-level fields
+    const rawEntries: BLEntry[] = group.flatMap(d => {
+      const pv = d.payment_voucher_details;
+      if (pv?.bl_entries && pv.bl_entries.length > 0) return pv.bl_entries;
+      return [{ bl_number: pv?.bl_number ?? null, pss_invoice_number: pv?.pss_invoice_number ?? null, amount: pv?.payable_amount ?? null }];
+    });
+    // Deduplicate by BL number, merging to keep the best available data per field
+    const blMap = new Map<string, BLEntry>();
+    for (const entry of rawEntries) {
+      const key = entry.bl_number?.trim().toUpperCase() || `__no_bl_${blMap.size}`;
+      if (blMap.has(key)) {
+        const existing = blMap.get(key)!;
+        blMap.set(key, {
+          bl_number:          existing.bl_number          || entry.bl_number,
+          pss_invoice_number: existing.pss_invoice_number || entry.pss_invoice_number,
+          amount:             existing.amount             || entry.amount,
+        });
+      } else {
+        blMap.set(key, entry);
+      }
+    }
+    const blEntries: BLEntry[] = Array.from(blMap.values());
 
-    // Detect currency from any payable_amount string (default SGD)
+    // Detect currency from any amount string (default SGD)
     const currencyStr = group
       .map(d => d.payment_voucher_details?.payable_amount ?? '')
       .find(s => /USD/i.test(s)) ? 'USD' : 'SGD';
 
-    // Sum numeric totals; keep the raw string if parsing fails
+    // Sum from bl_entries amounts (most accurate after dedup); fall back to group totals
     let totalStr: string | null = null;
-    const numericTotal = group.reduce((sum, d) => {
-      const raw = d.payment_voucher_details?.payable_amount
-                || d.payment_voucher_details?.total_payable_amount
-                || '';
-      const num = parseFloat(raw.replace(/[^0-9.]/g, ''));
+    const entryTotal = blEntries.reduce((sum, e) => {
+      const num = parseFloat((e.amount || '').replace(/[^0-9.]/g, ''));
       return sum + (isNaN(num) ? 0 : num);
     }, 0);
-    if (numericTotal > 0) {
-      totalStr = `${numericTotal.toFixed(2)} ${currencyStr}`;
+    if (entryTotal > 0) {
+      totalStr = `${entryTotal.toFixed(2)} ${currencyStr}`;
+    } else {
+      // Fall back: use total_payable_amount from whichever chunk has it
+      const rawTotal = group.map(d => d.payment_voucher_details?.total_payable_amount).find(Boolean) || null;
+      totalStr = rawTotal ?? null;
     }
 
     // Merge charges_summary: union of all unique charge types

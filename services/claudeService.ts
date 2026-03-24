@@ -528,14 +528,6 @@ const mergeSameSupplierPVs = (docs: DocumentData[]): DocumentData[] => {
 
   const mergedPVs: DocumentData[] = [];
   for (const group of grouped.values()) {
-    // Debug: log every group member so we can see exactly what Claude returned per doc
-    console.group('%c[ZHL] mergeSameSupplierPVs group', 'color:#ec4899;font-weight:bold');
-    group.forEach((d, i) => {
-      const pv = d.payment_voucher_details;
-      console.log(`  [${i}] bl=${pv?.bl_number} | pss=${pv?.pss_invoice_number} | amount=${pv?.payable_amount} | bl_entries=${JSON.stringify(pv?.bl_entries ?? null)}`);
-    });
-    console.groupEnd();
-
     if (group.length === 1) {
       mergedPVs.push(group[0]);
       continue;
@@ -755,8 +747,10 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
   return Array.from(uniqueDocs.values());
 };
 
-// Split a PDF file into chunks of `chunkSize` pages, returned as base64 strings
-const splitPdfIntoChunks = async (file: File, chunkSize = 10): Promise<{ base64: string; pages: string }[]> => {
+// Split a PDF file into chunks of `chunkSize` pages, returned as base64 strings.
+// For accounts role (overlap > 0): each chunk overlaps the previous by `overlap` pages
+// so that BL/invoice sets that span a chunk boundary appear in full in at least one chunk.
+const splitPdfIntoChunks = async (file: File, chunkSize = 10, overlap = 0): Promise<{ base64: string; pages: string }[]> => {
   const arrayBuffer = await file.arrayBuffer();
   const srcDoc = await PDFDocument.load(arrayBuffer);
   const totalPages = srcDoc.getPageCount();
@@ -767,7 +761,8 @@ const splitPdfIntoChunks = async (file: File, chunkSize = 10): Promise<{ base64:
   }
 
   const chunks: { base64: string; pages: string }[] = [];
-  for (let start = 0; start < totalPages; start += chunkSize) {
+  const stride = Math.max(1, chunkSize - overlap);
+  for (let start = 0; start < totalPages; start += stride) {
     const end = Math.min(start + chunkSize, totalPages);
     const chunkDoc = await PDFDocument.create();
     const pageIndices = Array.from({ length: end - start }, (_, i) => start + i);
@@ -780,6 +775,8 @@ const splitPdfIntoChunks = async (file: File, chunkSize = 10): Promise<{ base64:
     }
     const base64 = btoa(binary);
     chunks.push({ base64, pages: `${start + 1}-${end}` });
+    // Stop once the last page is covered
+    if (end >= totalPages) break;
   }
   return chunks;
 };
@@ -954,7 +951,9 @@ export const extractDocumentData = async (
   // Accounts docs can have many BL+Invoice pairs per file — use smaller chunks so
   // each API call has ~3-5 documents rather than 20+, avoiding output token truncation.
   const chunkSize = role === 'accounts' ? 15 : 50;
-  const chunks = await splitPdfIntoChunks(file, chunkSize);
+  // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
+  const chunkOverlap = role === 'accounts' ? 3 : 0;
+  const chunks = await splitPdfIntoChunks(file, chunkSize, chunkOverlap);
 
   const allDocs: DocumentData[] = [];
   for (let i = 0; i < chunks.length; i++) {

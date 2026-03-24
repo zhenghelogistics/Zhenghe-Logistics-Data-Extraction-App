@@ -839,12 +839,18 @@ const extractFromChunk = async (
       });
       const text = response.content[0].type === "text" ? response.content[0].text : "";
       if (!text) throw new Error("No data returned from Claude");
-      console.log('[DEBUG] Claude raw response:', text.slice(0, 3000));
+      console.group('%c[ZHL] Claude raw response', 'color:#6366f1;font-weight:bold');
+      console.log(text);
+      console.groupEnd();
       const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
       let docs: DocumentData[] = [];
       try {
         const result = JSON.parse(jsonrepair(clean)) as ExtractionResponse;
-        console.log('[DEBUG] Parsed document types:', result.documents?.map(d => d.document_type));
+        console.group('%c[ZHL] Parsed documents', 'color:#10b981;font-weight:bold');
+        result.documents?.forEach((d, i) => {
+          console.log(`  [${i}] ${d.document_type} | ref: ${d.metadata?.reference_number} | pss: ${d.payment_voucher_details?.pss_invoice_number} | carrier_inv: ${d.payment_voucher_details?.carrier_invoice_number} | amount: ${d.payment_voucher_details?.total_payable_amount ?? d.payment_voucher_details?.payable_amount}`);
+        });
+        console.groupEnd();
         docs = result.documents || [];
       } catch {
         // jsonrepair failed — likely a hard truncation mid-token.
@@ -937,18 +943,29 @@ export const extractDocumentData = async (
   }
 
   onProgress?.('Processing results...');
+
+  const logDocs = (label: string, docs: DocumentData[], color: string) => {
+    console.group(`%c[ZHL] ${label}`, `color:${color};font-weight:bold`);
+    docs.forEach((d, i) => console.log(`  [${i}] ${d.document_type} | ref: ${d.metadata?.reference_number} | pss: ${d.payment_voucher_details?.pss_invoice_number} | amount: ${d.payment_voucher_details?.total_payable_amount ?? d.payment_voucher_details?.payable_amount}`));
+    if (!docs.length) console.log('  (empty)');
+    console.groupEnd();
+  };
+
+  logDocs(`Raw from Claude (${allDocs.length} docs)`, allDocs, '#f59e0b');
+
   let processed: DocumentData[];
   if (role === 'accounts') {
-    // Hard-enforce accounts lane: convert any stray LCRs to PV/GL, drop OPD/Allied/CDAS entirely
     processed = enforceAccountsLane(allDocs);
-    // Definitive rule: one PDF = one PV per supplier, always.
-    // Merge same-supplier PV/GL entries in code so this never depends on Claude following instructions.
+    logDocs(`After enforceAccountsLane (${processed.length} docs)`, processed, '#3b82f6');
     processed = mergeSameSupplierPVs(processed);
+    logDocs(`After mergeSameSupplierPVs (${processed.length} docs)`, processed, '#8b5cf6');
   } else if (role === 'logistics' || role === 'transport') {
     processed = allDocs;
   } else {
-    // No role: synthesize PVs from LCRs as a fallback
     processed = ensurePaymentVouchers(allDocs);
   }
-  return deduplicateByContainer(deduplicateDocuments(processed));
+
+  const final = deduplicateByContainer(deduplicateDocuments(processed));
+  logDocs(`Final output (${final.length} docs)`, final, '#10b981');
+  return final;
 };

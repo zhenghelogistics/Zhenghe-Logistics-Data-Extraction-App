@@ -353,6 +353,8 @@ DOCUMENT TYPES — USE EXACTLY THESE TWO, NOTHING ELSE:
 
 DO NOT USE these types — they do not exist for accounts: Logistics Local Charges Report, Outward Permit Declaration, Allied Report, CDAS Report.
 
+CRITICAL RULE — DO NOT SKIP INVOICES: A PDF may contain a BL followed immediately by a carrier Tax Invoice (both about the same shipment). Even though they share the same BL number, they are TWO SEPARATE entries. The Tax Invoice MUST become its own "Payment Voucher/GL" entry. Do NOT treat the invoice as part of the BL. Do NOT skip it because you already extracted the BL. A page showing a carrier letterhead with "INVOICE", charge line items, and "AMOUNT DUE" is always a Tax Invoice → always "Payment Voucher/GL". Customs Permits / Cargo Clearance Permits are the ONLY pages you should ignore for accounts.
+
 EXTRACTION RULES FOR "Payment Voucher/GL":
 - PAYMENT TO ('payment_to'): Company name from the carrier's invoice letterhead (the issuing company). Known: MSC → 'MSC MEDITERRANEAN SHIPPING CO SA', ONE → 'OCEAN NETWORK EXPRESS PTE. LTD', OOCL → 'OOCL (SINGAPORE) PTE LTD'. For others, use the full name as printed.
 - PSS INVOICE NUMBER ('pss_invoice_number'): The internal PSS invoice number linked to the BL. It can appear ANYWHERE on the BL — including inside the Shipper address block, Remarks, or Reference fields — next to a label like "Invoice:", "Invoice No:", "Inv:", or "SI:". Format: "#" + number (e.g. "INVOICE: 26030371" → "#26030371"). NOT the carrier's own invoice number. Search the entire document.

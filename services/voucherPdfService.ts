@@ -40,8 +40,16 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
       field.setFontSize(fontSize);
       field.setAlignment(TextAlignment.Left);
       if (fontSize <= 9) {
-        // Dense row — enable multiline so text wraps, keep original field height
+        // Dense row — multiline, expand field height downward to fit wrapped text
         field.enableMultiline();
+        for (const widget of field.acroField.getWidgets()) {
+          const r = widget.getRectangle();
+          const charsPerLine = Math.max(1, Math.floor(r.width / (fontSize * 0.55)));
+          const lines = Math.max(1, Math.ceil(value.length / charsPerLine));
+          const newHeight = lines * (fontSize * 1.4) + 4;
+          const extra = Math.max(0, newHeight - r.height);
+          widget.setRectangle({ x: r.x, y: r.y - extra, width: r.width, height: newHeight });
+        }
       } else {
         // Normal row — pin height to sit flush on the form line
         for (const widget of field.acroField.getWidgets()) {

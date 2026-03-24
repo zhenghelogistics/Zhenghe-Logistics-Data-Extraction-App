@@ -839,10 +839,12 @@ const extractFromChunk = async (
       });
       const text = response.content[0].type === "text" ? response.content[0].text : "";
       if (!text) throw new Error("No data returned from Claude");
+      console.log('[DEBUG] Claude raw response:', text.slice(0, 3000));
       const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
       let docs: DocumentData[] = [];
       try {
         const result = JSON.parse(jsonrepair(clean)) as ExtractionResponse;
+        console.log('[DEBUG] Parsed document types:', result.documents?.map(d => d.document_type));
         docs = result.documents || [];
       } catch {
         // jsonrepair failed — likely a hard truncation mid-token.

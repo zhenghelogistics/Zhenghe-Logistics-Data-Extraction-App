@@ -528,6 +528,14 @@ const mergeSameSupplierPVs = (docs: DocumentData[]): DocumentData[] => {
 
   const mergedPVs: DocumentData[] = [];
   for (const group of grouped.values()) {
+    // Debug: log every group member so we can see exactly what Claude returned per doc
+    console.group('%c[ZHL] mergeSameSupplierPVs group', 'color:#ec4899;font-weight:bold');
+    group.forEach((d, i) => {
+      const pv = d.payment_voucher_details;
+      console.log(`  [${i}] bl=${pv?.bl_number} | pss=${pv?.pss_invoice_number} | amount=${pv?.payable_amount} | bl_entries=${JSON.stringify(pv?.bl_entries ?? null)}`);
+    });
+    console.groupEnd();
+
     if (group.length === 1) {
       mergedPVs.push(group[0]);
       continue;

@@ -118,6 +118,9 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   setField('SGD  USD Total', grandTotal.toFixed(2));
   try { form.getCheckBox('sgd_check').check(); } catch { /* skip */ }
 
+  // Generate appearance streams so filled values are visible without flattening
+  form.updateFieldAppearances();
+
   // Save templateDoc directly — preserves AcroForm so fields remain editable in Acrobat
   const bytes = await templateDoc.save();
   return new Blob([bytes], { type: 'application/pdf' });
@@ -202,6 +205,9 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     } else {
       form.getCheckBox('usd_check').check();
     }
+
+    // Generate appearance streams so filled values are visible without flattening
+    form.updateFieldAppearances();
 
     return templateDoc;
   };

@@ -486,9 +486,11 @@ function App() {
             const stripCurr = (v?: string | null) => (v || '').replace(/SGD\s*/gi, '').replace(/USD\s*/gi, '').trim();
             if (pv.bl_entries && pv.bl_entries.length > 0) {
               const carrierParts = (pv.carrier_invoice_number || m.reference_number || '').split(',').map((s: string) => s.trim());
+              const pssParts = (pv.pss_invoice_number || '').split(',').map((s: string) => s.trim());
               return pv.bl_entries.map((entry: { bl_number?: string; pss_invoice_number?: string; amount?: string }, i: number) => {
                 const carrierInv = carrierParts[i] || carrierParts[0] || '';
-                return [safe(entry.pss_invoice_number),safe(carrierInv),safe(entry.bl_number||pv.bl_number||m.related_reference_number),safe(stripCurr(entry.amount||pv.payable_amount||fin.total_amount)),safe(stripCurr(pv.total_payable_amount)),safe(charges),safe(filename)].join(',');
+                const pssInv = entry.pss_invoice_number || pssParts[i] || '';
+                return [safe(pssInv),safe(carrierInv),safe(entry.bl_number||pv.bl_number||m.related_reference_number),safe(stripCurr(entry.amount||pv.payable_amount||fin.total_amount)),safe(stripCurr(pv.total_payable_amount)),safe(charges),safe(filename)].join(',');
               }).join('\n');
             }
             return [safe(pv.pss_invoice_number),safe(pv.carrier_invoice_number||m.reference_number),safe(pv.bl_number||m.related_reference_number),safe(stripCurr(pv.payable_amount||fin.total_amount)),safe(stripCurr(pv.total_payable_amount)),safe(charges),safe(filename)].join(',');

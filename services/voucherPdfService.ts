@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, TextAlignment } from 'pdf-lib';
+import { PDFDocument, StandardFonts, TextAlignment, PDFName, PDFBool } from 'pdf-lib';
 import type { DocumentData } from '../types';
 
 function shortenInvoiceList(raw: string | null | undefined): string {
@@ -121,6 +121,9 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   // Embed a standard font so appearance streams render in all PDF viewers
   const font = await templateDoc.embedFont(StandardFonts.Helvetica);
   form.updateFieldAppearances(font);
+  // Clear NeedAppearances so Adobe Acrobat uses our pre-generated streams
+  // instead of regenerating them with fonts it cannot find (which produces blank fields)
+  (form.acroForm.dict as any).set(PDFName.of('NeedAppearances'), PDFBool.False);
 
   // Save templateDoc directly — preserves AcroForm so fields remain editable in Acrobat
   const bytes = await templateDoc.save();
@@ -210,6 +213,8 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     // Embed a standard font so appearance streams render in all PDF viewers
     const font = await templateDoc.embedFont(StandardFonts.Helvetica);
     form.updateFieldAppearances(font);
+    // Clear NeedAppearances so Adobe Acrobat uses our pre-generated streams
+    (form.acroForm.dict as any).set(PDFName.of('NeedAppearances'), PDFBool.False);
 
     return templateDoc;
   };

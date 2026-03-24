@@ -6,7 +6,7 @@ import {
 } from './services/supabase';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
-import { generateVoucherPdf, generateCDASVoucherPdf } from './services/voucherPdfService';
+import { generateVoucherPdf, generateCDASVoucherPdf, generateAlliedVoucherPdf } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
@@ -410,7 +410,30 @@ function App() {
     }
   };
 
+  const handleGenerateAlliedVoucher = async (docs: DocumentData[]) => {
+    setIsGeneratingPdf(true);
+    try {
+      const blob = await generateAlliedVoucherPdf(docs);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'allied_payment_voucher.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to generate Allied voucher PDF:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const handleGenerateVouchers = async (docs: DocumentData[]) => {
+    // Route container-report vouchers to their own generators
+    if (docs[0]?.document_type === 'Allied Report') return handleGenerateAlliedVoucher(docs);
+    if (docs[0]?.document_type === 'CDAS Report') return handleGenerateCDASVoucher(docs);
     setIsGeneratingPdf(true);
     try {
       const blob = await generateVoucherPdf(docs);
@@ -768,6 +791,25 @@ function App() {
                   >
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export CDAS Voucher'}
+                  </button>
+                ) : null;
+              })()}
+
+              {/* Export Allied Voucher PDF — only on Allied Report tab */}
+              {activeTab === 'Allied Report' && (() => {
+                const alliedDocs = files.flatMap(f =>
+                  (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING)
+                    ? (f.data ?? []).filter(d => d.document_type === 'Allied Report')
+                    : []
+                );
+                return alliedDocs.length > 0 ? (
+                  <button
+                    onClick={() => handleGenerateAlliedVoucher(alliedDocs)}
+                    disabled={isGeneratingPdf}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                    {isGeneratingPdf ? 'Generating...' : 'Export Allied Voucher'}
                   </button>
                 ) : null;
               })()}

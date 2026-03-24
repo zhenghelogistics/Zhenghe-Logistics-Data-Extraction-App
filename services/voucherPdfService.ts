@@ -130,6 +130,98 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   return new Blob([bytes], { type: 'application/pdf' });
 }
 
+export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Blob> {
+  const templateBytes = await fetch('/ZHL_Payment_Voucher_ALLIED.pdf').then(r => r.arrayBuffer());
+  const templateDoc = await PDFDocument.load(templateBytes);
+  const form = templateDoc.getForm();
+
+  const setField = (name: string, value: string, fontSize = 11.5) => {
+    try {
+      const field = form.getTextField(name);
+      field.setFontSize(fontSize);
+      field.setAlignment(TextAlignment.Left);
+      for (const widget of field.acroField.getWidgets()) {
+        const r = widget.getRectangle();
+        widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
+      }
+      field.setText(value);
+    } catch { /* field not in template — skip */ }
+  };
+
+  const parse = (v: string | null | undefined) => parseFloat(v?.replace(/[^0-9.]/g, '') || '0') || 0;
+
+  type ContainerEntry = { container: string; amount: number };
+  let dhcTotal = 0;
+  let dheTotal = 0;
+  let adminTotal = 0;
+  let washingTotal = 0;
+  const washingEntries: ContainerEntry[] = [];
+  let repairTotal = 0;
+  const repairEntries: ContainerEntry[] = [];
+  let detentionTotal = 0;
+  const detentionEntries: ContainerEntry[] = [];
+  let demurrageTotal = 0;
+  const demurrageEntries: ContainerEntry[] = [];
+
+  for (const doc of docs) {
+    const a = doc.allied_report;
+    if (!a) continue;
+    dhcTotal  += parse(a.dhc_in) + parse(a.dhc_out);
+    dheTotal  += parse(a.dhe_in) + parse(a.dhe_out);
+    adminTotal += parse(a.data_admin_fee);
+    const w = parse(a.washing);
+    if (w > 0) { washingTotal += w; if (a.container_booking_no) washingEntries.push({ container: a.container_booking_no, amount: w }); }
+    const r = parse(a.repair);
+    if (r > 0) { repairTotal += r; if (a.container_booking_no) repairEntries.push({ container: a.container_booking_no, amount: r }); }
+    const det = parse(a.detention);
+    if (det > 0) { detentionTotal += det; if (a.container_booking_no) detentionEntries.push({ container: a.container_booking_no, amount: det }); }
+    const dem = parse(a.demurrage);
+    if (dem > 0) { demurrageTotal += dem; if (a.container_booking_no) demurrageEntries.push({ container: a.container_booking_no, amount: dem }); }
+  }
+
+  const containerDetail = (entries: ContainerEntry[]) =>
+    entries.map(e => `${e.container} $${e.amount}/-`).join(', ');
+
+  const rows: { desc: string; amount: number }[] = [];
+  if (dhcTotal > 0)        rows.push({ desc: 'DHC', amount: dhcTotal });
+  if (dheTotal > 0)        rows.push({ desc: 'DHE', amount: dheTotal });
+  if (adminTotal > 0)      rows.push({ desc: 'ADMIN FEE', amount: adminTotal });
+  if (washingTotal > 0)    rows.push({ desc: washingEntries.length ? `WASHING - ${containerDetail(washingEntries)}` : 'WASHING', amount: washingTotal });
+  if (repairTotal > 0)     rows.push({ desc: repairEntries.length ? `REPAIR - ${containerDetail(repairEntries)}` : 'REPAIR', amount: repairTotal });
+  if (detentionTotal > 0)  rows.push({ desc: detentionEntries.length ? `DETENTION - ${containerDetail(detentionEntries)}` : 'DETENTION', amount: detentionTotal });
+  if (demurrageTotal > 0)  rows.push({ desc: demurrageEntries.length ? `DEMURRAGE - ${containerDetail(demurrageEntries)}` : 'DEMURRAGE', amount: demurrageTotal });
+
+  const grandTotal = rows.reduce((s, r) => s + r.amount, 0);
+
+  const rawDate = docs[0]?.allied_report?.invoice_date || docs[0]?.metadata?.date || '';
+  const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const dateDisplay = rawDate
+    ? (() => { const [y, m, d] = rawDate.split('-'); return `${parseInt(d)} ${MONTHS[parseInt(m) - 1]} ${y}`; })()
+    : '';
+
+  setField('ref', '');
+  setField('Payment To', 'ALLIED CONTAINER (E&M) PTE LTD');
+  setField('Date', dateDisplay);
+  setField('CASH CHEQUE No', 'CIMB - GIRO');
+
+  rows.forEach((row, i) => {
+    const rowNum = i + 1;
+    if (rowNum > 6) return;
+    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 45 ? 9 : 11.5);
+    setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
+  });
+
+  setField('SGD  USD Total', grandTotal.toFixed(2));
+  try { form.getCheckBox('sgd_check').check(); } catch { /* skip */ }
+
+  const font = await templateDoc.embedFont(StandardFonts.Helvetica);
+  form.updateFieldAppearances(font);
+  (form.acroForm.dict as any).set(PDFName.of('NeedAppearances'), PDFBool.False);
+
+  const bytes = await templateDoc.save();
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
 export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
   const templateBytes = await fetch('/ZHL_Payment_Voucher_Updated.pdf').then(r => r.arrayBuffer());
 

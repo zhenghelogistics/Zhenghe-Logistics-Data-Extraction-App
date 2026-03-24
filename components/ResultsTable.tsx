@@ -538,6 +538,20 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                             </button>
                           )}
                         </>)}
+                        {(activeTab === 'Allied Report' || activeTab === 'CDAS Report') && onGenerateVoucher && (() => {
+                          const fileDocs = (row.file.data ?? []).filter(doc => doc.document_type === activeTab);
+                          return fileDocs.length > 0 ? (
+                            <button
+                              type="button"
+                              title={`Download ${activeTab} payment voucher for this file`}
+                              disabled={isGeneratingPdf}
+                              onClick={(e) => { e.stopPropagation(); onGenerateVoucher(fileDocs); }}
+                              className="text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            >
+                              {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
+                            </button>
+                          ) : null;
+                        })()}
                         <button
                           type="button"
                           onClick={(e) => {

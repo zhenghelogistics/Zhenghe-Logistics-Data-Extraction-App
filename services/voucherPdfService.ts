@@ -39,10 +39,17 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
       const field = form.getTextField(name);
       field.setFontSize(fontSize);
       field.setAlignment(TextAlignment.Left);
-      for (const widget of field.acroField.getWidgets()) {
-        const r = widget.getRectangle();
-        widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
+      if (fontSize <= 9) {
+        // Dense row — enable multiline so text wraps, keep original field height
+        field.enableMultiline();
+      } else {
+        // Normal row — pin height to sit flush on the form line
+        for (const widget of field.acroField.getWidgets()) {
+          const r = widget.getRectangle();
+          widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
+        }
       }
+
       field.setText(value);
     } catch { /* field not in template — skip */ }
   };
@@ -111,7 +118,7 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   rows.forEach((row, i) => {
     const rowNum = i + 1;
     if (rowNum > 6) return;
-    setField(`row${rowNum}_desc`, row.desc);
+    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 40 ? 8.5 : 11.5);
     setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
   });
 
@@ -140,9 +147,13 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
       const field = form.getTextField(name);
       field.setFontSize(fontSize);
       field.setAlignment(TextAlignment.Left);
-      for (const widget of field.acroField.getWidgets()) {
-        const r = widget.getRectangle();
-        widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
+      if (fontSize <= 9) {
+        field.enableMultiline();
+      } else {
+        for (const widget of field.acroField.getWidgets()) {
+          const r = widget.getRectangle();
+          widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
+        }
       }
       field.setText(value);
     } catch { /* field not in template — skip */ }
@@ -207,7 +218,7 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
   rows.forEach((row, i) => {
     const rowNum = i + 1;
     if (rowNum > 6) return;
-    setField(`row${rowNum}_desc`, row.desc);
+    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 40 ? 8.5 : 11.5);
     setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
   });
 

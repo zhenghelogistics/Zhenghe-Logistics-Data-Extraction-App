@@ -503,6 +503,11 @@ function App() {
           case 'Payment Voucher/GL': {
             const pv = d.payment_voucher_details || {};
             const charges = pv.charges_summary || fin.line_item_charges?.map(c => `${c.description}: ${c.amount}`).join('; ') || '';
+            if (pv.bl_entries && pv.bl_entries.length > 0) {
+              return pv.bl_entries.map((entry: { bl_number?: string; pss_invoice_number?: string; amount?: string }) =>
+                [safe(entry.pss_invoice_number),safe(pv.carrier_invoice_number||m.reference_number),safe(entry.bl_number||pv.bl_number||m.related_reference_number),safe(entry.amount||pv.payable_amount||fin.total_amount),safe(pv.total_payable_amount),safe(charges),safe(filename)].join(',')
+              ).join('\n');
+            }
             return [safe(pv.pss_invoice_number),safe(pv.carrier_invoice_number||m.reference_number),safe(pv.bl_number||m.related_reference_number),safe(pv.payable_amount||fin.total_amount),safe(pv.total_payable_amount),safe(charges),safe(filename)].join(',');
           }
           case 'Bill of Lading':

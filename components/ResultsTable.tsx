@@ -11,13 +11,12 @@ interface ResultsTableProps {
   onDeleteFile: (fileId: string) => void;
   onBulkDelete: (ids: string[]) => void;
   onGenerateVoucher?: (docs: DocumentData[]) => void;
-  onGenerateVoucherDocx?: (docs: DocumentData[]) => void;
   isGeneratingPdf?: boolean;
   activeTab: string;
   userRole: UserRole | null;
 }
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, onGenerateVoucherDocx, isGeneratingPdf, activeTab, userRole }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, isGeneratingPdf, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorPopover, setErrorPopover] = useState<{ fileId: string; errors: string[] } | null>(null);
 
@@ -538,17 +537,6 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                               {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
                             </button>
                           )}
-                          {onGenerateVoucherDocx && (
-                            <button
-                              type="button"
-                              title="Download Word voucher"
-                              disabled={isGeneratingPdf}
-                              onClick={(e) => { e.stopPropagation(); onGenerateVoucherDocx([d]); }}
-                              className="text-slate-400 hover:text-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                            >
-                              {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
-                            </button>
-                          )}
                         </>)}
                         <button
                           type="button"
@@ -587,7 +575,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                   {/* Actions — individual voucher download */}
                   <td className="whitespace-nowrap px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
-                    {(onGenerateVoucher || onGenerateVoucherDocx) && (() => {
+                    {onGenerateVoucher && (() => {
                       const singleDoc: DocumentData = {
                         ...d,
                         payment_voucher_details: {
@@ -600,30 +588,17 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                           bl_entries: null,
                         },
                       };
-                      return (<>
-                        {onGenerateVoucher && (
-                          <button
-                            type="button"
-                            title={`PDF voucher for ${entry.pss_invoice_number || entry.bl_number || 'this entry'}`}
-                            disabled={isGeneratingPdf}
-                            onClick={(e) => { e.stopPropagation(); onGenerateVoucher([singleDoc]); }}
-                            className="text-blue-300 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                          >
-                            {isGeneratingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-                          </button>
-                        )}
-                        {onGenerateVoucherDocx && (
-                          <button
-                            type="button"
-                            title={`Word voucher for ${entry.pss_invoice_number || entry.bl_number || 'this entry'}`}
-                            disabled={isGeneratingPdf}
-                            onClick={(e) => { e.stopPropagation(); onGenerateVoucherDocx([singleDoc]); }}
-                            className="text-blue-300 hover:text-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                          >
-                            {isGeneratingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-                          </button>
-                        )}
-                      </>);
+                      return (
+                        <button
+                          type="button"
+                          title={`PDF voucher for ${entry.pss_invoice_number || entry.bl_number || 'this entry'}`}
+                          disabled={isGeneratingPdf}
+                          onClick={(e) => { e.stopPropagation(); onGenerateVoucher([singleDoc]); }}
+                          className="text-blue-300 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        >
+                          {isGeneratingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                        </button>
+                      );
                     })()}
                     </div>
                   </td>

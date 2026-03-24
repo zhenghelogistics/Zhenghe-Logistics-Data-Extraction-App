@@ -118,7 +118,7 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   setField('SGD  USD Total', grandTotal.toFixed(2));
   try { form.getCheckBox('sgd_check').check(); } catch { /* skip */ }
 
-  form.flatten();
+  // Do not flatten — keeps form fields editable in Acrobat
   const [page] = await outputDoc.copyPages(templateDoc, [0]);
   outputDoc.addPage(page);
 
@@ -210,8 +210,7 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
       form.getCheckBox('usd_check').check();
     }
 
-    // Flatten: burns filled values into the page as static content
-    form.flatten();
+    // Do not flatten — keeps form fields editable in Acrobat
 
     const [page] = await outputDoc.copyPages(templateDoc, [0]);
     outputDoc.addPage(page);

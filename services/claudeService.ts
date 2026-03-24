@@ -714,7 +714,7 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
       uniqueDocs.set(`CDAS_${Math.random()}`, doc);
     } else {
       let key = "";
-      if (doc.payment_voucher_details?.pss_invoice_number) {
+      if (doc.document_type === 'Payment Voucher/GL' && doc.payment_voucher_details?.pss_invoice_number) {
         key = `PV_${doc.payment_voucher_details.pss_invoice_number}`;
       } else if (doc.metadata?.reference_number) {
         key = `${doc.document_type}_${doc.metadata.reference_number}`;

@@ -7,6 +7,7 @@ import {
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
 import { generateVoucherPdf, generateCDASVoucherPdf } from './services/voucherPdfService';
+import { generateVoucherDocx } from './services/voucherDocxService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
@@ -432,6 +433,26 @@ function App() {
     }
   };
 
+  const handleGenerateVoucherDocx = async (docs: DocumentData[]) => {
+    setIsGeneratingPdf(true);
+    try {
+      const blob = await generateVoucherDocx(docs);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `voucher_${docs[0].payment_voucher_details?.pss_invoice_number || 'export'}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to generate voucher DOCX:', err);
+      alert('Failed to generate Word document. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const downloadReport = async () => {
     const allDocuments: { data: DocumentData; filename: string }[] = [];
     files.forEach(f => {
@@ -769,6 +790,7 @@ function App() {
                     : []
                 );
                 return pvDocs.length > 0 ? (
+                  <div className="flex gap-2">
                   <button
                     onClick={() => handleGenerateVouchers(pvDocs)}
                     disabled={isGeneratingPdf}
@@ -777,6 +799,15 @@ function App() {
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export Vouchers PDF'}
                   </button>
+                  <button
+                    onClick={() => handleGenerateVoucherDocx(pvDocs)}
+                    disabled={isGeneratingPdf}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                    {isGeneratingPdf ? 'Generating...' : 'Export Voucher DOCX'}
+                  </button>
+                  </div>
                 ) : null;
               })()}
 

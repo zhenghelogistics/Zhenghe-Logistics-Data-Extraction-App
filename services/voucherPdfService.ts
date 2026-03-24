@@ -51,12 +51,11 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
           widget.setRectangle({ x: r.x, y: r.y - extra, width: r.width, height: newHeight });
         }
       } else {
-        // Normal row — centre field vertically within the original row height
+        // Normal row — anchor to top of field so text sits flush on the form line
         for (const widget of field.acroField.getWidgets()) {
           const r = widget.getRectangle();
           const h = fontSize + 4;
-          const centredY = r.y + (r.height - h) / 2;
-          widget.setRectangle({ x: r.x, y: centredY, width: r.width, height: h });
+          widget.setRectangle({ x: r.x, y: r.y + r.height - h, width: r.width, height: h });
         }
       }
 
@@ -128,7 +127,7 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   rows.forEach((row, i) => {
     const rowNum = i + 1;
     if (rowNum > 6) return;
-    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 40 ? 8.5 : 11.5);
+    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 40 ? 7.5 : 11.5);
     setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
   });
 
@@ -228,7 +227,7 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
   rows.forEach((row, i) => {
     const rowNum = i + 1;
     if (rowNum > 6) return;
-    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 40 ? 8.5 : 11.5);
+    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 40 ? 7.5 : 11.5);
     setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
   });
 

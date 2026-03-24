@@ -158,10 +158,19 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
       field.setAlignment(TextAlignment.Left);
       if (fontSize <= 9) {
         field.enableMultiline();
+        for (const widget of field.acroField.getWidgets()) {
+          const r = widget.getRectangle();
+          const charsPerLine = Math.max(1, Math.floor(r.width / (fontSize * 0.55)));
+          const lines = Math.max(1, Math.ceil(value.length / charsPerLine));
+          const newHeight = lines * (fontSize * 1.4) + 4;
+          const extra = Math.max(0, newHeight - r.height);
+          widget.setRectangle({ x: r.x, y: r.y - extra + 2, width: r.width, height: newHeight });
+        }
       } else {
         for (const widget of field.acroField.getWidgets()) {
           const r = widget.getRectangle();
-          widget.setRectangle({ x: r.x, y: r.y, width: r.width, height: fontSize + 4 });
+          const h = fontSize + 4;
+          widget.setRectangle({ x: r.x, y: r.y + r.height - h + 2, width: r.width, height: h });
         }
       }
       field.setText(value);

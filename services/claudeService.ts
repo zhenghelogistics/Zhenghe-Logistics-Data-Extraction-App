@@ -86,7 +86,7 @@ EXTRACTION RULES FOR "Payment Voucher/GL":
 - CARRIER INVOICE NUMBER ('carrier_invoice_number'): The invoice number issued by the carrier/forwarder on their tax invoice (e.g., "SGD987.12"). This is a different number from PSS Invoice Number.
 - BL NUMBER ('bl_number'): Extract the BL/HBL number if present. Link each carrier invoice to its corresponding BL using the Booking Reference number — both the BL and its Tax Invoice share the same Booking Reference.
 - PAYABLE AMOUNT ('payable_amount'): Grand Total with currency (e.g., "250.00 SGD").
-- CHARGES SUMMARY ('charges_summary'): List the charge TYPES found in the tax invoice, comma-separated. Use these short forms for known charges: THC (Terminal Handling Charges), BL (BL Fee / Document Fee), SEALS (Seal Fee), O.F (Ocean Freight), ENS, AMS, SBL (Surrender of BL), PRINTED BL. For any OTHER charges not in this list, include them as they appear on the invoice (e.g., "FOOD GRADE", "FUMIGATION", "ISPS"). Example output: "THC, SEALS, BL, SBL, ENS, FOOD GRADE". Only include charges that are actually present in the document.
+- CHARGES SUMMARY ('charges_summary'): List the charge TYPES found in the tax invoice, comma-separated. Use these short forms for known charges: THC (Terminal Handling Charges), BL (BL Fee / Document Fee / O/B DOC FEE / LOCAL BL), SEALS (Seal Fee / HI SEC SEAL CHG), O.F (Ocean Freight), ENS, AMS (Advance Manifest / ADV MFST CHGR), SBL (Surrender of BL), PRINTED BL. For any OTHER charges not in this list, include them as they appear on the invoice (e.g., "FOOD GRADE", "FUMIGATION", "ISPS"). Example output: "THC, SEALS, BL, SBL, ENS, FOOD GRADE". Only include charges that are actually present in the document.
 - MULTI-INVOICE RULE:
   * If multiple invoices are from DIFFERENT suppliers/carriers (different payment_to), create a SEPARATE Payment Voucher/GL entry for each supplier.
   * If multiple invoices are from the SAME supplier/carrier (same payment_to), merge them into ONE Payment Voucher/GL entry: set carrier_invoice_number to all invoice numbers comma-separated, set total_payable_amount to the combined total, and populate bl_entries as an array — one entry per BL with its bl_number, pss_invoice_number, and individual amount.
@@ -362,12 +362,13 @@ EXTRACTION RULES FOR "Payment Voucher/GL":
 - BL NUMBER ('bl_number'): The BL/HBL number referenced on the invoice.
 - PAYABLE AMOUNT ('payable_amount'): Grand total with currency (e.g. "250.00 SGD").
 - TOTAL PAYABLE AMOUNT ('total_payable_amount'): Same as payable amount.
-- CHARGES SUMMARY ('charges_summary'): Charge types present, comma-separated. Short forms: THC, BL, SEALS, O.F, ENS, AMS, SBL, PRINTED BL. Include other charges as printed.
+- CHARGES SUMMARY ('charges_summary'): Charge types present, comma-separated. Short forms: THC, BL (also O/B DOC FEE / LOCAL BL), SEALS (also HI SEC SEAL CHG), O.F (Ocean Freight), ENS, AMS (also ADV MFST CHGR), SBL, PRINTED BL. Include other charges as printed.
 - PAYMENT METHOD ('payment_method'): e.g. FAST, CHEQUE, CASH, TT — if shown on document.
 - MULTI-INVOICE RULE: CRITICAL — Output exactly ONE separate "Payment Voucher/GL" entry per Tax Invoice number found in the PDF. If you see invoice PWT260300134 and invoice PWT260300201, that is TWO invoices → output TWO entries. Count the distinct invoice numbers and output that exact number of entries. NEVER combine multiple invoice numbers into one entry's carrier_invoice_number field. NEVER sum amounts across invoices. Each entry must have exactly one carrier_invoice_number, one bl_number, one payable_amount.
 
 EXTRACTION RULES FOR "Bill of Lading":
 - Extract shipper, consignee, notify party, vessel name, voyage, POL, POD, BL number, container numbers, date.
+- Set payment_voucher_details to null for BL entries. Do NOT populate pss_invoice_number on a BL entry — that field belongs only on Payment Voucher/GL entries.
 
 IMPORTANT:
 - If a value is not found, return null. Do NOT guess.

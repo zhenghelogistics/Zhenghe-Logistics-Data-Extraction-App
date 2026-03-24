@@ -896,6 +896,7 @@ function App() {
               onDeleteFile={handleDeleteFile}
               onBulkDelete={handleBulkDelete}
               onGenerateVoucher={handleGenerateVouchers}
+              onGenerateVoucherDocx={handleGenerateVoucherDocx}
               isGeneratingPdf={isGeneratingPdf}
               activeTab={activeTab}
               userRole={userRole}

@@ -11,12 +11,13 @@ interface ResultsTableProps {
   onDeleteFile: (fileId: string) => void;
   onBulkDelete: (ids: string[]) => void;
   onGenerateVoucher?: (docs: DocumentData[]) => void;
+  onGenerateVoucherDocx?: (docs: DocumentData[]) => void;
   isGeneratingPdf?: boolean;
   activeTab: string;
   userRole: UserRole | null;
 }
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, isGeneratingPdf, activeTab, userRole }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, onGenerateVoucherDocx, isGeneratingPdf, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorPopover, setErrorPopover] = useState<{ fileId: string; errors: string[] } | null>(null);
 
@@ -525,17 +526,30 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                     ))}
                     <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {activeTab === 'Payment Voucher/GL' && onGenerateVoucher && d && (
-                          <button
-                            type="button"
-                            title="Generate PDF voucher"
-                            disabled={isGeneratingPdf}
-                            onClick={(e) => { e.stopPropagation(); onGenerateVoucher([d]); }}
-                            className="text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                          >
-                            {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
-                          </button>
-                        )}
+                        {activeTab === 'Payment Voucher/GL' && d && (<>
+                          {onGenerateVoucher && (
+                            <button
+                              type="button"
+                              title="Download PDF voucher"
+                              disabled={isGeneratingPdf}
+                              onClick={(e) => { e.stopPropagation(); onGenerateVoucher([d]); }}
+                              className="text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            >
+                              {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
+                            </button>
+                          )}
+                          {onGenerateVoucherDocx && (
+                            <button
+                              type="button"
+                              title="Download Word voucher"
+                              disabled={isGeneratingPdf}
+                              onClick={(e) => { e.stopPropagation(); onGenerateVoucherDocx([d]); }}
+                              className="text-slate-400 hover:text-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            >
+                              {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
+                            </button>
+                          )}
+                        </>)}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -572,33 +586,46 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">-</td>
                   {/* Actions — individual voucher download */}
                   <td className="whitespace-nowrap px-3 py-2 text-right">
-                    {onGenerateVoucher && (
-                      <button
-                        type="button"
-                        title={`Download voucher for ${entry.pss_invoice_number || entry.bl_number || 'this entry'}`}
-                        disabled={isGeneratingPdf}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Synthesise a single-BL doc from the parent, overriding with this entry's fields
-                          const singleDoc: DocumentData = {
-                            ...d,
-                            payment_voucher_details: {
-                              ...d.payment_voucher_details,
-                              carrier_invoice_number: entry.pss_invoice_number || null,
-                              bl_number: entry.bl_number || null,
-                              pss_invoice_number: entry.pss_invoice_number || null,
-                              payable_amount: entry.amount || null,
-                              total_payable_amount: entry.amount || null,
-                              bl_entries: null,
-                            },
-                          };
-                          onGenerateVoucher([singleDoc]);
-                        }}
-                        className="text-blue-300 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                      >
-                        {isGeneratingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-                      </button>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                    {(onGenerateVoucher || onGenerateVoucherDocx) && (() => {
+                      const singleDoc: DocumentData = {
+                        ...d,
+                        payment_voucher_details: {
+                          ...d.payment_voucher_details,
+                          carrier_invoice_number: entry.pss_invoice_number || null,
+                          bl_number: entry.bl_number || null,
+                          pss_invoice_number: entry.pss_invoice_number || null,
+                          payable_amount: entry.amount || null,
+                          total_payable_amount: entry.amount || null,
+                          bl_entries: null,
+                        },
+                      };
+                      return (<>
+                        {onGenerateVoucher && (
+                          <button
+                            type="button"
+                            title={`PDF voucher for ${entry.pss_invoice_number || entry.bl_number || 'this entry'}`}
+                            disabled={isGeneratingPdf}
+                            onClick={(e) => { e.stopPropagation(); onGenerateVoucher([singleDoc]); }}
+                            className="text-blue-300 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                          >
+                            {isGeneratingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                          </button>
+                        )}
+                        {onGenerateVoucherDocx && (
+                          <button
+                            type="button"
+                            title={`Word voucher for ${entry.pss_invoice_number || entry.bl_number || 'this entry'}`}
+                            disabled={isGeneratingPdf}
+                            onClick={(e) => { e.stopPropagation(); onGenerateVoucherDocx([singleDoc]); }}
+                            className="text-blue-300 hover:text-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                          >
+                            {isGeneratingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                          </button>
+                        )}
+                      </>);
+                    })()}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -483,12 +483,15 @@ function App() {
           case 'Payment Voucher/GL': {
             const pv = d.payment_voucher_details || {};
             const charges = pv.charges_summary || fin.line_item_charges?.map(c => `${c.description}: ${c.amount}`).join('; ') || '';
+            const stripCurr = (v?: string | null) => (v || '').replace(/SGD\s*/gi, '').replace(/USD\s*/gi, '').trim();
             if (pv.bl_entries && pv.bl_entries.length > 0) {
-              return pv.bl_entries.map((entry: { bl_number?: string; pss_invoice_number?: string; amount?: string }) =>
-                [safe(entry.pss_invoice_number),safe(pv.carrier_invoice_number||m.reference_number),safe(entry.bl_number||pv.bl_number||m.related_reference_number),safe(entry.amount||pv.payable_amount||fin.total_amount),safe(pv.total_payable_amount),safe(charges),safe(filename)].join(',')
-              ).join('\n');
+              const carrierParts = (pv.carrier_invoice_number || m.reference_number || '').split(',').map((s: string) => s.trim());
+              return pv.bl_entries.map((entry: { bl_number?: string; pss_invoice_number?: string; amount?: string }, i: number) => {
+                const carrierInv = carrierParts[i] || carrierParts[0] || '';
+                return [safe(entry.pss_invoice_number),safe(carrierInv),safe(entry.bl_number||pv.bl_number||m.related_reference_number),safe(stripCurr(entry.amount||pv.payable_amount||fin.total_amount)),safe(stripCurr(pv.total_payable_amount)),safe(charges),safe(filename)].join(',');
+              }).join('\n');
             }
-            return [safe(pv.pss_invoice_number),safe(pv.carrier_invoice_number||m.reference_number),safe(pv.bl_number||m.related_reference_number),safe(pv.payable_amount||fin.total_amount),safe(pv.total_payable_amount),safe(charges),safe(filename)].join(',');
+            return [safe(pv.pss_invoice_number),safe(pv.carrier_invoice_number||m.reference_number),safe(pv.bl_number||m.related_reference_number),safe(stripCurr(pv.payable_amount||fin.total_amount)),safe(stripCurr(pv.total_payable_amount)),safe(charges),safe(filename)].join(',');
           }
           case 'Bill of Lading':
             return [safe(m.reference_number),safe(p.shipper_supplier),safe(p.consignee_buyer),safe(p.notify_party),safe(log.vessel_name),safe(log.voyage_number),safe(log.port_of_loading),safe(log.port_of_discharge),safe(filename)].join(',');

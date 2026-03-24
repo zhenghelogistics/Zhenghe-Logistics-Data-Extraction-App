@@ -200,7 +200,7 @@ export async function generateVoucherPdf(docs: DocumentData[]): Promise<Blob> {
     // 'SGD  USD Total' has a double space — exact field name from Acrobat
     if (total) setField('SGD  USD Total', total);
 
-    setField('CASH CHEQUE No', paymentMethod || 'UOB SGD FAST / GIRO PAYMENT');
+    setField('CASH CHEQUE No', 'UOB SGD FAST / GIRO PAYMENT');
 
     // Currency checkboxes share their name between header row and total row,
     // so one check() call ticks both simultaneously.

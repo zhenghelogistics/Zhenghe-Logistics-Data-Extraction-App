@@ -111,7 +111,7 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   rows.forEach((row, i) => {
     const rowNum = i + 1;
     if (rowNum > 6) return;
-    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 45 ? 9 : 11.5);
+    setField(`row${rowNum}_desc`, row.desc);
     setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
   });
 
@@ -207,7 +207,7 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
   rows.forEach((row, i) => {
     const rowNum = i + 1;
     if (rowNum > 6) return;
-    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 45 ? 9 : 11.5);
+    setField(`row${rowNum}_desc`, row.desc);
     setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
   });
 

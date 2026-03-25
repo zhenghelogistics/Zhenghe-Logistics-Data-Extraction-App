@@ -316,6 +316,7 @@ interface TestPanelProps {
 
 const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) => {
   const [testResults, setTestResults] = useState<Record<string, string | null> | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -324,20 +325,25 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
 
   const runTest = async (file: File) => {
     setTesting(true);
+    setTestError(null);
     setTestFileName(file.name);
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const base64 = btoa(
-        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
+      // Chunk-based base64 to avoid stack overflow on large PDFs
+      const uint8 = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < uint8.length; i += 8192) {
+        binary += String.fromCharCode(...uint8.subarray(i, i + 8192));
+      }
+      const base64 = btoa(binary);
       const client = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY, dangerouslyAllowBrowser: true });
       const fieldLines = template.fields.map(f => {
         const desc = f.hint?.trim() ? ` — ${f.hint}` : '';
         return `- ${f.key}${desc}`;
       }).join('\n');
       const msg = await client.messages.create({
-        model: 'claude-opus-4-6',
-        max_tokens: 512,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
         system: 'Extract only the requested fields from the document. Use your understanding of the content to find each value — descriptions explain what the value represents, not its physical location. Return ONLY a JSON object mapping field keys to their string values or null. No explanation, no markdown.',
         messages: [{
           role: 'user',
@@ -348,12 +354,12 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
         }],
       });
       const raw = (msg.content[0] as { text: string }).text.trim();
-      const parsed = JSON.parse(raw.replace(/^```json\s*|```$/g, '').trim());
+      const parsed = JSON.parse(raw.replace(/^```json\s*|```\s*$/g, '').trim());
       setTestResults(parsed);
       setAttempts(a => a + 1);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Test extraction failed:', err);
-      setTestResults({});
+      setTestError(err?.message || 'Something went wrong. Check your API key or try again.');
     } finally {
       setTesting(false);
     }
@@ -405,7 +411,7 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
         </div>
 
         <div className="px-7 pb-7">
-          <div className={`grid gap-5 ${testResults ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-5 ${testResults || testError ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {/* Drop zone */}
             <div
               onDragOver={e => e.preventDefault()}
@@ -428,8 +434,24 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
               <input ref={fileRef} type="file" accept="application/pdf" className="sr-only" onChange={handleFileSelect} />
             </div>
 
+            {/* Error */}
+            {testError && (
+              <div className="space-y-3">
+                <div className="bg-red-50 rounded-xl p-4 text-sm text-red-700">
+                  <p className="font-semibold mb-1">Test failed</p>
+                  <p className="text-xs">{testError}</p>
+                </div>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg bg-surface-low text-primary text-xs font-medium hover:bg-surface-container transition-colors cursor-pointer"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+
             {/* Results */}
-            {testResults && (
+            {testResults && !testError && (
               <div className="space-y-2">
                 <p className="text-[0.6875rem] font-medium uppercase tracking-[0.05em] text-[#4a5568] mb-2">Results</p>
                 {template.fields.map(f => {
@@ -445,8 +467,9 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
                         </span>
                       </div>
                       {!found && (
-                        <div className="ml-4 bg-amber-50 rounded-lg p-2.5 text-xs text-amber-700">
-                          💡 Try being more specific — e.g. "top right corner, labelled {f.label}:"
+                        <div className="ml-4 bg-amber-50 rounded-lg p-2.5 text-xs text-amber-700 space-y-1">
+                          <p className="font-medium">Couldn't find this automatically.</p>
+                          <p>Does <span className="font-semibold">{f.label}</span> appear on the document under a different name? Add that to the description — e.g. <span className="italic">"may also appear as {f.label.split(' ')[0]} Fee or {f.label.replace(' ', '/')}"</span></p>
                         </div>
                       )}
                     </div>
@@ -465,7 +488,7 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
                       onClick={onFixHints}
                       className="px-3 py-1.5 rounded-lg border border-secondary text-secondary text-xs font-medium hover:bg-secondary-fixed/30 transition-colors cursor-pointer"
                     >
-                      Fix hints →
+                      Update descriptions →
                     </button>
                   )}
                   {attempts >= 2 && failingFields.length > 0 && (

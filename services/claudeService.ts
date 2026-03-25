@@ -211,21 +211,29 @@ EXTRACTION RULES FOR "CDAS Report" (Transport Team):
 - Strip the "$" symbol and return numeric strings only (e.g. "75.00" not "$75.00").
 
 EXTRACTION RULES FOR "Export Permit Declaration (PSS)" (Logistics/Shipping Team):
-- DOCUMENT STRUCTURE: A SHIPMENT BUNDLE — Purchase Order(s), Commercial Invoice, Packing List, Loading Report, and/or supporting docs for the same PSS shipment.
-- ONE ENTRY TOTAL: Produce EXACTLY ONE "Export Permit Declaration (PSS)" entry for the entire bundle. Set metadata.reference_number to the Invoice Number.
-- ONE ITEM PER INVOICE LINE: "export_permit_pss.items" has one entry per line item on the Commercial Invoice.
-- JOIN KEY: Match items across documents using the item/part code (e.g. MC-ARG-PRM-xxxxx) found in both Invoice and PO.
-- hs_code: HS/Tariff code from PO for this item. Numbers only (e.g. "84483200").
+- DOCUMENT STRUCTURE: Either (A) a PSS shipment bundle — Purchase Order(s), Commercial Invoice, Packing List, Loading Report, and/or supporting docs; OR (B) a standalone Proforma Invoice / Delivery Note from an overseas supplier to a Singapore receiver.
+- ONE ENTRY TOTAL: Produce EXACTLY ONE "Export Permit Declaration (PSS)" entry for the entire document. Set metadata.reference_number to the Invoice Number.
+- ONE ITEM PER INVOICE LINE: "export_permit_pss.items" has one entry per line item on the invoice.
+- JOIN KEY (for bundle format): Match items across documents using the item/part code (e.g. MC-ARG-PRM-xxxxx) found in both Invoice and PO.
+- hs_code: HS/Tariff code for this item. Numbers only (e.g. "84483200"). Sources in priority order:
+  1. Explicit "HS CODE:" or "Tariff Code:" label on any document in the bundle.
+  2. "Comm.code.no.:" field on Proforma Invoice / Delivery Note — extract only the numeric portion before any space (e.g. "Comm.code.no.: 831190 COO DE" → "831190").
+  3. Tariff/HS column on PO.
 - quantity: Quantity from Invoice. INTEGER ONLY — strip all decimals (1.000 → "1", 50.000 → "50").
-- uom: Unit of Measure from Invoice (e.g. "UNIT", "SET", "PCS", "KGS").
+- uom: Unit of Measure from Invoice (e.g. "UNIT", "SET", "PCS", "KGS", "Pc").
 - item_description: Full item description from Invoice verbatim.
-- product_of_origin: "Product Of Origin" from PO for this item. Full country name in CAPITALS (e.g. "GERMANY", "CHINA").
-- nett_weight: Nett Weight for this line item from Invoice (look for a "Nett Weight" column). Number only, no units (e.g. "45.00").
+- product_of_origin: Full country name in CAPITALS. Sources in priority order:
+  1. "Product Of Origin" column on PO.
+  2. Country code suffix in "Comm.code.no.:" field (e.g. "COO DE" → "GERMANY", "COO CN" → "CHINA", "COO ID" → "INDONESIA", "COO SG" → "SINGAPORE"). Map ISO-2 codes to full English country names.
+  3. Any explicit "Country of Origin:" field.
+- nett_weight: Nett Weight for this line item (look for "Nett Weight" or "Net Weight" column, or per-line weight in Delivery Note). Number only, no units. Null if not available per line.
 - nett_weight_unit: Always output "KGS".
-- amount: Extended Price / Total Amount for this line item from Invoice. Number only (e.g. "1250.00").
-- currency: Currency from Invoice header (e.g. "USD").
-- po_number: PO reference number from the Purchase Order covering this item (e.g. "PSV26-01-0013").
-- invoice_number: Invoice Number from the Commercial Invoice header (e.g. "IN26030237").
+- amount: Extended Price / Total Amount for this line item. Number only (e.g. "1250.00").
+- currency: Currency from Invoice header (e.g. "USD", "EUR").
+- po_number: PO reference number. Sources in priority order:
+  1. Purchase Order number from PO document (e.g. "PSV26-01-0013").
+  2. "Your order:" / "Your order No." / "Order No." / "Customer PO" field on Proforma Invoice or Delivery Note.
+- invoice_number: Invoice Number from the invoice header. Accept: "Invoice No.", "Inv. No.", "Document No.", "Proforma Invoice No.", "Invoice Number" (e.g. "IN26030237", "170222918").
 
 IMPORTANT:
 - If a value is not found, return null or empty string. Do NOT guess.
@@ -477,7 +485,8 @@ You are extracting for the logistics team. Follow these rules strictly:
 1. ONLY extract documents of these types: "Logistics Local Charges Report", "Outward Permit Declaration", and "Export Permit Declaration (PSS)". All other types must be IGNORED.
 2. When you encounter a Tax Invoice or Freight Invoice: classify it as "Logistics Local Charges Report" ONLY. Do NOT create a "Payment Voucher/GL" entry.
 3. When you encounter a bundle containing Purchase Orders, Commercial Invoice, and Packing List for a PSS import shipment: classify it as "Export Permit Declaration (PSS)" and extract per the rules above.
-4. IGNORE completely: standalone Bill of Lading pages, Allied Reports, CDAS Reports — do not extract these at all.`,
+4. When you encounter a Proforma Invoice or Delivery Note from an overseas supplier shipped to a Singapore receiver (e.g. Schütz Singapore, any Singapore-addressed consignee): classify it as "Export Permit Declaration (PSS)" and extract per the rules above.
+5. IGNORE completely: standalone Bill of Lading pages, Allied Reports, CDAS Reports — do not extract these at all.`,
 
   transport: `
 

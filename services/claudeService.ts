@@ -840,7 +840,7 @@ const extractFromChunk = async (
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const response = await client.messages.create({
+      const stream = client.messages.stream({
         model: "claude-sonnet-4-6",
         max_tokens: 32000,
         system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
@@ -862,6 +862,7 @@ const extractFromChunk = async (
           },
         ],
       });
+      const response = await stream.finalMessage();
       const text = response.content[0].type === "text" ? response.content[0].text : "";
       if (!text) throw new Error("No data returned from Claude");
       console.group('%c[ZHL] Claude raw response', 'color:#6366f1;font-weight:bold');

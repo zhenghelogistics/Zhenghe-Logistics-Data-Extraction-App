@@ -20,7 +20,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import {
   Ship, User, LogOut, Upload, Zap, Download, FileText, Loader2,
   FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
-  Anchor, Package, ShoppingCart, Code2, ClipboardList, ScrollText,
+  Anchor, Package, ShoppingCart, Code2, ClipboardList, ScrollText, RefreshCw,
 } from 'lucide-react';
 
 const CUSTOM_RULES_STORAGE_KEY = 'zhenghe_custom_rules';
@@ -375,6 +375,41 @@ function App() {
     setIsProcessing(false);
   }, [files, customRules]);
 
+  const handleReprocess = useCallback(async (id: string) => {
+    const fileWrapper = files.find(f => f.id === id);
+    if (!fileWrapper || fileWrapper.file.size === 0) return;
+    setIsProcessing(true);
+    setFiles(prev => prev.map(f =>
+      f.id === id ? { ...f, status: FileStatus.PROCESSING, data: undefined, errorMessage: undefined, validationErrors: undefined, stage: undefined } : f
+    ));
+    addLog(`Re-processing: ${fileWrapper.file.name}`);
+    try {
+      const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage) => {
+        setFiles(prev => prev.map(f => f.id === id ? { ...f, stage } : f));
+      }, userRole ?? undefined);
+      const validationErrors = validateDocumentData(dataList);
+      const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
+      addLog(`Re-done: ${fileWrapper.file.name} — ${dataList.length} document(s).`);
+      const savedDoc = await saveDocument(fileWrapper.file.name, newStatus, dataList);
+      setFiles(prev => prev.map(f =>
+        f.id === id ? { ...f, status: newStatus, data: dataList, validationErrors: validationErrors.length > 0 ? validationErrors : undefined, id: savedDoc?.id || f.id } : f
+      ));
+      if (savedDoc?.id) {
+        const containerRows = extractContainerRows(dataList, fileWrapper.file.name, savedDoc.id);
+        if (containerRows.length > 0) {
+          await insertContainerBillingRows(containerRows);
+          const refreshed = await fetchContainerBilling();
+          setContainerRecords(refreshed);
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setFiles(prev => prev.map(f => f.id === id ? { ...f, status: FileStatus.ERROR, errorMessage } : f));
+      addLog(`ERROR re-processing ${fileWrapper.file.name}: ${errorMessage}`);
+    }
+    setIsProcessing(false);
+  }, [files, customRules, userRole]);
+
   const handleBillingUpdate = (fileId: string, updates: Partial<ProcessedFile>) => {
     setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...updates } : f));
   };
@@ -492,6 +527,7 @@ function App() {
         case 'Commercial Invoice': headers = ['Invoice Number','Supplier','Buyer','Incoterms','Total Amount','Currency','Date','Source File']; break;
         case 'Allied Report': headers = ['Container/Booking No','DHC In','DHC Out','DHE In','DHE Out','Data Admin Fee','Washing','Repair','Detention','Demurrage','Source File']; break;
         case 'CDAS Report': headers = ['Container Number','DHC In','DHC Out','DHE In','DHE Out','Data Admin Fee','Washing','Repair','Detention','Demurrage','Source File']; break;
+        case 'Export Permit Declaration (PSS)': headers = ['A. HS Code','B. Qty','C. UOM','D. Item Description','E. Product of Origin','F. Nett Weight (KGS)','G. Nett Wt Unit','H. Amount','I. Currency','J. PO Number','K. Invoice Number','Source File']; break;
         default: headers = ['Document Type','Reference Number','Date','Entity','Total Amount','Source File'];
       }
 
@@ -536,6 +572,13 @@ function App() {
           case 'CDAS Report': {
             const cs = d.cdas_report || {};
             return [safe(cs.container_number),safe(cs.dhc_in),safe(cs.dhc_out),safe(cs.dhe_in),safe(cs.dhe_out),safe(cs.data_admin_fee),safe(cs.washing),safe(cs.repair),safe(cs.detention),safe(cs.demurrage),safe(filename)].join(',');
+          }
+          case 'Export Permit Declaration (PSS)': {
+            const items = d.export_permit_pss?.items ?? [];
+            if (items.length === 0) return [safe(''),safe(''),safe(''),safe(''),safe(''),safe(''),safe(''),safe(''),safe(''),safe(''),safe(''),safe(filename)].join(',');
+            return items.map(item =>
+              [safe(item.hs_code),safe(item.quantity),safe(item.uom),safe(item.item_description),safe(item.product_of_origin),safe(item.nett_weight),safe(item.nett_weight_unit||'KGS'),safe(item.amount),safe(item.currency),safe(item.po_number),safe(item.invoice_number),safe(filename)].join(',')
+            ).join('\n');
           }
           default:
             return [safe(d.document_type),safe(m.reference_number),safe(m.date),safe(p.shipper_supplier),safe(fin.total_amount),safe(filename)].join(',');
@@ -927,6 +970,7 @@ function App() {
               onDeleteFile={handleDeleteFile}
               onBulkDelete={handleBulkDelete}
               onGenerateVoucher={handleGenerateVouchers}
+              onReprocessFile={handleReprocess}
               isGeneratingPdf={isGeneratingPdf}
               activeTab={activeTab}
               userRole={userRole}

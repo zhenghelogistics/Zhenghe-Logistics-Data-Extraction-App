@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProcessedFile, FileStatus, DocumentData } from '../types';
 import { AppConfig } from '../config';
-import { CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Trash2, FileText } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Trash2, FileText, RefreshCw } from 'lucide-react';
 import { UserRole } from '../users';
 
 interface ResultsTableProps {
@@ -11,12 +11,13 @@ interface ResultsTableProps {
   onDeleteFile: (fileId: string) => void;
   onBulkDelete: (ids: string[]) => void;
   onGenerateVoucher?: (docs: DocumentData[]) => void;
+  onReprocessFile?: (id: string) => void;
   isGeneratingPdf?: boolean;
   activeTab: string;
   userRole: UserRole | null;
 }
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, isGeneratingPdf, activeTab, userRole }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, onReprocessFile, isGeneratingPdf, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorPopover, setErrorPopover] = useState<{ fileId: string; errors: string[] } | null>(null);
 
@@ -333,13 +334,25 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                       </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">{new Date().toLocaleDateString()}</td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); onDeleteFile(file.id); }}
-                          className="text-outline hover:text-red-600 cursor-pointer transition-colors"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          {file.file.size > 0 && onReprocessFile && (
+                            <button
+                              type="button"
+                              title="Re-run extraction"
+                              onClick={(e) => { e.stopPropagation(); onReprocessFile(file.id); }}
+                              className="text-outline hover:text-secondary cursor-pointer transition-colors"
+                            >
+                              <RefreshCw size={14} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onDeleteFile(file.id); }}
+                            className="text-outline hover:text-red-600 cursor-pointer transition-colors"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

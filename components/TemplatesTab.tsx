@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import Anthropic from '@anthropic-ai/sdk';
+import { jsonrepair } from 'jsonrepair';
 import { Plus, Pencil, Trash2, FlaskConical, Download, X, GripVertical, ChevronRight, ChevronLeft, Copy, Check, Blocks } from 'lucide-react';
 import { ExtractionTemplate, TemplateField, ProcessedFile, FileStatus } from '../types';
 import { saveTemplate, updateTemplate, deleteTemplate } from '../services/supabase';
@@ -317,51 +318,100 @@ interface TestPanelProps {
 const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) => {
   const [testResults, setTestResults] = useState<Record<string, string | null> | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
-  const [testing, setTesting] = useState(false);
+  const [testing, setTesting] = useState<string | null>(null); // null | stage label
   const [attempts, setAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
   const [testFileName, setTestFileName] = useState('');
+  const [discovery, setDiscovery] = useState<{label: string; value: string}[] | null>(null);
+  const [showDiscovery, setShowDiscovery] = useState(false);
+  const [descriptionsUpdated, setDescriptionsUpdated] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const toBase64 = (arrayBuffer: ArrayBuffer): string => {
+    const uint8 = new Uint8Array(arrayBuffer);
+    let binary = '';
+    for (let i = 0; i < uint8.length; i += 8192) {
+      binary += String.fromCharCode(...uint8.subarray(i, i + 8192));
+    }
+    return btoa(binary);
+  };
+
+  const friendlyError = (err: any): string => {
+    const msg: string = err?.message || err?.toString() || '';
+    if (msg.includes('JSON') || msg.includes('token') || msg.includes('is not valid')) {
+      return "Claude's response wasn't in the expected format. Try re-running — this usually fixes itself.";
+    }
+    if (msg.includes('401') || msg.toLowerCase().includes('api_key') || msg.toLowerCase().includes('authentication')) {
+      return "API key problem. The app may need to be redeployed with the correct API key.";
+    }
+    if (msg.includes('400') || msg.toLowerCase().includes('invalid request')) {
+      return "The PDF couldn't be read. Make sure it's not password-protected or corrupted.";
+    }
+    if (msg.includes('529') || msg.toLowerCase().includes('overloaded')) {
+      return "Claude is busy right now. Wait a few seconds and try again.";
+    }
+    return msg || 'Something went wrong. Try again.';
+  };
+
   const runTest = async (file: File) => {
-    setTesting(true);
     setTestError(null);
+    setDescriptionsUpdated(false);
     setTestFileName(file.name);
+
     try {
+      setTesting('Reading document…');
       const arrayBuffer = await file.arrayBuffer();
-      // Chunk-based base64 to avoid stack overflow on large PDFs
-      const uint8 = new Uint8Array(arrayBuffer);
-      let binary = '';
-      for (let i = 0; i < uint8.length; i += 8192) {
-        binary += String.fromCharCode(...uint8.subarray(i, i + 8192));
-      }
-      const base64 = btoa(binary);
+      const base64 = toBase64(arrayBuffer);
       const client = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY, dangerouslyAllowBrowser: true });
+
+      const docContent = { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: base64 } };
+
       const fieldLines = template.fields.map(f => {
         const desc = f.hint?.trim() ? ` — ${f.hint}` : '';
         return `- ${f.key}${desc}`;
       }).join('\n');
-      const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: 'Extract only the requested fields from the document. Use your understanding of the content to find each value — descriptions explain what the value represents, not its physical location. Return ONLY a JSON object mapping field keys to their string values or null. No explanation, no markdown.',
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-            { type: 'text', text: `Extract these fields:\n${fieldLines}\n\nReturn JSON: {"key": "value_or_null"}` },
+
+      setTesting('Extracting your fields…');
+      // Run field extraction + discovery in parallel
+      const [extractionMsg, discoveryMsg] = await Promise.all([
+        client.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          system: 'You are a JSON extraction API. Respond with ONLY a valid JSON object — no prose, no explanation, no apology. Every key must be present; use null if the value is not found. Your entire response must be parseable by JSON.parse().',
+          messages: [
+            { role: 'user', content: [docContent, { type: 'text', text: `Extract these fields:\n${fieldLines}` }] },
+            { role: 'assistant', content: [{ type: 'text', text: '{' }] },
           ],
-        }],
-      });
-      const raw = (msg.content[0] as { text: string }).text.trim();
-      const parsed = JSON.parse(raw.replace(/^```json\s*|```\s*$/g, '').trim());
+        }),
+        client.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 768,
+          system: 'You are a document scanner. Respond with ONLY a valid JSON array — no prose, no explanation.',
+          messages: [
+            { role: 'user', content: [docContent, { type: 'text', text: 'List every clearly labelled value in this document (amounts, dates, IDs, names, codes). Return a JSON array of {"label": "...", "value": "..."} objects. Include all you can find.' }] },
+            { role: 'assistant', content: [{ type: 'text', text: '[' }] },
+          ],
+        }),
+      ]);
+
+      // Parse extraction — prepend the prefill '{' that the assistant continued from
+      const rawExtraction = '{' + (extractionMsg.content[0] as { text: string }).text;
+      const parsed = JSON.parse(jsonrepair(rawExtraction));
       setTestResults(parsed);
       setAttempts(a => a + 1);
+
+      // Parse discovery (optional — don't fail if it errors)
+      try {
+        const rawDiscovery = '[' + (discoveryMsg.content[0] as { text: string }).text;
+        const disc = JSON.parse(jsonrepair(rawDiscovery));
+        setDiscovery(Array.isArray(disc) ? disc : []);
+      } catch { /* discovery is bonus, ignore parse errors */ }
+
     } catch (err: any) {
       console.error('Test extraction failed:', err);
-      setTestError(err?.message || 'Something went wrong. Check your API key or try again.');
+      setTestError(friendlyError(err));
     } finally {
-      setTesting(false);
+      setTesting(null);
     }
   };
 
@@ -374,10 +424,11 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) runTest(file);
+    e.target.value = '';
   };
 
   const failingFields = testResults
-    ? template.fields.filter(f => testResults[f.key] === null || testResults[f.key] === undefined || testResults[f.key] === '')
+    ? template.fields.filter(f => !testResults[f.key])
     : [];
 
   const copyDiagnostic = () => {
@@ -388,7 +439,7 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
       '',
       ...template.fields.map(f => {
         const val = testResults?.[f.key];
-        const status = val ? `PASSING → ${val}` : `FAILING (hint: "${f.hint}") → null`;
+        const status = val ? `PASSING → ${val}` : `FAILING → null`;
         return `${f.key}: ${status}`;
       }),
     ];
@@ -397,37 +448,39 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const hasResults = testResults !== null && !testError;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/60 backdrop-blur-sm">
-      <div className="bg-surface-lowest rounded-2xl w-[720px] max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="bg-surface-lowest rounded-2xl w-[800px] max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="px-7 pt-6 pb-4 flex items-center justify-between">
           <div>
             <p className="text-[1rem] font-semibold text-primary">Test Mode — {template.name}</p>
-            <p className="text-xs text-[#4a5568] mt-0.5">Upload a sample PDF to verify extraction</p>
+            <p className="text-xs text-[#4a5568] mt-0.5">Upload a sample PDF to see what Claude can extract</p>
           </div>
           <button onClick={onClose} className="text-outline hover:text-primary transition-colors cursor-pointer">
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-7 pb-7">
-          <div className={`grid gap-5 ${testResults || testError ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <div className="px-7 pb-7 space-y-5">
+          <div className={`grid gap-5 ${hasResults || testError ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {/* Drop zone */}
             <div
               onDragOver={e => e.preventDefault()}
               onDrop={handleFileDrop}
-              onClick={() => fileRef.current?.click()}
+              onClick={() => !testing && fileRef.current?.click()}
               className="flex flex-col items-center justify-center min-h-48 rounded-xl border-2 border-dashed border-outline/40 bg-surface-low hover:border-secondary/50 hover:bg-secondary-fixed/10 transition-all cursor-pointer"
             >
               {testing ? (
                 <div className="text-center">
                   <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-[#4a5568]">Extracting…</p>
+                  <p className="text-sm text-[#4a5568]">{testing}</p>
                 </div>
               ) : (
                 <div className="text-center px-4">
                   <FlaskConical size={28} className="mx-auto mb-2 text-outline" />
-                  <p className="text-sm font-medium text-primary">Drop a sample PDF to test</p>
+                  <p className="text-sm font-medium text-primary">{testFileName ? 'Drop another PDF to re-test' : 'Drop a sample PDF to test'}</p>
                   <p className="text-xs text-[#4a5568] mt-1">{testFileName || 'or click to browse'}</p>
                 </div>
               )}
@@ -438,7 +491,7 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
             {testError && (
               <div className="space-y-3">
                 <div className="bg-red-50 rounded-xl p-4 text-sm text-red-700">
-                  <p className="font-semibold mb-1">Test failed</p>
+                  <p className="font-semibold mb-1">Something went wrong</p>
                   <p className="text-xs">{testError}</p>
                 </div>
                 <button
@@ -451,25 +504,33 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
             )}
 
             {/* Results */}
-            {testResults && !testError && (
+            {hasResults && (
               <div className="space-y-2">
-                <p className="text-[0.6875rem] font-medium uppercase tracking-[0.05em] text-[#4a5568] mb-2">Results</p>
+                {descriptionsUpdated && (
+                  <div className="flex items-center gap-1.5 text-xs text-secondary mb-2">
+                    <Check size={12} />
+                    Descriptions updated — results below use your new descriptions
+                  </div>
+                )}
+                <p className="text-[0.6875rem] font-medium uppercase tracking-[0.05em] text-[#4a5568] mb-2">
+                  Your fields — {template.fields.filter((f: TemplateField) => testResults![f.key]).length}/{template.fields.length} found
+                </p>
                 {template.fields.map(f => {
-                  const val = testResults[f.key];
-                  const found = val !== null && val !== undefined && val !== '';
+                  const val = testResults![f.key];
+                  const found = !!val;
                   return (
                     <div key={f.key} className="space-y-1">
                       <div className="flex items-start gap-2 text-sm">
-                        <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${found ? 'bg-secondary' : 'bg-red-400'}`} />
+                        <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${found ? 'bg-secondary' : 'bg-red-400'}`} />
                         <span className="font-semibold text-primary flex-shrink-0">{f.label}</span>
-                        <span className={`flex-1 text-xs mt-0.5 ${found ? 'text-[#4a5568]' : 'text-red-500 italic'}`}>
+                        <span className={`flex-1 text-xs mt-0.5 ${found ? 'text-[#4a5568]' : 'text-red-400 italic'}`}>
                           {found ? val : 'not found'}
                         </span>
                       </div>
                       {!found && (
-                        <div className="ml-4 bg-amber-50 rounded-lg p-2.5 text-xs text-amber-700 space-y-1">
-                          <p className="font-medium">Couldn't find this automatically.</p>
-                          <p>Does <span className="font-semibold">{f.label}</span> appear on the document under a different name? Add that to the description — e.g. <span className="italic">"may also appear as {f.label.split(' ')[0]} Fee or {f.label.replace(' ', '/')}"</span></p>
+                        <div className="ml-4 bg-amber-50 rounded-lg p-2.5 text-xs text-amber-700">
+                          <p className="font-medium mb-0.5">Couldn't find this automatically.</p>
+                          <p>Check the "What's in your doc" section below — find the value you're after and note what it's labelled on the document, then click <span className="font-semibold">Update descriptions</span>.</p>
                         </div>
                       )}
                     </div>
@@ -477,16 +538,10 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
                 })}
 
                 <div className="pt-3 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => fileRef.current?.click()}
-                    className="px-3 py-1.5 rounded-lg bg-surface-low text-primary text-xs font-medium hover:bg-surface-container transition-colors cursor-pointer"
-                  >
-                    Re-run test
-                  </button>
                   {failingFields.length > 0 && (
                     <button
-                      onClick={onFixHints}
-                      className="px-3 py-1.5 rounded-lg border border-secondary text-secondary text-xs font-medium hover:bg-secondary-fixed/30 transition-colors cursor-pointer"
+                      onClick={() => { setDescriptionsUpdated(false); onFixHints(); }}
+                      className="px-3 py-1.5 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold cursor-pointer hover:opacity-90"
                     >
                       Update descriptions →
                     </button>
@@ -504,6 +559,32 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
               </div>
             )}
           </div>
+
+          {/* Discovery — what's in the document */}
+          {discovery && discovery.length > 0 && (
+            <div className="bg-surface-low rounded-xl overflow-hidden">
+              <button
+                onClick={() => setShowDiscovery((s: boolean) => !s)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-primary cursor-pointer hover:bg-surface-container transition-colors"
+              >
+                <span>What's in your document ({discovery.length} values found)</span>
+                <span className="text-outline text-xs">{showDiscovery ? '▲ hide' : '▼ show'}</span>
+              </button>
+              {showDiscovery && (
+                <div className="px-4 pb-4">
+                  <p className="text-xs text-[#4a5568] mb-3">Everything Claude detected in your PDF. If a field above shows "not found", look for it here — the label Claude sees may be different from what you called it.</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {discovery.map((d: {label: string; value: string}, i: number) => (
+                      <div key={i} className="flex items-baseline gap-2 text-xs bg-surface-lowest rounded-lg px-3 py-2">
+                        <span className="text-[#4a5568] flex-shrink-0 min-w-[80px]">{d.label}</span>
+                        <span className="font-medium text-primary truncate">{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import Anthropic from '@anthropic-ai/sdk';
+import { PDFDocument } from 'pdf-lib';
 import { jsonrepair } from 'jsonrepair';
-import { Plus, Pencil, Trash2, FlaskConical, Download, X, GripVertical, ChevronRight, ChevronLeft, Copy, Check, Blocks } from 'lucide-react';
+import { Plus, Pencil, Trash2, FlaskConical, Download, X, FileText, Copy, Check, Blocks } from 'lucide-react';
 import { ExtractionTemplate, TemplateField, ProcessedFile, FileStatus } from '../types';
 import { saveTemplate, updateTemplate, deleteTemplate } from '../services/supabase';
 
@@ -24,283 +25,328 @@ const toKey = (label: string) =>
 
 const ADMIN_USER_ID = 'a43ea670-2ca8-4c0c-8445-7d95e38cdb6c';
 
-// ─── Wizard ──────────────────────────────────────────────────────────────────
+// ─── Discovery Wizard ─────────────────────────────────────────────────────────
 
-interface WizardState {
-  name: string;
-  document_hint: string;
-  fields: TemplateField[];
-}
+type WizardStage = 'name' | 'upload' | 'scanning' | 'pick';
 
-const emptyWizard = (): WizardState => ({
-  name: '',
-  document_hint: '',
-  fields: [{ key: '', label: '', hint: '' }],
-});
+interface DiscoveredItem { label: string; value: string }
+interface PickedField { docLabel: string; userLabel: string }
 
 interface WizardProps {
   initial?: ExtractionTemplate | null;
-  initialStep?: number;
   onSave: (t: Omit<ExtractionTemplate, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
-  onSaveAndTest: (t: Omit<ExtractionTemplate, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   onClose: () => void;
 }
 
-const PRECISION_TIPS = [
-  '💡 Use a name your team will recognise — e.g. "FR Meyer Freight Invoice", not just "Invoice"',
-  '💡 Mention what makes the document unique — the company name, layout, key headings',
-  '💡 Describe what the value means, not where it is. e.g. "the total freight charge before GST, may also appear as Ocean Freight or Base Rate"',
-  '💡 Review all fields before saving. You can always edit later.',
-];
-
-const Wizard: React.FC<WizardProps> = ({ initial, initialStep = 1, onSave, onSaveAndTest, onClose }) => {
-  const [step, setStep] = useState(initialStep);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<WizardState>(() =>
-    initial
-      ? { name: initial.name, document_hint: initial.document_hint, fields: initial.fields.length ? initial.fields : [{ key: '', label: '', hint: '' }] }
-      : emptyWizard()
+const Wizard: React.FC<WizardProps> = ({ initial, onSave, onClose }) => {
+  const isEdit = !!initial;
+  const [name, setName] = useState(initial?.name ?? '');
+  const [stage, setStage] = useState<WizardStage>(isEdit ? 'pick' : 'name');
+  const [scanProgress, setScanProgress] = useState('');
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [discovered, setDiscovered] = useState<DiscoveredItem[]>([]);
+  const [picked, setPicked] = useState<PickedField[]>(
+    initial?.fields.map(f => ({ docLabel: f.hint || f.label, userLabel: f.label })) ?? []
   );
+  const [saving, setSaving] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const setField = (idx: number, key: keyof TemplateField, value: string) => {
-    setForm(prev => {
-      const fields = prev.fields.map((f, i) => {
-        if (i !== idx) return f;
-        const updated = { ...f, [key]: value };
-        if (key === 'label') updated.key = toKey(value);
-        return updated;
+  const toBase64 = (bytes: Uint8Array): string => {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    }
+    return btoa(binary);
+  };
+
+  const scanPDF = async (file: File) => {
+    setStage('scanning');
+    setScanProgress('Reading your document…');
+    setScanError(null);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const total = pdfDoc.getPageCount();
+      const client = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY, dangerouslyAllowBrowser: true });
+      const allValues: DiscoveredItem[] = [];
+
+      for (let start = 0; start < total; start += 10) {
+        const end = Math.min(start + 10, total);
+        setScanProgress(total === 1 ? 'Scanning document…' : `Scanning pages ${start + 1}–${end} of ${total}…`);
+        try {
+          const chunk = await PDFDocument.create();
+          const indices = Array.from({ length: end - start }, (_, i) => start + i);
+          const pages = await chunk.copyPages(pdfDoc, indices);
+          pages.forEach(p => chunk.addPage(p));
+          const bytes = await chunk.save();
+          const base64 = toBase64(bytes);
+
+          const msg = await client.messages.create({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 1024,
+            system: 'You are a document scanner. Return ONLY a valid JSON array of {"label": "exact label text from document", "value": "the corresponding value"} objects. Include every labelled field you can find.',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+                  { type: 'text', text: 'List every labelled field and its value. Return as a JSON array.' },
+                ],
+              },
+              { role: 'assistant', content: [{ type: 'text', text: '[' }] },
+            ],
+          });
+          const raw = '[' + (msg.content[0] as { text: string }).text;
+          const parsed = JSON.parse(jsonrepair(raw));
+          if (Array.isArray(parsed)) allValues.push(...parsed);
+        } catch (e) { console.warn('Chunk scan failed:', e); }
+      }
+
+      const seen = new Set<string>();
+      const unique = allValues.filter(v => {
+        const k = `${v.label}|${v.value}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
       });
-      return { ...prev, fields };
-    });
+      setDiscovered(unique);
+      setStage('pick');
+    } catch (err) {
+      console.error('PDF scan failed:', err);
+      setScanError('Could not read this PDF. Try a different one, or skip to add fields manually.');
+      setDiscovered([]);
+      setStage('pick');
+    }
   };
 
-  const addField = () =>
-    setForm(prev => ({ ...prev, fields: [...prev.fields, { key: '', label: '', hint: '' }] }));
+  const isSelected = (item: DiscoveredItem) => picked.some(p => p.docLabel === item.label);
 
-  const removeField = (idx: number) =>
-    setForm(prev => ({ ...prev, fields: prev.fields.filter((_, i) => i !== idx) }));
-
-  const canAdvance = () => {
-    if (step === 1) return form.name.trim().length > 0;
-    if (step === 2) return form.document_hint.trim().length > 0;
-    if (step === 3) return form.fields.some(f => f.label.trim().length > 0);
-    return true;
+  const toggleItem = (item: DiscoveredItem) => {
+    if (isSelected(item)) {
+      setPicked(prev => prev.filter(p => p.docLabel !== item.label));
+    } else {
+      setPicked(prev => [...prev, { docLabel: item.label, userLabel: item.label }]);
+    }
   };
 
-  const buildPayload = () => ({
-    name: form.name.trim(),
-    document_hint: form.document_hint.trim(),
-    fields: form.fields.filter(f => f.label.trim()),
-    is_active: initial?.is_active ?? true,
-  });
+  const updateField = (i: number, key: 'userLabel' | 'docLabel', value: string) =>
+    setPicked(prev => prev.map((f, j) => j === i ? { ...f, [key]: value } : f));
+
+  const removePickedField = (i: number) => setPicked(prev => prev.filter((_, j) => j !== i));
+
+  const addManualField = () => setPicked(prev => [...prev, { docLabel: '', userLabel: '' }]);
 
   const handleSave = async () => {
+    const fields = picked
+      .filter(p => p.userLabel.trim())
+      .map(p => ({ key: toKey(p.userLabel), label: p.userLabel.trim(), hint: p.docLabel.trim() || p.userLabel.trim() }));
     setSaving(true);
-    try { await onSave(buildPayload()); } finally { setSaving(false); }
+    try {
+      await onSave({ name: name.trim(), document_hint: '', fields, is_active: initial?.is_active ?? true });
+    } finally { setSaving(false); }
   };
 
-  const handleSaveAndTest = async () => {
-    setSaving(true);
-    try { await onSaveAndTest(buildPayload()); } finally { setSaving(false); }
-  };
-
-  const progress = ((step - 1) / 3) * 100;
+  const canSave = name.trim().length > 0 && picked.some(p => p.userLabel.trim().length > 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/60 backdrop-blur-sm">
-      <div className="bg-surface-lowest rounded-2xl w-[640px] max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="bg-surface-lowest rounded-2xl w-[680px] max-h-[92vh] flex flex-col shadow-2xl">
 
         {/* Header */}
-        <div className="px-7 pt-6 pb-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[0.6875rem] font-medium uppercase tracking-[0.05em] text-[#4a5568]">
-              Step {step} of 4
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[0.6875rem] font-medium uppercase tracking-[0.05em] bg-amber-50 text-amber-700 rounded-full px-2 py-0.5">
-                Draft Mode
-              </span>
-              <button onClick={onClose} className="text-outline hover:text-primary transition-colors cursor-pointer">
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-          {/* Progress bar */}
-          <div className="h-1 bg-surface-container rounded-full overflow-hidden">
-            <div
-              className="h-full bg-secondary rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+        <div className="px-7 pt-6 pb-4 flex-shrink-0 flex items-center justify-between">
+          <p className="text-[1rem] font-semibold text-primary">
+            {isEdit ? `Edit — ${initial!.name}` : 'New Template'}
+          </p>
+          <button onClick={onClose} className="text-outline hover:text-primary transition-colors cursor-pointer">
+            <X size={16} />
+          </button>
         </div>
 
-        {/* Body */}
-        <div className="px-7 pb-6 space-y-5">
+        <div className="px-7 pb-7 flex-1 overflow-y-auto space-y-5">
 
-          {/* Step 1 — Name */}
-          {step === 1 && (
+          {/* Stage: name */}
+          {stage === 'name' && (
             <>
               <div>
                 <p className="text-[1.75rem] font-bold text-primary leading-tight">What do you call this document?</p>
-                <p className="text-[0.875rem] text-[#4a5568] mt-1">Step 1 of 4: Give your template a clear, recognisable name</p>
+                <p className="text-sm text-[#4a5568] mt-1">Give your template a recognisable name — e.g. "FR Meyer Freight Invoice"</p>
               </div>
               <input
                 autoFocus
-                value={form.name}
-                onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g. FR Meyer Freight Invoice"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && name.trim() && setStage('upload')}
+                placeholder="Template name…"
                 className="w-full bg-surface-low rounded-lg px-4 py-3 text-sm text-primary placeholder-outline focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/10 border border-transparent transition"
               />
-              <div className="bg-secondary-fixed/40 rounded-xl p-4 text-sm text-[#4a5568]">
-                {PRECISION_TIPS[0]}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setStage('upload')}
+                  disabled={!name.trim()}
+                  className="px-6 py-2.5 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-sm font-semibold disabled:opacity-40 cursor-pointer hover:opacity-90 transition-opacity"
+                >
+                  Next →
+                </button>
               </div>
             </>
           )}
 
-          {/* Step 2 — Describe */}
-          {step === 2 && (
+          {/* Stage: upload */}
+          {stage === 'upload' && (
             <>
               <div>
-                <p className="text-[1.75rem] font-bold text-primary leading-tight">Describe this document</p>
-                <p className="text-[0.875rem] text-[#4a5568] mt-1">Step 2 of 4: Explain it as if to a new colleague</p>
+                <p className="text-[1.75rem] font-bold text-primary leading-tight">Drop a sample PDF</p>
+                <p className="text-sm text-[#4a5568] mt-1">Claude will scan it and show you everything it finds. You just click what you want to capture.</p>
               </div>
-              <textarea
-                autoFocus
-                rows={4}
-                value={form.document_hint}
-                onChange={e => setForm(prev => ({ ...prev, document_hint: e.target.value }))}
-                placeholder="e.g. A freight invoice from FR Meyer containing BL references and charge breakdowns. Usually 1–2 pages with the company logo at top left."
-                className="w-full bg-surface-low rounded-lg px-4 py-3 text-sm text-primary placeholder-outline focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/10 border border-transparent transition resize-none"
-              />
-              <div className="bg-secondary-fixed/40 rounded-xl p-4 text-sm text-[#4a5568]">
-                {PRECISION_TIPS[1]}
+              <div
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f?.type === 'application/pdf') scanPDF(f); }}
+                onClick={() => fileRef.current?.click()}
+                className="flex flex-col items-center justify-center min-h-52 rounded-xl border-2 border-dashed border-outline/40 bg-surface-low hover:border-secondary/50 hover:bg-secondary-fixed/10 transition-all cursor-pointer"
+              >
+                <FileText size={32} className="mb-3 text-outline" />
+                <p className="text-sm font-medium text-primary">Drop your PDF here</p>
+                <p className="text-xs text-[#4a5568] mt-1">or click to browse</p>
+                <input ref={fileRef} type="file" accept="application/pdf" className="sr-only" onChange={e => { const f = e.target.files?.[0]; if (f) scanPDF(f); e.target.value = ''; }} />
+              </div>
+              <div className="flex items-center justify-between">
+                <button onClick={() => setStage('name')} className="text-sm text-[#4a5568] hover:text-primary transition-colors cursor-pointer">← Back</button>
+                <button
+                  onClick={() => { setDiscovered([]); setStage('pick'); }}
+                  className="text-sm text-secondary hover:text-on-secondary-container transition-colors cursor-pointer"
+                >
+                  Skip — I'll add fields manually →
+                </button>
               </div>
             </>
           )}
 
-          {/* Step 3 — Fields */}
-          {step === 3 && (
+          {/* Stage: scanning */}
+          {stage === 'scanning' && (
+            <div className="flex flex-col items-center justify-center min-h-64 space-y-4 py-12">
+              <div className="w-10 h-10 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm font-medium text-primary">{scanProgress}</p>
+              <p className="text-xs text-[#4a5568]">This takes 10–30 seconds depending on document size.</p>
+            </div>
+          )}
+
+          {/* Stage: pick */}
+          {stage === 'pick' && (
             <>
+              {scanError && (
+                <div className="bg-amber-50 rounded-xl p-4 text-sm text-amber-700">
+                  <p className="font-medium">Couldn't scan the PDF</p>
+                  <p className="text-xs mt-0.5">{scanError}</p>
+                </div>
+              )}
+
               <div>
-                <p className="text-[1.75rem] font-bold text-primary leading-tight">Define extraction fields</p>
-                <p className="text-[0.875rem] text-[#4a5568] mt-1">Step 3 of 4: Name each field and optionally describe what it means</p>
+                <p className="text-[1.25rem] font-bold text-primary leading-tight">
+                  {discovered.length > 0
+                    ? `Found ${discovered.length} values — click the ones you want`
+                    : isEdit ? `Edit fields for "${name}"` : 'Add your fields'}
+                </p>
+                {discovered.length > 0 && (
+                  <p className="text-sm text-[#4a5568] mt-1">Select everything you want to capture. You can rename each one.</p>
+                )}
               </div>
-              <div className="space-y-3">
-                {form.fields.map((f, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <GripVertical size={16} className="mt-3 text-outline flex-shrink-0" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <input
-                            value={f.label}
-                            onChange={e => setField(i, 'label', e.target.value)}
-                            placeholder="Field name (e.g. Total Freight Charge)"
-                            className="w-full bg-surface-low rounded-lg px-3 py-2 text-sm text-primary placeholder-outline focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/10 border border-transparent transition"
-                          />
-                          {f.key && (
-                            <p className="text-[0.6875rem] font-mono text-outline mt-0.5 ml-1">key: {f.key}</p>
+
+              {/* Discovered grid */}
+              {discovered.length > 0 && (
+                <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                  {discovered.map((item, i) => {
+                    const selected = isSelected(item);
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => toggleItem(item)}
+                        className={`text-left rounded-xl px-4 py-3 transition-all cursor-pointer ${
+                          selected
+                            ? 'bg-secondary-fixed border-2 border-secondary/40'
+                            : 'bg-surface-low hover:bg-surface-container border-2 border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[0.6875rem] text-[#4a5568] truncate">{item.label}</p>
+                            <p className="text-sm font-semibold text-primary truncate mt-0.5">{item.value}</p>
+                          </div>
+                          {selected && (
+                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-secondary flex items-center justify-center mt-0.5">
+                              <Check size={11} className="text-white" />
+                            </span>
                           )}
                         </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Selected fields list */}
+              {picked.length > 0 && (
+                <div className="space-y-2">
+                  {discovered.length > 0 && (
+                    <p className="text-[0.6875rem] font-medium uppercase tracking-[0.05em] text-[#4a5568]">
+                      Your fields ({picked.filter(p => p.userLabel.trim()).length})
+                    </p>
+                  )}
+                  {picked.map((p, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-surface-low rounded-lg px-3 py-2.5">
+                      <div className="flex-1 min-w-0 space-y-0.5">
                         <input
-                          value={f.hint}
-                          onChange={e => setField(i, 'hint', e.target.value)}
-                          placeholder="Optional: what is this value? e.g. 'total freight before GST, may also say Ocean Freight'"
-                          className="flex-[2] bg-surface-low rounded-lg px-3 py-2 text-sm text-primary placeholder-outline focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/10 border border-transparent transition"
+                          value={p.userLabel}
+                          onChange={e => updateField(i, 'userLabel', e.target.value)}
+                          placeholder="What do you call this?"
+                          className="w-full bg-transparent text-sm font-medium text-primary placeholder-outline focus:outline-none"
                         />
-                        <button
-                          onClick={() => removeField(i)}
-                          disabled={form.fields.length === 1}
-                          className="mt-1 text-outline hover:text-red-400 disabled:opacity-30 transition-colors cursor-pointer"
-                        >
-                          <X size={15} />
-                        </button>
+                        <input
+                          value={p.docLabel}
+                          onChange={e => updateField(i, 'docLabel', e.target.value)}
+                          placeholder="How it appears in the document (optional)"
+                          className="w-full bg-transparent text-[0.6875rem] text-[#4a5568] placeholder-outline/60 focus:outline-none"
+                        />
                       </div>
+                      <button
+                        onClick={() => removePickedField(i)}
+                        className="text-outline hover:text-red-400 transition-colors cursor-pointer flex-shrink-0"
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
-                  </div>
-                ))}
-                <button
-                  onClick={addField}
-                  className="text-secondary text-sm font-medium hover:text-on-secondary-container transition-colors cursor-pointer"
-                >
-                  + Add another field
-                </button>
-              </div>
-              <div className="bg-secondary-fixed/40 rounded-xl p-4 text-sm text-[#4a5568]">
-                {form.fields.filter(f => f.label).length >= 3 ? PRECISION_TIPS[2] : PRECISION_TIPS[2]}
-              </div>
-            </>
-          )}
+                  ))}
+                </div>
+              )}
 
-          {/* Step 4 — Review */}
-          {step === 4 && (
-            <>
-              <div>
-                <p className="text-[1.75rem] font-bold text-primary leading-tight">Review your template</p>
-                <p className="text-[0.875rem] text-[#4a5568] mt-1">Step 4 of 4: Confirm everything looks right</p>
-              </div>
-              <div className="bg-surface-low rounded-xl p-5 space-y-3">
-                <div>
-                  <p className="text-[0.6875rem] font-medium uppercase tracking-[0.05em] text-[#4a5568]">Template Name</p>
-                  <p className="text-primary font-semibold mt-0.5">{form.name}</p>
-                </div>
-                <div>
-                  <p className="text-[0.6875rem] font-medium uppercase tracking-[0.05em] text-[#4a5568]">Document Hint</p>
-                  <p className="text-primary text-sm mt-0.5">{form.document_hint}</p>
-                </div>
-                <div>
-                  <p className="text-[0.6875rem] font-medium uppercase tracking-[0.05em] text-[#4a5568] mb-1.5">Fields ({form.fields.filter(f => f.label).length})</p>
-                  <div className="space-y-1">
-                    {form.fields.filter(f => f.label).map((f, i) => (
-                      <div key={i} className="flex items-start gap-2 text-sm">
-                        <span className="font-semibold text-primary min-w-[120px]">{f.label}</span>
-                        <span className="font-mono text-[0.6875rem] text-outline bg-surface-container rounded px-1 py-0.5 mt-0.5">{f.key}</span>
-                        <span className="text-[#4a5568] text-xs flex-1">{f.hint}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+              {picked.length === 0 && <p className="text-sm text-[#4a5568]">No fields selected yet.</p>}
 
-          {/* Footer nav */}
-          <div className="flex items-center justify-between pt-2">
-            <button
-              onClick={() => step > 1 ? setStep(s => s - 1) : onClose()}
-              className="inline-flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium text-[#4a5568] hover:bg-surface-low transition-colors cursor-pointer"
-            >
-              <ChevronLeft size={15} />
-              {step === 1 ? 'Cancel' : 'Back'}
-            </button>
-            {step < 4 ? (
               <button
-                onClick={() => setStep(s => s + 1)}
-                disabled={!canAdvance()}
-                className="inline-flex items-center gap-1 px-5 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-opacity cursor-pointer"
+                onClick={addManualField}
+                className="text-secondary text-sm font-medium hover:text-on-secondary-container transition-colors cursor-pointer"
               >
-                Next
-                <ChevronRight size={15} />
+                + Add a field manually
               </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSaveAndTest}
-                  disabled={saving}
-                  className="px-4 py-2 rounded-lg border border-secondary text-secondary text-sm font-medium hover:bg-secondary-fixed/30 transition-colors disabled:opacity-40 cursor-pointer"
-                >
-                  Save & Test
-                </button>
+
+              <div className="flex items-center justify-between pt-2">
+                {!isEdit ? (
+                  <button
+                    onClick={() => setStage('upload')}
+                    className="text-sm text-[#4a5568] hover:text-primary transition-colors cursor-pointer"
+                  >
+                    ← Scan a different PDF
+                  </button>
+                ) : <div />}
                 <button
                   onClick={handleSave}
-                  disabled={saving}
-                  className="px-5 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-sm font-semibold disabled:opacity-40 cursor-pointer"
+                  disabled={!canSave || saving}
+                  className="px-6 py-2.5 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-sm font-semibold disabled:opacity-40 cursor-pointer hover:opacity-90 transition-opacity"
                 >
-                  {saving ? 'Saving…' : 'Save Template'}
+                  {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Template'}
                 </button>
               </div>
-            )}
-          </div>
+            </>
+          )}
+
         </div>
       </div>
     </div>
@@ -625,7 +671,6 @@ const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, cu
   const [editingTemplate, setEditingTemplate] = useState<ExtractionTemplate | null>(null);
   const [testingTemplate, setTestingTemplate] = useState<Omit<ExtractionTemplate, 'id' | 'user_id' | 'created_at'> | null>(null);
   const [deletingTemplate, setDeletingTemplate] = useState<ExtractionTemplate | null>(null);
-  const [goToStep3, setGoToStep3] = useState(false);
 
   const canManage = (t: ExtractionTemplate) =>
     currentUserId === t.user_id || isAdmin;
@@ -642,19 +687,6 @@ const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, cu
     }
     setWizardOpen(false);
     setEditingTemplate(null);
-  }, [editingTemplate, templates, onTemplatesChange]);
-
-  const handleSaveAndTest = useCallback(async (payload: Omit<ExtractionTemplate, 'id' | 'user_id' | 'created_at'>) => {
-    if (editingTemplate) {
-      await updateTemplate(editingTemplate.id, payload);
-      onTemplatesChange(templates.map(t => t.id === editingTemplate.id ? { ...t, ...payload } : t));
-    } else {
-      const saved = await saveTemplate(payload);
-      if (saved) onTemplatesChange([saved, ...templates]);
-    }
-    setWizardOpen(false);
-    setEditingTemplate(null);
-    setTestingTemplate(payload);
   }, [editingTemplate, templates, onTemplatesChange]);
 
   const handleDelete = async () => {
@@ -851,7 +883,7 @@ const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, cu
                 {canManage(t) && (
                   <>
                     <button
-                      onClick={() => { setEditingTemplate(t); setGoToStep3(false); setWizardOpen(true); }}
+                      onClick={() => { setEditingTemplate(t); setWizardOpen(true); }}
                       className="p-1.5 rounded-lg text-outline hover:text-primary hover:bg-surface-low transition-colors cursor-pointer"
                       title="Edit"
                     >
@@ -926,10 +958,8 @@ const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, cu
       {wizardOpen && (
         <Wizard
           initial={editingTemplate}
-          initialStep={goToStep3 ? 3 : 1}
           onSave={handleSave}
-          onSaveAndTest={handleSaveAndTest}
-          onClose={() => { setWizardOpen(false); setEditingTemplate(null); setGoToStep3(false); }}
+          onClose={() => { setWizardOpen(false); setEditingTemplate(null); }}
         />
       )}
 
@@ -940,7 +970,6 @@ const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, cu
           onFixHints={() => {
             const full = templates.find(t => t.name === testingTemplate.name);
             setEditingTemplate(full ?? null);
-            setGoToStep3(true);
             setTestingTemplate(null);
             setWizardOpen(true);
           }}

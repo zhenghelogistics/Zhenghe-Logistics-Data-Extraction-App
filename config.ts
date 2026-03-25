@@ -25,7 +25,7 @@ export const AppConfig = {
       defaultTab: 'Payment Voucher/GL'
     },
     logistics: {
-      allowedTypes: ['All Files', 'Logistics Local Charges Report', 'Outward Permit Declaration'],
+      allowedTypes: ['All Files', 'Logistics Local Charges Report', 'Outward Permit Declaration', 'Export Permit Declaration (PSS)'],
       defaultTab: 'Logistics Local Charges Report'
     },
     transport: {
@@ -79,6 +79,9 @@ export const AppConfig = {
     },
     'CDAS Report': {
       columns: ['Container Number', 'DHC In', 'DHC Out', 'DHE In', 'DHE Out', 'Data Admin Fee', 'Washing', 'Repair', 'Detention', 'Demurrage'],
+    },
+    'Export Permit Declaration (PSS)': {
+      columns: ['A. HS Code', 'B. Qty', 'C. UOM', 'D. Item Description', 'E. Product of Origin', 'F. Nett Weight (KGS)', 'G. Nett Wt Unit', 'H. Amount', 'I. Currency', 'J. PO Number', 'K. Invoice Number'],
     }
   }
 };

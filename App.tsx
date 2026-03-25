@@ -6,6 +6,7 @@ import {
 } from './services/supabase';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
+import ExportPermitTab from './components/ExportPermitTab';
 import { generateVoucherPdf, generateCDASVoucherPdf, generateAlliedVoucherPdf } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
@@ -19,7 +20,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import {
   Ship, User, LogOut, Upload, Zap, Download, FileText, Loader2,
   FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
-  Anchor, Package, ShoppingCart, Code2, ClipboardList,
+  Anchor, Package, ShoppingCart, Code2, ClipboardList, ScrollText,
 } from 'lucide-react';
 
 const CUSTOM_RULES_STORAGE_KEY = 'zhenghe_custom_rules';
@@ -36,6 +37,7 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
   'Purchase Order': <ShoppingCart size={15} />,
   'Developer Notes': <Code2 size={15} />,
   'CRM Billing': <ClipboardList size={15} />,
+  'Export Permit Declaration (PSS)': <ScrollText size={15} />,
 };
 
 function App() {
@@ -878,6 +880,8 @@ function App() {
             <DeveloperNotes />
           ) : activeTab === 'CRM Billing' ? (
             <CrmBillingTab records={containerRecords} onRecordUpdate={handleContainerRecordUpdate} onRecordDelete={handleContainerRecordDelete} onRecordDeleteMany={handleContainerRecordDeleteMany} />
+          ) : activeTab === 'Export Permit Declaration (PSS)' ? (
+            <ExportPermitTab files={files} />
           ) : !hasFiles ? (
             /* ── Drag & Drop Upload Zone ── */
             <div

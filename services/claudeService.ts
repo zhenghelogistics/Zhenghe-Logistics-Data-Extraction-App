@@ -18,6 +18,7 @@ const TYPES_WITHOUT_METADATA_REF = new Set([
   'Outward Permit Declaration',
   'Allied Report',
   'CDAS Report',
+  'Export Permit Declaration (PSS)',
 ]);
 
 export const validateDocumentData = (dataList: DocumentData[]): string[] => {
@@ -71,6 +72,7 @@ CLASSIFICATION GUIDELINES:
 4. **"Bill of Lading"**: ONLY a standalone Bill of Lading document itself — not an invoice that references one.
 5. **"Allied Report"**: An ALLIED Containers report listing container/booking numbers with associated charges (Repair, Detention, DHC In/Out, DHE In/Out, Washing, Data Admin Fee).
 6. **"CDAS Report"**: A "TRANSPORTER DAILY TRANSACTION REPORT" — has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each row = one container transaction. Charges are in the "Depot Remark" column as semicolon-separated pairs.
+7. **"Export Permit Declaration (PSS)"**: A shipment bundle for PSS (Pulau Sambu Singapore) import shipments, containing Purchase Orders (PO), Commercial Invoice, Packing List, Loading Report, and/or supporting documents. Produce EXACTLY ONE entry for the whole bundle with a per-line-item array in "export_permit_pss.items".
 
 **CRITICAL DUAL-ENTRY RULE — MANDATORY, NO EXCEPTIONS**:
 - ANY Tax Invoice, Freight Invoice, Debit Note, or Credit Note from a carrier/forwarder MUST produce TWO entries:
@@ -208,6 +210,23 @@ EXTRACTION RULES FOR "CDAS Report" (Transport Team):
   - "DEMURRAGE" → demurrage
 - Strip the "$" symbol and return numeric strings only (e.g. "75.00" not "$75.00").
 
+EXTRACTION RULES FOR "Export Permit Declaration (PSS)" (Logistics/Shipping Team):
+- DOCUMENT STRUCTURE: A SHIPMENT BUNDLE — Purchase Order(s), Commercial Invoice, Packing List, Loading Report, and/or supporting docs for the same PSS shipment.
+- ONE ENTRY TOTAL: Produce EXACTLY ONE "Export Permit Declaration (PSS)" entry for the entire bundle. Set metadata.reference_number to the Invoice Number.
+- ONE ITEM PER INVOICE LINE: "export_permit_pss.items" has one entry per line item on the Commercial Invoice.
+- JOIN KEY: Match items across documents using the item/part code (e.g. MC-ARG-PRM-xxxxx) found in both Invoice and PO.
+- hs_code: HS/Tariff code from PO for this item. Numbers only (e.g. "84483200").
+- quantity: Quantity from Invoice. INTEGER ONLY — strip all decimals (1.000 → "1", 50.000 → "50").
+- uom: Unit of Measure from Invoice (e.g. "UNIT", "SET", "PCS", "KGS").
+- item_description: Full item description from Invoice verbatim.
+- product_of_origin: "Product Of Origin" from PO for this item. Full country name in CAPITALS (e.g. "GERMANY", "CHINA").
+- nett_weight: Nett Weight for this line item from Invoice (look for a "Nett Weight" column). Number only, no units (e.g. "45.00").
+- nett_weight_unit: Always output "KGS".
+- amount: Extended Price / Total Amount for this line item from Invoice. Number only (e.g. "1250.00").
+- currency: Currency from Invoice header (e.g. "USD").
+- po_number: PO reference number from the Purchase Order covering this item (e.g. "PSV26-01-0013").
+- invoice_number: Invoice Number from the Commercial Invoice header (e.g. "IN26030237").
+
 IMPORTANT:
 - If a value is not found, return null or empty string. Do NOT guess.
 - Convert all monetary values to SGD if possible.
@@ -216,7 +235,7 @@ Respond ONLY with valid JSON matching this exact structure:
 {
   "documents": [
     {
-      "document_type": "string (one of: Bill of Lading, Commercial Invoice, Packing List, Purchase Order, Payment Voucher/GL, Container Report, Logistics Local Charges Report, Outward Permit Declaration, Allied Report, CDAS Report, Unknown)",
+      "document_type": "string (one of: Bill of Lading, Commercial Invoice, Packing List, Purchase Order, Payment Voucher/GL, Container Report, Logistics Local Charges Report, Outward Permit Declaration, Allied Report, CDAS Report, Export Permit Declaration (PSS), Unknown)",
       "metadata": {
         "reference_number": "string",
         "related_reference_number": "string or null",
@@ -333,6 +352,23 @@ Respond ONLY with valid JSON matching this exact structure:
         "repair": "string or null",
         "detention": "string or null",
         "demurrage": "string or null"
+      },
+      "export_permit_pss": {
+        "items": [
+          {
+            "hs_code": "string or null",
+            "quantity": "integer string or null",
+            "uom": "string or null",
+            "item_description": "string or null",
+            "product_of_origin": "string or null",
+            "nett_weight": "number string or null",
+            "nett_weight_unit": "KGS",
+            "amount": "number string or null",
+            "currency": "string or null",
+            "po_number": "string or null",
+            "invoice_number": "string or null"
+          }
+        ]
       }
     }
   ]
@@ -437,9 +473,10 @@ const ROLE_SCOPE: Record<string, string> = {
 
 TEAM SCOPE — LOGISTICS TEAM (MANDATORY OVERRIDE):
 You are extracting for the logistics team. Follow these rules strictly:
-1. ONLY extract documents of these types: "Logistics Local Charges Report" and "Outward Permit Declaration". All other types must be IGNORED.
+1. ONLY extract documents of these types: "Logistics Local Charges Report", "Outward Permit Declaration", and "Export Permit Declaration (PSS)". All other types must be IGNORED.
 2. When you encounter a Tax Invoice or Freight Invoice: classify it as "Logistics Local Charges Report" ONLY. Do NOT create a "Payment Voucher/GL" entry.
-3. IGNORE completely: standalone Bill of Lading pages, Allied Reports, CDAS Reports — do not extract these at all.`,
+3. When you encounter a bundle containing Purchase Orders, Commercial Invoice, and Packing List for a PSS import shipment: classify it as "Export Permit Declaration (PSS)" and extract per the rules above.
+4. IGNORE completely: standalone Bill of Lading pages, Allied Reports, CDAS Reports — do not extract these at all.`,
 
   transport: `
 

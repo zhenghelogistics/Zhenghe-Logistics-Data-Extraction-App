@@ -148,6 +148,24 @@ export interface CdasReport {
   demurrage?: string | null;
 }
 
+export interface ExportPermitPSSItem {
+  hs_code?: string | null;
+  quantity?: string | null;
+  uom?: string | null;
+  item_description?: string | null;
+  product_of_origin?: string | null;
+  nett_weight?: string | null;
+  nett_weight_unit?: string | null;
+  amount?: string | null;
+  currency?: string | null;
+  po_number?: string | null;
+  invoice_number?: string | null;
+}
+
+export interface ExportPermitPSS {
+  items?: ExportPermitPSSItem[] | null;
+}
+
 export interface DocumentData {
   document_type: string;
   metadata: DocumentMetadata;
@@ -159,6 +177,7 @@ export interface DocumentData {
   outward_permit_declaration?: OutwardPermitDeclaration;
   allied_report?: AlliedReport;
   cdas_report?: CdasReport;
+  export_permit_pss?: ExportPermitPSS;
 }
 
 // Wrapper for the API response which now returns a list

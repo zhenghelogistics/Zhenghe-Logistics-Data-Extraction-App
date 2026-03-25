@@ -190,6 +190,11 @@ export const deleteContainerBilling = async (id: string): Promise<void> => {
   if (error) throw new Error(error.message);
 };
 
+export const deleteManyContainerBilling = async (ids: string[]): Promise<void> => {
+  const { error } = await supabase.from('container_billing').delete().in('id', ids);
+  if (error) throw new Error(error.message);
+};
+
 export const archiveContainerBilling = async (ids: string[], label: string): Promise<void> => {
   const { error } = await supabase
     .from('container_billing')

@@ -21,6 +21,7 @@ interface Props {
   records: ContainerBillingRecord[];
   onRecordUpdate: (id: string, updates: Partial<ContainerBillingRecord>) => void;
   onRecordDelete: (id: string) => void;
+  onRecordDeleteMany: (ids: string[]) => Promise<void>;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ function formatMonthLabel(ym: string): string {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete }: Props) {
+export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete, onRecordDeleteMany }: Props) {
   const [view, setView] = useState<CrmView>('dashboard');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,6 +105,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
   const [dateTo, setDateTo] = useState('');
   const [revertConfirm, setRevertConfirm] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [archiveMonth, setArchiveMonth] = useState<string>('');
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   // Local remarks map to avoid textarea losing focus on debounce
@@ -172,6 +174,18 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
       toast('Record deleted');
     } catch {
       toast('Failed to delete record', 'error');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds];
+    setBulkDeleteConfirm(false);
+    try {
+      await onRecordDeleteMany(ids);
+      setSelectedIds(new Set());
+      toast(`${ids.length} record${ids.length > 1 ? 's' : ''} deleted`);
+    } catch {
+      toast('Failed to delete records', 'error');
     }
   };
 
@@ -496,6 +510,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
             >
               <Download size={13} /> Export All
             </button>
+            <button
+              disabled={selectedIds.size === 0}
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-red-200 bg-white text-red-500 text-xs font-medium hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Trash2 size={13} /> Delete Selected ({selectedIds.size})
+            </button>
           </div>
 
           {filteredUnbilled.length === 0 ? (
@@ -692,6 +713,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
               className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download size={13} /> Export All
+            </button>
+            <button
+              disabled={selectedIds.size === 0}
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-red-200 bg-white text-red-500 text-xs font-medium hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trash2 size={13} /> Delete Selected ({selectedIds.size})
             </button>
           </div>
 
@@ -950,6 +978,22 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete 
             <div className="flex gap-3 justify-end">
               <button onClick={() => setRevertConfirm(null)} className="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50">Cancel</button>
               <button onClick={() => moveToUnbilled(revertConfirm)} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600">Move Back</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk delete confirm dialog ────────────────────────────────────────── */}
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="font-semibold text-slate-900 mb-2">Delete {selectedIds.size} record{selectedIds.size > 1 ? 's' : ''}?</h3>
+            <p className="text-sm text-slate-500 mb-5">
+              This will permanently remove {selectedIds.size} container billing record{selectedIds.size > 1 ? 's' : ''}. This cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setBulkDeleteConfirm(false)} className="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50">Cancel</button>
+              <button onClick={handleBulkDelete} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600">Delete {selectedIds.size}</button>
             </div>
           </div>
         </div>

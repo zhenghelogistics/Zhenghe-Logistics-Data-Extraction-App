@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { extractDocumentData, validateDocumentData } from './services/claudeService';
 import {
   supabase, fetchDocuments, saveDocument, deleteDocument,
-  fetchContainerBilling, insertContainerBillingRows, deleteContainerBilling, ContainerBillingRecord,
+  fetchContainerBilling, insertContainerBillingRows, deleteContainerBilling, deleteManyContainerBilling, ContainerBillingRecord,
 } from './services/supabase';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
@@ -388,6 +388,11 @@ function App() {
     } catch {
       addLog(`Error deleting container billing record ${id}`);
     }
+  };
+
+  const handleContainerRecordDeleteMany = async (ids: string[]) => {
+    await deleteManyContainerBilling(ids);
+    setContainerRecords(prev => prev.filter(r => !ids.includes(r.id)));
   };
 
   const handleGenerateCDASVoucher = async (docs: DocumentData[]) => {
@@ -872,7 +877,7 @@ function App() {
           {activeTab === 'Developer Notes' ? (
             <DeveloperNotes />
           ) : activeTab === 'CRM Billing' ? (
-            <CrmBillingTab records={containerRecords} onRecordUpdate={handleContainerRecordUpdate} onRecordDelete={handleContainerRecordDelete} />
+            <CrmBillingTab records={containerRecords} onRecordUpdate={handleContainerRecordUpdate} onRecordDelete={handleContainerRecordDelete} onRecordDeleteMany={handleContainerRecordDeleteMany} />
           ) : !hasFiles ? (
             /* ── Drag & Drop Upload Zone ── */
             <div

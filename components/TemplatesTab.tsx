@@ -11,6 +11,9 @@ interface Props {
   onTemplatesChange: (templates: ExtractionTemplate[]) => void;
   files: ProcessedFile[];
   currentUserId: string | null;
+  pinnedTemplateIds: string[];
+  onPinToggle: (id: string) => void;
+  focusedTemplateName?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -45,7 +48,7 @@ interface WizardProps {
 const PRECISION_TIPS = [
   '💡 Use a name your team will recognise — e.g. "FR Meyer Freight Invoice", not just "Invoice"',
   '💡 Mention what makes the document unique — the company name, layout, key headings',
-  '💡 Be specific about location — "top right corner, labelled Invoice No:" is better than "at the top"',
+  '💡 Describe what the value means, not where it is. e.g. "the total freight charge before GST, may also appear as Ocean Freight or Base Rate"',
   '💡 Review all fields before saving. You can always edit later.',
 ];
 
@@ -179,7 +182,7 @@ const Wizard: React.FC<WizardProps> = ({ initial, initialStep = 1, onSave, onSav
             <>
               <div>
                 <p className="text-[1.75rem] font-bold text-primary leading-tight">Define extraction fields</p>
-                <p className="text-[0.875rem] text-[#4a5568] mt-1">Step 3 of 4: Tell Claude exactly what to find and where</p>
+                <p className="text-[0.875rem] text-[#4a5568] mt-1">Step 3 of 4: Name each field and optionally describe what it means</p>
               </div>
               <div className="space-y-3">
                 {form.fields.map((f, i) => (
@@ -191,7 +194,7 @@ const Wizard: React.FC<WizardProps> = ({ initial, initialStep = 1, onSave, onSav
                           <input
                             value={f.label}
                             onChange={e => setField(i, 'label', e.target.value)}
-                            placeholder="Field label (e.g. Invoice Number)"
+                            placeholder="Field name (e.g. Total Freight Charge)"
                             className="w-full bg-surface-low rounded-lg px-3 py-2 text-sm text-primary placeholder-outline focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/10 border border-transparent transition"
                           />
                           {f.key && (
@@ -201,8 +204,8 @@ const Wizard: React.FC<WizardProps> = ({ initial, initialStep = 1, onSave, onSav
                         <input
                           value={f.hint}
                           onChange={e => setField(i, 'hint', e.target.value)}
-                          placeholder="Where on page + label nearby"
-                          className="flex-1 bg-surface-low rounded-lg px-3 py-2 text-sm text-primary placeholder-outline focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/10 border border-transparent transition"
+                          placeholder="Optional: what is this value? e.g. 'total freight before GST, may also say Ocean Freight'"
+                          className="flex-[2] bg-surface-low rounded-lg px-3 py-2 text-sm text-primary placeholder-outline focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/10 border border-transparent transition"
                         />
                         <button
                           onClick={() => removeField(i)}
@@ -328,11 +331,14 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
         new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
       );
       const client = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY, dangerouslyAllowBrowser: true });
-      const fieldLines = template.fields.map(f => `- ${f.key}: ${f.hint}`).join('\n');
+      const fieldLines = template.fields.map(f => {
+        const desc = f.hint?.trim() ? ` — ${f.hint}` : '';
+        return `- ${f.key}${desc}`;
+      }).join('\n');
       const msg = await client.messages.create({
         model: 'claude-opus-4-6',
         max_tokens: 512,
-        system: 'Extract only the requested fields. Return ONLY a JSON object mapping field keys to their values or null. No explanation, no markdown.',
+        system: 'Extract only the requested fields from the document. Use your understanding of the content to find each value — descriptions explain what the value represents, not its physical location. Return ONLY a JSON object mapping field keys to their string values or null. No explanation, no markdown.',
         messages: [{
           role: 'user',
           content: [
@@ -508,7 +514,7 @@ const DeleteConfirm: React.FC<DeleteConfirmProps> = ({ name, onConfirm, onCancel
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, currentUserId }) => {
+const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, currentUserId, pinnedTemplateIds, onPinToggle, focusedTemplateName }) => {
   const isAdmin = currentUserId === ADMIN_USER_ID;
 
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -598,6 +604,65 @@ const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, cu
     URL.revokeObjectURL(url);
   };
 
+  // ── Focused tab view (when template is pinned and active in sidebar) ──
+  if (focusedTemplateName) {
+    const focused = templates.find(t => t.name === focusedTemplateName);
+    const group = extractedGroups.find(g => g.template.name === focusedTemplateName);
+    if (!focused) return null;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-[#4a5568]">
+            {group ? `${group.rows.length} document${group.rows.length !== 1 ? 's' : ''} extracted` : 'No documents extracted yet for this template.'}
+          </p>
+          {group && (
+            <button
+              onClick={() => exportCSV(group)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold cursor-pointer hover:opacity-90"
+            >
+              <Download size={14} />
+              Export CSV
+            </button>
+          )}
+        </div>
+        {group ? (
+          <div className="bg-surface-lowest rounded-xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-surface-low">
+                    <th className="text-left px-4 py-2.5 font-semibold text-[#4a5568] whitespace-nowrap">Filename</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-[#4a5568] whitespace-nowrap">Date</th>
+                    {focused.fields.map(f => (
+                      <th key={f.key} className="text-left px-4 py-2.5 font-semibold text-[#4a5568] whitespace-nowrap">{f.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.rows.map((row, i) => (
+                    <tr key={i} className={`hover:bg-surface-low transition-colors ${i % 2 === 1 ? 'bg-surface-low/50' : ''}`}>
+                      <td className="px-4 py-2 text-primary font-mono text-[11px]">{row.filename}</td>
+                      <td className="px-4 py-2 text-[#4a5568]">{row.date ?? '—'}</td>
+                      {focused.fields.map(f => (
+                        <td key={f.key} className="px-4 py-2 text-primary">{row.fields[f.key] ?? '—'}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center min-h-64 rounded-xl border-2 border-dashed border-outline/30 bg-surface-lowest text-[#4a5568]">
+            <Blocks size={28} className="mb-3 text-outline" />
+            <p className="font-medium text-primary">No results yet</p>
+            <p className="text-sm mt-1">Process documents that match the <span className="font-semibold">{focusedTemplateName}</span> template to see them here.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
 
@@ -660,7 +725,18 @@ const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, cu
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 pt-1">
+              <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                <button
+                  onClick={() => onPinToggle(t.id)}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    pinnedTemplateIds.includes(t.id)
+                      ? 'bg-secondary-fixed text-on-secondary-container hover:bg-secondary/20'
+                      : 'bg-surface-low text-[#4a5568] hover:bg-surface-container'
+                  }`}
+                  title={pinnedTemplateIds.includes(t.id) ? 'Remove from sidebar' : 'Add to sidebar'}
+                >
+                  {pinnedTemplateIds.includes(t.id) ? '📌 In sidebar' : '+ Add to sidebar'}
+                </button>
                 <button
                   onClick={() => setTestingTemplate(t)}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-low text-primary text-xs font-medium hover:bg-surface-container transition-colors cursor-pointer"
@@ -680,7 +756,7 @@ const TemplatesTab: React.FC<Props> = ({ templates, onTemplatesChange, files, cu
                     <button
                       onClick={() => setDeletingTemplate(t)}
                       className="p-1.5 rounded-lg text-outline hover:text-red-400 hover:bg-surface-low transition-colors cursor-pointer"
-                      title="Delete"
+                      title="Delete template"
                     >
                       <Trash2 size={13} />
                     </button>

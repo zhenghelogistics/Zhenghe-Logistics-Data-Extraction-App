@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 const CUSTOM_RULES_STORAGE_KEY = 'zhenghe_custom_rules';
+const PINNED_TEMPLATES_KEY = 'zhenghe_pinned_templates';
 
 const TAB_ICONS: Record<string, React.ReactNode> = {
   'All Files': <FolderOpen size={15} />,
@@ -62,6 +63,12 @@ function App() {
 
   const [containerRecords, setContainerRecords] = useState<ContainerBillingRecord[]>([]);
   const [templates, setTemplates] = useState<ExtractionTemplate[]>([]);
+  const [pinnedTemplateIds, setPinnedTemplateIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(PINNED_TEMPLATES_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -89,12 +96,25 @@ function App() {
     localStorage.setItem(CUSTOM_RULES_STORAGE_KEY, JSON.stringify(customRules));
   }, [customRules]);
 
+  useEffect(() => {
+    localStorage.setItem(PINNED_TEMPLATES_KEY, JSON.stringify(pinnedTemplateIds));
+  }, [pinnedTemplateIds]);
+
+  const handlePinToggle = (id: string) => {
+    setPinnedTemplateIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
   const getTabs = useCallback(() => {
     if (!userRole) return [];
     const roleConfig = AppConfig.roles[userRole as keyof typeof AppConfig.roles];
     const allowedTypes = roleConfig ? roleConfig.allowedTypes : [];
-    return [...allowedTypes, 'Developer Notes'];
-  }, [userRole]);
+    const pinnedNames = templates
+      .filter(t => pinnedTemplateIds.includes(t.id))
+      .map(t => t.name);
+    return [...allowedTypes, ...pinnedNames, 'Developer Notes'];
+  }, [userRole, templates, pinnedTemplateIds]);
 
   const tabs = getTabs();
 
@@ -896,6 +916,18 @@ function App() {
               onTemplatesChange={setTemplates}
               files={files}
               currentUserId={userId}
+              pinnedTemplateIds={pinnedTemplateIds}
+              onPinToggle={handlePinToggle}
+            />
+          ) : templates.find(t => t.name === activeTab) ? (
+            <TemplatesTab
+              templates={templates}
+              onTemplatesChange={setTemplates}
+              files={files}
+              currentUserId={userId}
+              pinnedTemplateIds={pinnedTemplateIds}
+              onPinToggle={handlePinToggle}
+              focusedTemplateName={activeTab}
             />
           ) : !hasFiles ? (
             /* ── Drag & Drop Upload Zone ── */

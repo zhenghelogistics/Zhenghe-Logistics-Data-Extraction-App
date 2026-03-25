@@ -499,10 +499,13 @@ const buildSystemPrompt = (customInstructions: string[], role?: string, template
   const activeTemplates = templates.filter(t => t.is_active && t.fields.length > 0);
   if (activeTemplates.length > 0) {
     const section = activeTemplates.map(t => {
-      const fieldLines = t.fields.map(f => `  - ${f.key}: ${f.hint}`).join('\n');
+      const fieldLines = t.fields.map(f => {
+        const desc = f.hint?.trim() ? ` — ${f.hint}` : '';
+        return `  - ${f.key}${desc}`;
+      }).join('\n');
       return `Template: "${t.name}" — ${t.document_hint}\nFields:\n${fieldLines}`;
     }).join('\n\n');
-    prompt += `\n\nCUSTOM TEMPLATE EXTRACTION:\nIf a document matches any template below, set document_type to the template name and populate "custom_fields" with the specified keys (string values, null if not found):\n\n${section}`;
+    prompt += `\n\nCUSTOM TEMPLATE EXTRACTION:\nIf a document matches any template below, set document_type to the template name and populate "custom_fields" with the specified keys (string values, null if not found). Use your understanding of the document content to locate each value — field descriptions are hints about what the value represents, not its physical position:\n\n${section}`;
   }
   return prompt;
 };

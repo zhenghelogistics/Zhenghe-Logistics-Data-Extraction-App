@@ -21,15 +21,15 @@ export const AppConfig = {
   // Role Configuration
   roles: {
     accounts: {
-      allowedTypes: ['All Files', 'Payment Voucher/GL'],
+      allowedTypes: ['All Files', 'Payment Voucher/GL', 'Templates'],
       defaultTab: 'Payment Voucher/GL'
     },
     logistics: {
-      allowedTypes: ['All Files', 'Logistics Local Charges Report', 'Outward Permit Declaration', 'Export Permit Declaration (PSS)'],
+      allowedTypes: ['All Files', 'Logistics Local Charges Report', 'Outward Permit Declaration', 'Export Permit Declaration (PSS)', 'Templates'],
       defaultTab: 'Logistics Local Charges Report'
     },
     transport: {
-      allowedTypes: ['All Files', 'Allied Report', 'CDAS Report', 'CRM Billing'],
+      allowedTypes: ['All Files', 'Allied Report', 'CDAS Report', 'CRM Billing', 'Templates'],
       defaultTab: 'Allied Report'
     }
   },
@@ -82,6 +82,9 @@ export const AppConfig = {
     },
     'Export Permit Declaration (PSS)': {
       columns: ['A. HS Code', 'B. Qty', 'C. UOM', 'D. Item Description', 'E. Product of Origin', 'F. Nett Weight (KGS)', 'G. Nett Wt Unit', 'H. Amount', 'I. Currency', 'J. PO Number', 'K. Invoice Number'],
+    },
+    'Templates': {
+      columns: [],
     }
   }
 };

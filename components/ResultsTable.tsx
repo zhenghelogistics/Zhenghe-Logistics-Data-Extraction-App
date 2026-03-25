@@ -64,7 +64,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
     switch (status) {
       case FileStatus.COMPLETED:
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-fixed text-on-secondary-container">
             <CheckCircle size={14} className="mr-1" />
             Done
           </span>
@@ -73,7 +73,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
         return (
           <button
             type="button"
-            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 cursor-pointer hover:bg-yellow-200 transition-colors"
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 cursor-pointer hover:bg-amber-100 transition-colors"
             onClick={() => {
               if (fileId && validationErrors && validationErrors.length > 0) {
                 setErrorPopover(prev => prev?.fileId === fileId ? null : { fileId, errors: validationErrors });
@@ -86,14 +86,14 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
         );
       case FileStatus.PROCESSING:
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-fixed text-secondary">
             <Loader2 size={14} className="mr-1 animate-spin" />
             Processing
           </span>
         );
       case FileStatus.PENDING:
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-container text-[#4a5568]">
             <Clock size={14} className="mr-1" />
             Pending
           </span>
@@ -123,7 +123,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
           <select
             value={currentFreightTerm}
             onChange={(e) => onUpdateFreightTerm(fileId, docIndex, e.target.value)}
-            className="block w-28 rounded-md border-0 py-1 pl-2 pr-6 text-xs text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-xs sm:leading-6"
+            className="block w-28 rounded-md border border-outline/20 py-1 pl-2 pr-6 text-xs text-primary focus:ring-2 focus:ring-secondary/20 focus:border-secondary sm:text-xs sm:leading-6 outline-none"
           >
             <option value="">Select</option>
             <option value="PREPAID">PREPAID</option>
@@ -212,7 +212,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
            <select
             value={currentIncoterm}
             onChange={(e) => onUpdateIncoterm(fileId, docIndex, e.target.value)}
-            className="block w-24 rounded-md border-0 py-1 pl-2 pr-6 text-xs text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-xs sm:leading-6"
+            className="block w-24 rounded-md border border-outline/20 py-1 pl-2 pr-6 text-xs text-primary focus:ring-2 focus:ring-secondary/20 focus:border-secondary sm:text-xs sm:leading-6 outline-none"
           >
             <option value="">Select</option>
             {isCustomValue && <option value={currentIncoterm}>{currentIncoterm}</option>}
@@ -252,7 +252,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
     return (
       <div className="space-y-2">
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-3 px-4 py-2 bg-red-50 rounded-lg">
             <span className="text-sm text-red-700 font-medium">{selectedIds.size} selected</span>
             <button
               type="button"
@@ -270,73 +270,73 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
             </button>
           </div>
         )}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl bg-surface-lowest shadow-sm">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
+            <table className="min-w-full">
+              <thead className="bg-surface-low">
                 <tr>
                   <th scope="col" className="px-3 py-3 pl-4">
                     <input
                       type="checkbox"
                       checked={allSelected}
                       onChange={() => handleSelectAll(allFileIds)}
-                      className="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                      className="rounded border-outline/30 text-red-600 focus:ring-red-500 cursor-pointer"
                     />
                   </th>
                   {['File Name', 'Status', 'Document Types Found', 'Upload Date', 'Actions'].map(header => (
-                    <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-[#4a5568] uppercase tracking-wider">
                       {header}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="bg-surface-lowest">
                 {files.map(file => {
                   const typesFound = file.data
                     ? Array.from(new Set(file.data.map(d => d.document_type))).join(', ')
                     : '-';
                   return (
-                    <tr key={file.id} className={`hover:bg-slate-50 transition-colors ${selectedIds.has(file.id) ? 'bg-red-50' : ''}`}>
+                    <tr key={file.id} className={`hover:bg-surface-low transition-colors ${selectedIds.has(file.id) ? 'bg-red-50' : ''}`}>
                       <td className="px-3 py-3.5 pl-4">
                         <input
                           type="checkbox"
                           checked={selectedIds.has(file.id)}
                           onChange={() => toggleSelect(file.id)}
-                          className="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                          className="rounded border-outline/30 text-red-600 focus:ring-red-500 cursor-pointer"
                         />
                       </td>
-                      <td className="whitespace-nowrap py-3.5 pr-3 text-sm font-medium text-slate-800">
+                      <td className="whitespace-nowrap py-3.5 pr-3 text-sm font-medium text-primary">
                         {file.file.name}
                       </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm">
                         <div className="relative inline-block">
                           {renderStatusBadge(file.status as FileStatus, file.validationErrors, file.id)}
                           {errorPopover?.fileId === file.id && (
-                            <div className="absolute z-50 left-0 top-full mt-1 w-80 bg-white border border-yellow-200 rounded-lg shadow-lg p-3">
+                            <div className="absolute z-50 left-0 top-full mt-1 w-80 bg-surface-lowest border border-amber-100 rounded-lg shadow-lg p-3">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-yellow-800">Extraction warnings</span>
-                                <button type="button" onClick={() => setErrorPopover(null)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                                <span className="text-xs font-semibold text-amber-700">Extraction warnings</span>
+                                <button type="button" onClick={() => setErrorPopover(null)} className="text-outline hover:text-primary text-xs">✕</button>
                               </div>
                               <ul className="space-y-1">
                                 {errorPopover.errors.map((e, i) => (
-                                  <li key={i} className="text-xs text-slate-700 bg-yellow-50 rounded px-2 py-1">{e}</li>
+                                  <li key={i} className="text-xs text-primary bg-amber-50 rounded px-2 py-1">{e}</li>
                                 ))}
                               </ul>
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-3.5 text-sm text-slate-500 max-w-xs">
+                      <td className="px-3 py-3.5 text-sm text-[#4a5568] max-w-xs">
                         {file.status === FileStatus.ERROR
                           ? <span className="text-red-500 text-xs">{file.errorMessage || 'Processing failed — try re-uploading'}</span>
                           : typesFound}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{new Date().toLocaleDateString()}</td>
+                      <td className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">{new Date().toLocaleDateString()}</td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onDeleteFile(file.id); }}
-                          className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
+                          className="text-outline hover:text-red-600 cursor-pointer transition-colors"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -357,8 +357,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
 
   if (displayRows.length === 0 && processingFiles.length === 0) {
     return (
-      <div className="text-center text-sm text-slate-400 py-12 border-2 border-dashed border-slate-200 rounded-xl bg-white">
-        No documents found for <span className="font-medium text-slate-600">{activeTab}</span>
+      <div className="text-center text-sm text-[#4a5568] py-12 border-2 border-dashed border-outline/30 rounded-xl bg-surface-lowest">
+        No documents found for <span className="font-medium text-primary">{activeTab}</span>
       </div>
     );
   }
@@ -382,7 +382,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
   return (
     <div className="space-y-2">
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-lg">
+        <div className="flex items-center gap-3 px-4 py-2 bg-red-50 rounded-lg">
           <span className="text-sm text-red-700 font-medium">{selectedIds.size} file(s) selected</span>
           <button
             type="button"
@@ -400,51 +400,51 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
           </button>
         </div>
       )}
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl bg-surface-lowest shadow-sm">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+        <table className="min-w-full">
+          <thead className="bg-surface-low">
             <tr>
               <th scope="col" className="px-3 py-3 pl-4">
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
                   onChange={() => handleSelectAll(allVisibleIds)}
-                  className="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                  className="rounded border-outline/30 text-red-600 focus:ring-red-500 cursor-pointer"
                 />
               </th>
               {dynamicHeaders.map(header => (
-                 <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                 <th key={header} scope="col" className="px-3 py-3 text-left text-xs font-semibold text-[#4a5568] uppercase tracking-wider">
                    {header}
                  </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
+          <tbody className="bg-surface-lowest">
             {/* Render Processing Files first (if in All tab) */}
             {processingFiles.map(file => (
-               <tr key={file.id} className="hover:bg-slate-50 transition-colors">
-                 <td className="whitespace-nowrap py-3.5 pl-4 pr-3 text-sm text-blue-600 sm:pl-5 font-medium">
+               <tr key={file.id} className="hover:bg-surface-low transition-colors">
+                 <td className="whitespace-nowrap py-3.5 pl-4 pr-3 text-sm text-secondary sm:pl-5 font-medium">
                    {file.status === FileStatus.PROCESSING ? 'Processing...' : file.status === FileStatus.PENDING ? 'Pending' : 'Error'}
                  </td>
-                 <td colSpan={dynamicHeaders.length - 4} className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-400">
+                 <td colSpan={dynamicHeaders.length - 4} className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">
                    {file.status === FileStatus.ERROR
                      ? <span className="text-red-500">{file.errorMessage || 'Unknown Error'}</span>
                      : <span className="inline-flex items-center gap-1.5"><Loader2 size={11} className="animate-spin shrink-0" />{file.stage || 'Analysis in progress'}</span>}
                  </td>
-                 <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{file.file.name}</td>
+                 <td className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">{file.file.name}</td>
                  <td className="whitespace-nowrap px-3 py-3.5 text-sm">
                    <div className="relative inline-block">
                      {renderStatusBadge(file.status as FileStatus, file.validationErrors, file.id)}
                      {errorPopover?.fileId === file.id && (
-                       <div className="absolute z-50 left-0 top-full mt-1 w-80 bg-white border border-yellow-200 rounded-lg shadow-lg p-3">
+                       <div className="absolute z-50 left-0 top-full mt-1 w-80 bg-surface-lowest border border-amber-100 rounded-lg shadow-lg p-3">
                          <div className="flex items-center justify-between mb-2">
-                           <span className="text-xs font-semibold text-yellow-800">Extraction warnings</span>
-                           <button type="button" onClick={() => setErrorPopover(null)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                           <span className="text-xs font-semibold text-amber-700">Extraction warnings</span>
+                           <button type="button" onClick={() => setErrorPopover(null)} className="text-outline hover:text-primary text-xs">✕</button>
                          </div>
                          <ul className="space-y-1">
                            {errorPopover.errors.map((e, i) => (
-                             <li key={i} className="text-xs text-slate-700 bg-yellow-50 rounded px-2 py-1">{e}</li>
+                             <li key={i} className="text-xs text-primary bg-amber-50 rounded px-2 py-1">{e}</li>
                            ))}
                          </ul>
                        </div>
@@ -458,7 +458,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                         e.stopPropagation();
                         onDeleteFile(file.id);
                       }}
-                      className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
+                      className="text-outline hover:text-red-600 cursor-pointer transition-colors"
                     >
                       <Trash2 size={15} />
                     </button>
@@ -475,28 +475,28 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
 
               return (
               <React.Fragment key={uniqueKey}>
-              <tr className={`transition-colors ${selectedIds.has(row.file.id) ? 'bg-red-50' : isCombined ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-slate-50'}`}>
+              <tr className={`transition-colors ${selectedIds.has(row.file.id) ? 'bg-red-50' : isCombined ? 'bg-secondary-fixed/20 hover:bg-secondary-fixed/40' : 'hover:bg-surface-low'}`}>
                 <td className="px-3 py-3.5 pl-4">
                   <input
                     type="checkbox"
                     checked={selectedIds.has(row.file.id)}
                     onChange={() => toggleSelect(row.file.id)}
-                    className="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                    className="rounded border-outline/30 text-red-600 focus:ring-red-500 cursor-pointer"
                   />
                 </td>
                 {activeTab === 'All' && userRole !== 'logistics' ? (
                    // Generic Row for "All" view
                    <>
-                    <td className="whitespace-nowrap py-3.5 pr-3 text-sm font-medium text-slate-800">{d.document_type}</td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{d.metadata?.reference_number || '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">{d.metadata?.date || '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500" title={d.metadata?.parties?.shipper_supplier || ''}>
+                    <td className="whitespace-nowrap py-3.5 pr-3 text-sm font-medium text-primary">{d.document_type}</td>
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">{d.metadata?.reference_number || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">{d.metadata?.date || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]" title={d.metadata?.parties?.shipper_supplier || ''}>
                       {d.metadata?.parties?.shipper_supplier ? d.metadata.parties.shipper_supplier.substring(0, 15) + '...' : '-'}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-500">
+                    <td className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">
                        {d.financials?.total_amount ? d.financials.total_amount : d.cargo_details?.total_gross_weight ? `${d.cargo_details.total_gross_weight} kg` : '-'}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-xs text-slate-400">
+                    <td className="whitespace-nowrap px-3 py-3.5 text-xs text-outline">
                        {row.file.file.name}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3.5 text-sm">
@@ -509,7 +509,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                           e.stopPropagation();
                           onDeleteFile(row.file.id);
                         }}
-                        className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
+                        className="text-outline hover:text-red-600 cursor-pointer transition-colors"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -519,7 +519,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                   // Specific Row for Typed view OR Logistics View
                   <>
                     {dynamicHeaders.slice(0, -1).map((header, idx) => (
-                      <td key={idx} className="whitespace-nowrap px-3 py-3.5 text-sm text-slate-600 first:pl-4 sm:first:pl-5">
+                      <td key={idx} className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568] first:pl-4 sm:first:pl-5">
                         {renderDynamicCell(header, d, row.file.id, row.docIndex)}
                       </td>
                     ))}
@@ -532,7 +532,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                               title="Download PDF voucher"
                               disabled={isGeneratingPdf}
                               onClick={(e) => { e.stopPropagation(); onGenerateVoucher([d]); }}
-                              className="text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                              className="text-outline hover:text-secondary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
                               {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
                             </button>
@@ -546,7 +546,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                               title={`Download ${activeTab} payment voucher for this file`}
                               disabled={isGeneratingPdf}
                               onClick={(e) => { e.stopPropagation(); onGenerateVoucher(fileDocs); }}
-                              className="text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                              className="text-outline hover:text-secondary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
                               {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
                             </button>
@@ -558,7 +558,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                             e.stopPropagation();
                             onDeleteFile(row.file.id);
                           }}
-                          className="text-slate-400 hover:text-red-600 cursor-pointer transition-colors"
+                          className="text-outline hover:text-red-600 cursor-pointer transition-colors"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -569,23 +569,23 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
               </tr>
               {/* Child rows for each BL entry in a combined PV */}
               {isCombined && blEntries.map((entry, ei) => (
-                <tr key={`${uniqueKey}-entry-${ei}`} className="bg-blue-50/40 hover:bg-blue-100/50 border-l-2 border-blue-300">
+                <tr key={`${uniqueKey}-entry-${ei}`} className="bg-secondary-fixed/10 hover:bg-secondary-fixed/20 border-l-2 border-secondary-container">
                   <td className="px-3 py-2 pl-4" />
                   {/* PSS's Invoice # */}
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-500 pl-8">
-                    <span className="text-blue-400 mr-1">↳</span>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-[#4a5568] pl-8">
+                    <span className="text-secondary mr-1">↳</span>
                     {entry.pss_invoice_number || '-'}
                   </td>
                   {/* Carrier/Forwarder Inv # — not on individual entry */}
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">-</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-outline">-</td>
                   {/* BL Number */}
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-500">{entry.bl_number || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-[#4a5568]">{entry.bl_number || '-'}</td>
                   {/* Payable Amount */}
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-500">{entry.amount || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-[#4a5568]">{entry.amount || '-'}</td>
                   {/* Total Payable Amount — same as amount at entry level */}
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">-</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-outline">-</td>
                   {/* Charges — not at entry level */}
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">-</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-outline">-</td>
                   {/* Actions — individual voucher download */}
                   <td className="whitespace-nowrap px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -608,7 +608,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                           title={`PDF voucher for ${entry.pss_invoice_number || entry.bl_number || 'this entry'}`}
                           disabled={isGeneratingPdf}
                           onClick={(e) => { e.stopPropagation(); onGenerateVoucher([singleDoc]); }}
-                          className="text-blue-300 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                          className="text-secondary-container hover:text-secondary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
                         >
                           {isGeneratingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
                         </button>

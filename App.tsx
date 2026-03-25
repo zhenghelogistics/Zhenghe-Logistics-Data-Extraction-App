@@ -3,15 +3,17 @@ import { extractDocumentData, validateDocumentData } from './services/claudeServ
 import {
   supabase, fetchDocuments, saveDocument, deleteDocument,
   fetchContainerBilling, insertContainerBillingRows, deleteContainerBilling, deleteManyContainerBilling, ContainerBillingRecord,
+  fetchTemplates,
 } from './services/supabase';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
 import ExportPermitTab from './components/ExportPermitTab';
+import TemplatesTab from './components/TemplatesTab';
 import { generateVoucherPdf, generateCDASVoucherPdf, generateAlliedVoucherPdf } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
-import { ProcessedFile, FileStatus, DocumentData } from './types';
+import { ProcessedFile, FileStatus, DocumentData, ExtractionTemplate } from './types';
 import { AppConfig } from './config';
 import { UserRole, TEAM_NAMES } from './users';
 // @ts-ignore
@@ -20,7 +22,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import {
   Ship, User, LogOut, Upload, Zap, Download, FileText, Loader2,
   FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
-  Anchor, Package, ShoppingCart, Code2, ClipboardList, ScrollText,
+  Anchor, Package, ShoppingCart, Code2, ClipboardList, ScrollText, Blocks,
 } from 'lucide-react';
 
 const CUSTOM_RULES_STORAGE_KEY = 'zhenghe_custom_rules';
@@ -38,12 +40,13 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
   'Developer Notes': <Code2 size={15} />,
   'CRM Billing': <ClipboardList size={15} />,
   'Export Permit Declaration (PSS)': <ScrollText size={15} />,
+  'Templates': <Blocks size={15} />,
 };
 
 function App() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const isAdmin = userId === import.meta.env.VITE_ADMIN_USER_ID;
+  const isAdmin = userId === 'a43ea670-2ca8-4c0c-8445-7d95e38cdb6c';
   const [files, setFiles] = useState<ProcessedFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -58,6 +61,7 @@ function App() {
   });
 
   const [containerRecords, setContainerRecords] = useState<ContainerBillingRecord[]>([]);
+  const [templates, setTemplates] = useState<ExtractionTemplate[]>([]);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -150,6 +154,10 @@ function App() {
       const containerRows = await fetchContainerBilling();
       setContainerRecords(containerRows);
       addLog(`Loaded ${containerRows.length} container billing records.`);
+
+      const userTemplates = await fetchTemplates();
+      setTemplates(userTemplates);
+      addLog(`Loaded ${userTemplates.length} extraction template(s).`);
     };
     loadDocs();
   }, [userRole]);
@@ -328,7 +336,7 @@ function App() {
       try {
         const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage) => {
           setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage } : f));
-        }, userRole ?? undefined);
+        }, userRole ?? undefined, templates);
         const validationErrors = validateDocumentData(dataList);
         const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
         if (validationErrors.length > 0) {
@@ -373,7 +381,7 @@ function App() {
 
     addLog('Batch processing finished.');
     setIsProcessing(false);
-  }, [files, customRules]);
+  }, [files, customRules, templates]);
 
   const handleBillingUpdate = (fileId: string, updates: Partial<ProcessedFile>) => {
     setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...updates } : f));
@@ -583,10 +591,10 @@ function App() {
 
   if (isSessionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-primary">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-400 text-sm">Loading session...</p>
+          <div className="w-10 h-10 border-2 border-secondary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-surface-container text-sm">Loading session...</p>
         </div>
       </div>
     );
@@ -598,9 +606,9 @@ function App() {
   const hasDevNotes = tabs.includes('Developer Notes');
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-surface overflow-hidden">
       {updateAvailable && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white text-center py-2 text-sm font-medium shadow-md">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-primary to-primary-container text-white text-center py-2 text-sm font-medium shadow-md">
           A new version is available.{' '}
           <button onClick={() => { window.location.replace(window.location.pathname + '?_r=' + Date.now()); }} className="underline font-semibold hover:text-blue-200">
             Click here to refresh
@@ -609,10 +617,10 @@ function App() {
       )}
 
       {/* ─── Sidebar ─── */}
-      <aside className="w-56 bg-slate-900 flex flex-col flex-shrink-0">
+      <aside className="w-56 bg-primary flex flex-col flex-shrink-0">
 
         {/* Brand */}
-        <div className="px-4 py-5 border-b border-slate-800">
+        <div className="px-4 py-5 border-b border-primary-container/50">
           <div className="flex items-center gap-3">
             <img
               src="/pluckd.png"
@@ -622,14 +630,14 @@ function App() {
             />
             <div>
               <p className="text-white font-bold text-sm leading-none">Pluckd</p>
-              <p className="text-slate-500 text-xs mt-0.5">By Zhenghe Logistics</p>
+              <p className="text-surface-container text-xs mt-0.5">By Zhenghe Logistics</p>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-          <p className="px-3 mb-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+          <p className="px-3 mb-2 text-[0.6875rem] font-medium text-surface-container uppercase tracking-[0.05em]">
             Documents
           </p>
           {mainTabs.map(tab => (
@@ -638,8 +646,8 @@ function App() {
               onClick={() => setActiveTab(tab)}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer text-left ${
                 activeTab === tab
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  ? 'bg-primary-container text-white'
+                  : 'text-surface-container hover:bg-primary-container/60 hover:text-white'
               }`}
             >
               <span className="flex-shrink-0">{TAB_ICONS[tab] || <FileText size={15} />}</span>
@@ -649,13 +657,13 @@ function App() {
 
           {hasDevNotes && (
             <>
-              <div className="my-3 border-t border-slate-800" />
+              <div className="my-3 border-t border-primary-container/50" />
               <button
                 onClick={() => setActiveTab('Developer Notes')}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer text-left ${
                   activeTab === 'Developer Notes'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                    ? 'bg-primary-container text-white'
+                    : 'text-surface-container hover:bg-primary-container/60 hover:text-white'
                 }`}
               >
                 <Code2 size={15} className="flex-shrink-0" />
@@ -666,14 +674,14 @@ function App() {
         </nav>
 
         {/* User Footer */}
-        <div className="px-2 py-3 border-t border-slate-800">
+        <div className="px-2 py-3 border-t border-primary-container/50">
           <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
-            <div className="w-7 h-7 bg-blue-600/20 border border-blue-500/30 rounded-full flex items-center justify-center flex-shrink-0">
-              <User size={13} className="text-blue-400" />
+            <div className="w-7 h-7 bg-secondary/20 border border-secondary/30 rounded-full flex items-center justify-center flex-shrink-0">
+              <User size={13} className="text-secondary-container" />
             </div>
             <div className="min-w-0">
-              <p className="text-slate-300 text-xs font-medium truncate">{getTeamName(userRole)}</p>
-              <p className="text-slate-600 text-xs">Active session</p>
+              <p className="text-surface-lowest text-xs font-medium truncate">{getTeamName(userRole)}</p>
+              <p className="text-surface-container text-xs">Active session</p>
             </div>
           </div>
           {isAdmin && (
@@ -684,8 +692,8 @@ function App() {
                   onClick={() => { setUserRole(role); localStorage.setItem('userRole', role); }}
                   className={`flex-1 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
                     userRole === role
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                      ? 'bg-secondary text-white'
+                      : 'bg-primary-container/40 text-surface-container hover:text-white'
                   }`}
                 >
                   {role === UserRole.ACCOUNTS ? 'Acct' : role === UserRole.LOGISTICS ? 'Log' : 'Tpt'}
@@ -695,12 +703,12 @@ function App() {
           )}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-slate-300 text-xs transition-colors cursor-pointer"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-surface-container hover:bg-primary-container/60 hover:text-white text-xs transition-colors cursor-pointer"
           >
             <LogOut size={13} />
             Sign Out
           </button>
-          <p className="px-3 pb-2 text-slate-600 text-[10px]">build {__COMMIT_HASH__}</p>
+          <p className="px-3 pb-2 text-surface-container/60 text-[10px]">build {__COMMIT_HASH__}</p>
         </div>
       </aside>
 
@@ -708,35 +716,35 @@ function App() {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Top Bar */}
-        <header className="bg-white border-b border-slate-200 px-6 py-3 flex-shrink-0">
+        <header className="bg-surface-lowest px-6 py-3 flex-shrink-0">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h1 className="text-sm font-semibold text-slate-900">{activeTab}</h1>
-              <p className="text-xs text-slate-400">AI-powered logistics document extraction</p>
+              <h1 className="text-sm font-semibold text-primary">{activeTab}</h1>
+              <p className="text-xs text-[#4a5568]">AI-powered logistics document extraction</p>
             </div>
 
             <div className="flex items-center gap-2">
               {/* Live Stats */}
               {hasFiles && (
-                <div className="flex items-center gap-3 pr-3 mr-1 border-r border-slate-200">
+                <div className="flex items-center gap-3 pr-3 mr-1">
                   <div className="text-center">
-                    <p className="text-base font-bold text-slate-800 leading-none">{files.length}</p>
-                    <p className="text-xs text-slate-400">Files</p>
+                    <p className="text-base font-bold text-primary leading-none">{files.length}</p>
+                    <p className="text-xs text-[#4a5568]">Files</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-base font-bold text-emerald-600 leading-none">{completedCount}</p>
-                    <p className="text-xs text-slate-400">Done</p>
+                    <p className="text-base font-bold text-secondary leading-none">{completedCount}</p>
+                    <p className="text-xs text-[#4a5568]">Done</p>
                   </div>
                   {pendingCount > 0 && (
                     <div className="text-center">
                       <p className="text-base font-bold text-amber-500 leading-none">{pendingCount}</p>
-                      <p className="text-xs text-slate-400">Pending</p>
+                      <p className="text-xs text-[#4a5568]">Pending</p>
                     </div>
                   )}
                   {errorCount > 0 && (
                     <div className="text-center">
                       <p className="text-base font-bold text-red-500 leading-none">{errorCount}</p>
-                      <p className="text-xs text-slate-400">Errors</p>
+                      <p className="text-xs text-[#4a5568]">Errors</p>
                     </div>
                   )}
                 </div>
@@ -745,7 +753,7 @@ function App() {
               {/* Select PDFs */}
               <label
                 htmlFor="file-upload"
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors cursor-pointer ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-low text-primary text-xs font-medium hover:bg-surface-container transition-colors cursor-pointer ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <Upload size={14} />
                 Select PDFs
@@ -764,7 +772,7 @@ function App() {
               <button
                 onClick={processFiles}
                 disabled={isProcessing || pendingCount === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity cursor-pointer"
               >
                 {isProcessing
                   ? <Loader2 size={14} className="animate-spin" />
@@ -777,7 +785,7 @@ function App() {
               <button
                 onClick={downloadReport}
                 disabled={completedCount === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity cursor-pointer"
               >
                 <Download size={14} />
                 Export
@@ -794,7 +802,7 @@ function App() {
                   <button
                     onClick={() => handleGenerateCDASVoucher(cdasDocs)}
                     disabled={isGeneratingPdf}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer"
                   >
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export CDAS Voucher'}
@@ -813,7 +821,7 @@ function App() {
                   <button
                     onClick={() => handleGenerateAlliedVoucher(alliedDocs)}
                     disabled={isGeneratingPdf}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer"
                   >
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export Allied Voucher'}
@@ -832,7 +840,7 @@ function App() {
                   <button
                     onClick={() => handleGenerateVouchers(pvDocs)}
                     disabled={isGeneratingPdf}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer"
                   >
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export Vouchers PDF'}
@@ -845,7 +853,7 @@ function App() {
                 onClick={downloadLogs}
                 disabled={logs.length === 0}
                 title="Download Logs"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-low text-primary text-xs font-medium hover:bg-surface-container disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 <FileText size={14} />
               </button>
@@ -855,16 +863,16 @@ function App() {
           {/* Progress Bar */}
           {isProcessing && (
             <div className="mt-3 pb-1">
-              <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
+              <div className="flex items-center justify-between text-xs text-[#4a5568] mb-1.5">
                 <span className="flex items-center gap-1.5">
                   <Loader2 size={11} className="animate-spin" />
                   Processing {processingCount} file{processingCount !== 1 ? 's' : ''}...
                 </span>
                 <span>{completedCount} of {files.length} complete</span>
               </div>
-              <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-1 bg-surface-container rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-blue-600 rounded-full transition-all duration-500"
+                  className="h-full bg-secondary rounded-full transition-all duration-500"
                   style={{ width: `${files.length > 0 ? (completedCount / files.length) * 100 : 0}%` }}
                 />
               </div>
@@ -882,6 +890,13 @@ function App() {
             <CrmBillingTab records={containerRecords} onRecordUpdate={handleContainerRecordUpdate} onRecordDelete={handleContainerRecordDelete} onRecordDeleteMany={handleContainerRecordDeleteMany} />
           ) : activeTab === 'Export Permit Declaration (PSS)' ? (
             <ExportPermitTab files={files} />
+          ) : activeTab === 'Templates' ? (
+            <TemplatesTab
+              templates={templates}
+              onTemplatesChange={setTemplates}
+              files={files}
+              currentUserId={userId}
+            />
           ) : !hasFiles ? (
             /* ── Drag & Drop Upload Zone ── */
             <div
@@ -891,24 +906,24 @@ function App() {
               onClick={() => document.getElementById('file-upload-drop')?.click()}
               className={`flex flex-col items-center justify-center min-h-96 rounded-2xl border-2 border-dashed transition-all cursor-pointer select-none ${
                 isDragging
-                  ? 'border-blue-400 bg-blue-50 scale-[1.01]'
-                  : 'border-slate-300 bg-white hover:border-blue-300 hover:bg-slate-50'
+                  ? 'border-secondary bg-secondary-fixed/20 scale-[1.01]'
+                  : 'border-outline/40 bg-surface-lowest hover:border-secondary/40 hover:bg-surface-low'
               }`}
             >
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 transition-colors ${isDragging ? 'bg-blue-100' : 'bg-slate-100'}`}>
-                <Upload size={28} className={isDragging ? 'text-blue-500' : 'text-slate-400'} />
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 transition-colors ${isDragging ? 'bg-secondary-fixed' : 'bg-surface-container'}`}>
+                <Upload size={28} className={isDragging ? 'text-secondary' : 'text-[#4a5568]'} />
               </div>
-              <p className="text-slate-800 font-semibold text-base mb-1">
+              <p className="text-primary font-semibold text-base mb-1">
                 {isDragging ? 'Drop your PDFs here' : 'Upload PDF Documents'}
               </p>
-              <p className="text-slate-400 text-sm mb-5">
+              <p className="text-[#4a5568] text-sm mb-5">
                 Drag & drop files here, or click to browse
               </p>
-              <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors pointer-events-none">
+              <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-sm font-semibold pointer-events-none">
                 <Upload size={15} />
                 Browse Files
               </div>
-              <p className="text-slate-400 text-xs mt-4">PDF files only</p>
+              <p className="text-[#4a5568] text-xs mt-4">PDF files only</p>
               <input
                 id="file-upload-drop"
                 type="file"

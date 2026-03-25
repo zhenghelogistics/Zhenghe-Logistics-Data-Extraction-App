@@ -178,6 +178,23 @@ export interface DocumentData {
   allied_report?: AlliedReport;
   cdas_report?: CdasReport;
   export_permit_pss?: ExportPermitPSS;
+  custom_fields?: Record<string, string> | null;
+}
+
+export interface TemplateField {
+  key: string;    // snake_case auto-generated from label
+  label: string;  // "Invoice Number"
+  hint: string;   // "top right corner, next to 'Invoice No:'"
+}
+
+export interface ExtractionTemplate {
+  id: string;
+  user_id: string;
+  name: string;
+  document_hint: string;
+  fields: TemplateField[];
+  is_active: boolean;
+  created_at: string;
 }
 
 // Wrapper for the API response which now returns a list

@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { DocumentData, FileStatus } from "../types";
+import { DocumentData, FileStatus, ExtractionTemplate } from "../types";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -200,6 +200,44 @@ export const archiveContainerBilling = async (ids: string[], label: string): Pro
     .from('container_billing')
     .update({ is_archived: true, archive_label: label })
     .in('id', ids);
+  if (error) throw new Error(error.message);
+};
+
+// ── Extraction Templates ────────────────────────────────────────────────────────
+
+export const fetchTemplates = async (): Promise<ExtractionTemplate[]> => {
+  const { data, error } = await supabase
+    .from('extraction_templates')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('Error fetching templates:', error); return []; }
+  return (data || []) as ExtractionTemplate[];
+};
+
+export const saveTemplate = async (
+  t: Omit<ExtractionTemplate, 'id' | 'user_id' | 'created_at'>
+): Promise<ExtractionTemplate | null> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from('extraction_templates')
+    .insert([{ ...t, user_id: user.id }])
+    .select()
+    .single();
+  if (error) { console.error('Error saving template:', error); return null; }
+  return data as ExtractionTemplate;
+};
+
+export const updateTemplate = async (
+  id: string,
+  updates: Partial<Pick<ExtractionTemplate, 'name' | 'document_hint' | 'fields' | 'is_active'>>
+): Promise<void> => {
+  const { error } = await supabase.from('extraction_templates').update(updates).eq('id', id);
+  if (error) throw new Error(error.message);
+};
+
+export const deleteTemplate = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('extraction_templates').delete().eq('id', id);
   if (error) throw new Error(error.message);
 };
 

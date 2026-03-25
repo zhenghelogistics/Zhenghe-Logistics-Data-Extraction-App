@@ -349,11 +349,11 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
   // ── Shared search bar
   const SearchBar = ({ placeholder }: { placeholder: string }) => (
     <div className="relative flex-1">
-      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-outline" />
       <input
         type="text" placeholder={placeholder} value={searchQuery}
         onChange={e => setSearchQuery(e.target.value)}
-        className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+        className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary"
       />
     </div>
   );
@@ -371,8 +371,8 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
             key={v} onClick={() => setView(v)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               view === v
-                ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-white/60'
+                ? 'bg-surface-lowest text-primary shadow-sm'
+                : 'text-[#4a5568] hover:text-primary hover:bg-surface-lowest/60'
             }`}
           >
             {v === 'dashboard' && <LayoutDashboard size={14} />}
@@ -389,7 +389,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                 style={{ backgroundColor: GREEN }}>{billed.length}</span>
             )}
             {v === 'summary' && archived.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-600">{archived.length}</span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-surface-container text-[#4a5568]">{archived.length}</span>
             )}
           </button>
         ))}
@@ -403,7 +403,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
           <div className="grid grid-cols-2 gap-4">
             <button
               onClick={() => setView('unbilled')}
-              className="p-5 rounded-2xl text-left hover:scale-[1.01] transition-transform shadow-sm border border-amber-100"
+              className="p-5 rounded-2xl text-left hover:scale-[1.01] transition-transform shadow-sm"
               style={{ background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)' }}
             >
               <div className="flex items-center gap-3 mb-3">
@@ -420,7 +420,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
 
             <button
               onClick={() => setView('billed')}
-              className="p-5 rounded-2xl text-left hover:scale-[1.01] transition-transform shadow-sm border border-emerald-100"
+              className="p-5 rounded-2xl text-left hover:scale-[1.01] transition-transform shadow-sm"
               style={{ background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)' }}
             >
               <div className="flex items-center gap-3 mb-3">
@@ -439,39 +439,39 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
           {activeRecords.length === 0 ? (
             <EmptyState message="No container billing records yet. Upload and process Allied or CDAS reports to get started." />
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-surface-lowest rounded-xl overflow-hidden shadow-sm">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
+                  <tr className="bg-surface-low">
                     {['Container No', 'Report Type', 'Source File', 'Invoice Date', 'Status', 'Billed At'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#4a5568] uppercase tracking-wide">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAll.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center text-sm text-slate-400 py-8">No results for "{searchQuery}"</td>
+                      <td colSpan={6} className="text-center text-sm text-[#4a5568] py-8">No results for "{searchQuery}"</td>
                     </tr>
                   ) : filteredAll.map((r, i) => (
                     <tr
                       key={r.id}
-                      className={`border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-colors ${i % 2 !== 0 ? 'bg-slate-50/30' : ''}`}
+                      className={`cursor-pointer hover:bg-surface-low transition-colors ${i % 2 !== 0 ? 'bg-surface-low/30' : ''}`}
                       onClick={() => { setView(r.billing_status === 'billed' ? 'billed' : 'unbilled'); setExpandedId(r.id); }}
                     >
-                      <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{r.container_number ?? '—'}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{r.report_type}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" title={r.filename}>{r.filename}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{displayDate(r)}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-primary">{r.container_number ?? '—'}</td>
+                      <td className="px-4 py-3 text-xs text-[#4a5568]">{r.report_type}</td>
+                      <td className="px-4 py-3 text-xs text-[#4a5568] max-w-xs truncate" title={r.filename}>{r.filename}</td>
+                      <td className="px-4 py-3 text-xs text-[#4a5568]">{displayDate(r)}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                          r.billing_status === 'billed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                          r.billing_status === 'billed' ? 'bg-secondary-fixed text-on-secondary-container' : 'bg-amber-50 text-amber-700'
                         }`}>
                           {r.billing_status === 'billed' ? <CheckCircle2 size={10} /> : <Clock size={10} />}
                           {r.billing_status === 'billed' ? 'Billed' : 'Unbilled'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">
+                      <td className="px-4 py-3 text-xs text-[#4a5568]">
                         {r.billed_at ? new Date(r.billed_at).toLocaleDateString() : '—'}
                       </td>
                     </tr>
@@ -490,7 +490,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
             <SearchBar placeholder="Search unbilled records…" />
             <button
               onClick={() => toggleSelectAll(filteredUnbilled)}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-[#4a5568] text-xs font-medium hover:bg-surface-low transition-colors"
             >
               {filteredUnbilled.length > 0 && filteredUnbilled.every(r => selectedIds.has(r.id))
                 ? <CheckSquare size={13} /> : <Square size={13} />}
@@ -499,21 +499,21 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
             <button
               disabled={selectedIds.size === 0}
               onClick={() => triggerCSVDownload(filteredUnbilled.filter(r => selectedIds.has(r.id)), 'unbilled_selected.csv')}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-[#4a5568] text-xs font-medium hover:bg-surface-low disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Download size={13} /> Export Selected
             </button>
             <button
               disabled={filteredUnbilled.length === 0}
               onClick={() => triggerCSVDownload(filteredUnbilled, 'unbilled_all.csv')}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-[#4a5568] text-xs font-medium hover:bg-surface-low disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Download size={13} /> Export All
             </button>
             <button
               disabled={selectedIds.size === 0}
               onClick={() => setBulkDeleteConfirm(true)}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-red-200 bg-white text-red-500 text-xs font-medium hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-red-200 bg-surface-lowest text-red-500 text-xs font-medium hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Trash2 size={13} /> Delete Selected ({selectedIds.size})
             </button>
@@ -522,22 +522,22 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
           {filteredUnbilled.length === 0 ? (
             unbilled.length === 0
               ? <EmptyState message="All records have been billed. Great work!" icon="check" />
-              : <p className="text-center text-sm text-slate-400 py-8">No results for "{searchQuery}"</p>
+              : <p className="text-center text-sm text-[#4a5568] py-8">No results for "{searchQuery}"</p>
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-surface-lowest rounded-xl overflow-hidden shadow-sm">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
+                  <tr className="bg-surface-low">
                     <th className="w-10 px-4 py-3">
                       <input
                         type="checkbox"
                         checked={filteredUnbilled.length > 0 && filteredUnbilled.every(r => selectedIds.has(r.id))}
                         onChange={() => toggleSelectAll(filteredUnbilled)}
-                        className="w-4 h-4 rounded border-slate-300"
+                        className="w-4 h-4 rounded border-outline/30"
                       />
                     </th>
                     {['Container No', 'Report Type', 'Source File', 'Invoice Date', 'Verified', '', ''].map((h, i) => (
-                      <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                      <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-[#4a5568] uppercase tracking-wide">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -550,8 +550,8 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                     return (
                       <React.Fragment key={r.id}>
                         <tr
-                          className={`border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors ${
-                            isExpanded ? 'bg-blue-50/40' : i % 2 !== 0 ? 'bg-slate-50/30' : ''
+                          className={`cursor-pointer hover:bg-surface-low transition-colors ${
+                            isExpanded ? 'bg-secondary-fixed/20' : i % 2 !== 0 ? 'bg-surface-low/30' : ''
                           }`}
                           onClick={() => setExpandedId(isExpanded ? null : r.id)}
                         >
@@ -560,16 +560,16 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                               type="checkbox"
                               checked={selectedIds.has(r.id)}
                               onChange={() => toggleSelect(r.id)}
-                              className="w-4 h-4 rounded border-slate-300"
+                              className="w-4 h-4 rounded border-outline/30"
                             />
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{r.container_number ?? '—'}</td>
-                          <td className="px-4 py-3 text-xs text-slate-600">{r.report_type}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500 max-w-[180px] truncate" title={r.filename}>{r.filename}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500">{displayDate(r)}</td>
+                          <td className="px-4 py-3 font-mono text-xs font-semibold text-primary">{r.container_number ?? '—'}</td>
+                          <td className="px-4 py-3 text-xs text-[#4a5568]">{r.report_type}</td>
+                          <td className="px-4 py-3 text-xs text-[#4a5568] max-w-[180px] truncate" title={r.filename}>{r.filename}</td>
+                          <td className="px-4 py-3 text-xs text-[#4a5568]">{displayDate(r)}</td>
                           <td className="px-4 py-3">
                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                              allDone ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                              allDone ? 'bg-secondary-fixed text-on-secondary-container' : 'bg-surface-container text-[#4a5568]'
                             }`}>
                               {checked}/{total}
                             </span>
@@ -577,7 +577,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                           <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                             <button
                               onClick={() => setDeleteConfirm(r.id)}
-                              className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                              className="p-1.5 rounded-lg text-outline hover:text-red-400 hover:bg-red-50 transition-colors"
                               title="Delete record"
                             >
                               <Trash2 size={13} />
@@ -585,18 +585,18 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                           </td>
                           <td className="px-4 py-3 text-right">
                             {isExpanded
-                              ? <ChevronDown size={15} className="text-slate-400 inline" />
-                              : <ChevronRight size={15} className="text-slate-400 inline" />
+                              ? <ChevronDown size={15} className="text-outline inline" />
+                              : <ChevronRight size={15} className="text-outline inline" />
                             }
                           </td>
                         </tr>
 
                         {/* Expanded charge panel */}
                         {isExpanded && (
-                          <tr className="bg-blue-50/20 border-b border-slate-100">
+                          <tr className="bg-secondary-fixed/10">
                             <td colSpan={8} className="px-6 py-5">
                               {billableCharges(r).length === 0 ? (
-                                <p className="text-sm text-slate-400 italic mb-4">No billable charges — ready to mark as billed.</p>
+                                <p className="text-sm text-[#4a5568] italic mb-4">No billable charges — ready to mark as billed.</p>
                               ) : (
                                 <div className="grid grid-cols-2 gap-2 mb-4">
                                   {billableCharges(r).map(([key, amount]) => {
@@ -606,8 +606,8 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                                         key={key}
                                         className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
                                           isTicked
-                                            ? 'border-emerald-200 bg-emerald-50'
-                                            : 'border-slate-200 bg-white hover:border-slate-300'
+                                            ? 'border-secondary/30 bg-secondary-fixed/40'
+                                            : 'border-outline/20 bg-surface-lowest hover:border-secondary/20'
                                         }`}
                                       >
                                         <div className="flex items-center gap-2.5">
@@ -615,13 +615,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                                             type="checkbox"
                                             checked={isTicked}
                                             onChange={() => toggleCharge(r.id, key, r.charge_validations)}
-                                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 cursor-pointer"
+                                            className="w-4 h-4 rounded border-outline/30 text-secondary cursor-pointer"
                                           />
-                                          <span className={`text-sm font-medium ${isTicked ? 'text-emerald-700' : 'text-slate-700'}`}>
+                                          <span className={`text-sm font-medium ${isTicked ? 'text-secondary' : 'text-primary'}`}>
                                             {CHARGE_LABELS[key] ?? key}
                                           </span>
                                         </div>
-                                        <span className={`text-sm font-mono ${isTicked ? 'text-emerald-600' : 'text-slate-500'}`}>
+                                        <span className={`text-sm font-mono ${isTicked ? 'text-secondary' : 'text-[#4a5568]'}`}>
                                           SGD {amount}
                                         </span>
                                       </label>
@@ -631,13 +631,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                               )}
 
                               <div className="mb-4">
-                                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Remarks</label>
+                                <label className="block text-xs font-semibold text-[#4a5568] uppercase tracking-wide mb-1.5">Remarks</label>
                                 <textarea
                                   rows={2}
                                   placeholder="Add notes…"
                                   value={remarksMap[r.id] ?? ''}
                                   onChange={e => onRemarksChange(r.id, e.target.value)}
-                                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                                  className="w-full px-3 py-2 rounded-lg border border-outline/20 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary bg-surface-lowest text-primary"
                                 />
                               </div>
 
@@ -648,7 +648,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                                     allDone
                                       ? 'text-white shadow-md hover:opacity-90 active:scale-[0.98]'
-                                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                      : 'bg-surface-container text-[#4a5568] cursor-not-allowed'
                                   }`}
                                   style={allDone ? { backgroundColor: GREEN } : {}}
                                 >
@@ -677,7 +677,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
             <select
               value={datePreset}
               onChange={e => setDatePreset(e.target.value)}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+              className="px-3 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-sm text-[#4a5568] focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary cursor-pointer"
             >
               <option value="all">All time</option>
               <option value="this_month">This month</option>
@@ -691,33 +691,33 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
               <>
                 <input
                   type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                  className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="px-3 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-sm text-[#4a5568] focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary"
                 />
-                <span className="text-slate-400 text-sm">→</span>
+                <span className="text-outline text-sm">→</span>
                 <input
                   type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                  className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="px-3 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-sm text-[#4a5568] focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary"
                 />
               </>
             )}
             <button
               disabled={selectedIds.size === 0}
               onClick={() => triggerCSVDownload(filteredBilled.filter(r => selectedIds.has(r.id)), 'billed_selected.csv')}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-[#4a5568] text-xs font-medium hover:bg-surface-low disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download size={13} /> Export Selected
             </button>
             <button
               disabled={filteredBilled.length === 0}
               onClick={() => triggerCSVDownload(filteredBilled, 'billed_all.csv')}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-[#4a5568] text-xs font-medium hover:bg-surface-low disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download size={13} /> Export All
             </button>
             <button
               disabled={selectedIds.size === 0}
               onClick={() => setBulkDeleteConfirm(true)}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-red-200 bg-white text-red-500 text-xs font-medium hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-red-200 bg-surface-lowest text-red-500 text-xs font-medium hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Trash2 size={13} /> Delete Selected ({selectedIds.size})
             </button>
@@ -726,22 +726,22 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
           {filteredBilled.length === 0 ? (
             billed.length === 0
               ? <EmptyState message="No billed records yet. Mark records as billed in the Unbilled view." />
-              : <p className="text-center text-sm text-slate-400 py-8">No results match your filters.</p>
+              : <p className="text-center text-sm text-[#4a5568] py-8">No results match your filters.</p>
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-surface-lowest rounded-xl overflow-hidden shadow-sm">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
+                  <tr className="bg-surface-low">
                     <th className="w-10 px-4 py-3">
                       <input
                         type="checkbox"
                         checked={filteredBilled.length > 0 && filteredBilled.every(r => selectedIds.has(r.id))}
                         onChange={() => toggleSelectAll(filteredBilled)}
-                        className="w-4 h-4 rounded border-slate-300"
+                        className="w-4 h-4 rounded border-outline/30"
                       />
                     </th>
                     {['Container No', 'Report Type', 'Source File', 'Date Billed', 'Charges', 'Remarks', ''].map((h, i) => (
-                      <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                      <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-[#4a5568] uppercase tracking-wide">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -751,31 +751,31 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                       .filter(([k]) => !NON_BILLABLE_KEYS.has(k))
                       .map(([k, v]) => `${CHARGE_LABELS[k] ?? k}: ${v}`).join(' · ') || '—';
                     return (
-                      <tr key={r.id} className={`border-b border-slate-50 ${i % 2 !== 0 ? 'bg-slate-50/30' : ''}`}>
+                      <tr key={r.id} className={`hover:bg-surface-low transition-colors ${i % 2 !== 0 ? 'bg-surface-low/30' : ''}`}>
                         <td className="px-4 py-3">
-                          <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelect(r.id)} className="w-4 h-4 rounded border-slate-300" />
+                          <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelect(r.id)} className="w-4 h-4 rounded border-outline/30" />
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{r.container_number ?? '—'}</td>
-                        <td className="px-4 py-3 text-xs text-slate-600">{r.report_type}</td>
-                        <td className="px-4 py-3 text-xs text-slate-500 max-w-[160px] truncate" title={r.filename}>{r.filename}</td>
-                        <td className="px-4 py-3 text-xs text-slate-500">
+                        <td className="px-4 py-3 font-mono text-xs font-semibold text-primary">{r.container_number ?? '—'}</td>
+                        <td className="px-4 py-3 text-xs text-[#4a5568]">{r.report_type}</td>
+                        <td className="px-4 py-3 text-xs text-[#4a5568] max-w-[160px] truncate" title={r.filename}>{r.filename}</td>
+                        <td className="px-4 py-3 text-xs text-[#4a5568]">
                           {r.billed_at ? new Date(r.billed_at).toLocaleDateString() : '—'}
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-500 max-w-[200px] truncate" title={chargesStr}>{chargesStr}</td>
-                        <td className="px-4 py-3 text-xs text-slate-500 max-w-[140px] truncate">
+                        <td className="px-4 py-3 text-xs text-[#4a5568] max-w-[200px] truncate" title={chargesStr}>{chargesStr}</td>
+                        <td className="px-4 py-3 text-xs text-[#4a5568] max-w-[140px] truncate">
                           {r.billing_remarks || '—'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => setRevertConfirm(r.id)}
-                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 border border-slate-200 hover:border-amber-200 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#4a5568] border border-outline/20 hover:border-amber-200 hover:text-amber-600 hover:bg-amber-50 transition-colors"
                             >
                               <RotateCcw size={11} /> Revert
                             </button>
                             <button
                               onClick={() => setDeleteConfirm(r.id)}
-                              className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                              className="p-1.5 rounded-lg text-outline hover:text-red-400 hover:bg-red-50 transition-colors"
                               title="Delete record"
                             >
                               <Trash2 size={13} />
@@ -800,7 +800,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
             <select
               value={summaryDatePreset}
               onChange={e => setSummaryDatePreset(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+              className="px-3 py-2 rounded-xl border border-outline/20 bg-surface-lowest text-sm text-[#4a5568] focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary cursor-pointer"
             >
               <option value="all">All time</option>
               <option value="this_month">This month</option>
@@ -813,22 +813,22 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
             {summaryDatePreset === 'custom' && (
               <>
                 <input type="date" value={summaryCustomFrom} onChange={e => setSummaryCustomFrom(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
-                <span className="text-slate-400 text-sm">→</span>
+                  className="px-3 py-2 rounded-xl border border-outline/20 bg-surface-lowest text-sm text-[#4a5568] focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary" />
+                <span className="text-outline text-sm">→</span>
                 <input type="date" value={summaryCustomTo} onChange={e => setSummaryCustomTo(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                  className="px-3 py-2 rounded-xl border border-outline/20 bg-surface-lowest text-sm text-[#4a5568] focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary" />
               </>
             )}
             <div className="flex items-center gap-1.5 ml-auto">
-              <span className="text-xs text-slate-400 mr-1">Charges:</span>
+              <span className="text-xs text-outline mr-1">Charges:</span>
               {BILLABLE_CHARGE_KEYS.map(key => (
                 <button
                   key={key}
                   onClick={() => toggleSummaryCharge(key)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                     summaryChargeFilter.has(key)
-                      ? 'bg-slate-800 text-white border-slate-800'
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-surface-lowest text-[#4a5568] border-outline/20 hover:border-outline'
                   }`}
                 >
                   {CHARGE_LABELS[key]}
@@ -839,17 +839,17 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
 
           {/* Active stats */}
           <div>
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Active Records</h3>
+            <h3 className="text-xs font-semibold text-[#4a5568] uppercase tracking-wider mb-3">Active Records</h3>
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                <p className="text-xs text-slate-500 mb-1">Unbilled</p>
+              <div className="bg-surface-lowest rounded-xl p-4 shadow-sm">
+                <p className="text-xs text-[#4a5568] mb-1">Unbilled</p>
                 <p className="text-2xl font-bold text-amber-600">{summaryUnbilled.length}</p>
-                <p className="text-xs text-slate-400 mt-0.5">containers</p>
+                <p className="text-xs text-outline mt-0.5">containers</p>
               </div>
-              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                <p className="text-xs text-slate-500 mb-1">Billed</p>
-                <p className="text-2xl font-bold text-emerald-600">{summaryBilled.length}</p>
-                <p className="text-xs text-slate-400 mt-0.5">containers</p>
+              <div className="bg-surface-lowest rounded-xl p-4 shadow-sm">
+                <p className="text-xs text-[#4a5568] mb-1">Billed</p>
+                <p className="text-2xl font-bold text-secondary">{summaryBilled.length}</p>
+                <p className="text-xs text-outline mt-0.5">containers</p>
               </div>
             </div>
             {summaryChargeFilter.size > 0 && (
@@ -859,15 +859,15 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                   const colors: Record<string, { border: string; text: string }> = {
                     demurrage: { border: 'border-red-100',    text: 'text-red-600' },
                     detention: { border: 'border-orange-100', text: 'text-orange-600' },
-                    washing:   { border: 'border-blue-100',   text: 'text-blue-600' },
+                    washing:   { border: 'border-secondary/20', text: 'text-secondary' },
                     repair:    { border: 'border-purple-100', text: 'text-purple-600' },
                   };
-                  const c = colors[key] ?? { border: 'border-slate-100', text: 'text-slate-700' };
+                  const c = colors[key] ?? { border: 'border-outline/20', text: 'text-primary' };
                   return (
-                    <div key={key} className={`bg-white rounded-xl border ${c.border} p-4 shadow-sm`}>
-                      <p className="text-xs text-slate-500 mb-1">Unbilled {CHARGE_LABELS[key]}</p>
+                    <div key={key} className={`bg-surface-lowest rounded-xl border ${c.border} p-4 shadow-sm`}>
+                      <p className="text-xs text-[#4a5568] mb-1">Unbilled {CHARGE_LABELS[key]}</p>
                       <p className={`text-xl font-bold ${c.text}`}>SGD {total.toFixed(2)}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">outstanding</p>
+                      <p className="text-xs text-outline mt-0.5">outstanding</p>
                     </div>
                   );
                 })}
@@ -877,19 +877,19 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
 
           {/* Archive section */}
           <div>
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Archive by Month</h3>
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <p className="text-sm text-slate-600 mb-4">
+            <h3 className="text-xs font-semibold text-[#4a5568] uppercase tracking-wider mb-3">Archive by Month</h3>
+            <div className="bg-surface-lowest rounded-xl p-5 shadow-sm">
+              <p className="text-sm text-[#4a5568] mb-4">
                 Select a month based on the invoice date of records. All active records (unbilled + billed) from that month will be archived and removed from the main views.
               </p>
               {availableMonths.length === 0 ? (
-                <p className="text-sm text-slate-400 italic">No records with invoice dates available for archiving.</p>
+                <p className="text-sm text-[#4a5568] italic">No records with invoice dates available for archiving.</p>
               ) : (
                 <div className="flex items-center gap-3 flex-wrap">
                   <select
                     value={archiveMonth}
                     onChange={e => setArchiveMonth(e.target.value)}
-                    className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="px-3 py-2.5 rounded-xl border border-outline/20 bg-surface-lowest text-sm text-primary focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary"
                   >
                     <option value="">Select month…</option>
                     {availableMonths.map(m => (
@@ -899,7 +899,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                   <button
                     disabled={!archiveMonth || archiveCandidates.length === 0}
                     onClick={() => setArchiveConfirm(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-br from-primary to-primary-container text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <Archive size={14} />
                     Archive {archiveCandidates.length > 0 ? `${archiveCandidates.length} records` : ''}
@@ -912,7 +912,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
           {/* Archived batches */}
           {Object.keys(archiveBatches).length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Archived Batches</h3>
+              <h3 className="text-xs font-semibold text-[#4a5568] uppercase tracking-wider mb-3">Archived Batches</h3>
               <div className="space-y-3">
                 {Object.entries(archiveBatches)
                   .sort(([a], [b]) => b.localeCompare(a))
@@ -922,16 +922,16 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                     const batchDemurrage = batch.reduce((s, r) => s + parseAmount(r.charges['demurrage']), 0);
                     const batchDetention = batch.reduce((s, r) => s + parseAmount(r.charges['detention']), 0);
                     return (
-                      <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                      <div key={label} className="bg-surface-lowest rounded-xl p-4 shadow-sm">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
-                            <Archive size={15} className="text-slate-400" />
-                            <span className="font-semibold text-slate-800">{label}</span>
-                            <span className="text-xs text-slate-400">{batch.length} containers</span>
+                            <Archive size={15} className="text-outline" />
+                            <span className="font-semibold text-primary">{label}</span>
+                            <span className="text-xs text-[#4a5568]">{batch.length} containers</span>
                           </div>
                           <button
                             onClick={() => triggerCSVDownload(batch, `archive_${label.replace(/\s+/g, '_')}.csv`)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-[#4a5568] border border-outline/20 hover:bg-surface-low transition-colors"
                           >
                             <Download size={11} /> Export
                           </button>
@@ -939,19 +939,19 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
                         <div className="grid grid-cols-4 gap-3">
                           <div className="text-center">
                             <p className="text-lg font-bold text-amber-600">{batchUnbilled}</p>
-                            <p className="text-xs text-slate-400">Unbilled</p>
+                            <p className="text-xs text-outline">Unbilled</p>
                           </div>
                           <div className="text-center">
-                            <p className="text-lg font-bold text-emerald-600">{batchBilled}</p>
-                            <p className="text-xs text-slate-400">Billed</p>
+                            <p className="text-lg font-bold text-secondary">{batchBilled}</p>
+                            <p className="text-xs text-outline">Billed</p>
                           </div>
                           <div className="text-center">
                             <p className="text-sm font-bold text-red-500">{batchDemurrage > 0 ? `SGD ${batchDemurrage.toFixed(2)}` : '—'}</p>
-                            <p className="text-xs text-slate-400">Demurrage</p>
+                            <p className="text-xs text-outline">Demurrage</p>
                           </div>
                           <div className="text-center">
                             <p className="text-sm font-bold text-orange-500">{batchDetention > 0 ? `SGD ${batchDetention.toFixed(2)}` : '—'}</p>
-                            <p className="text-xs text-slate-400">Detention</p>
+                            <p className="text-xs text-outline">Detention</p>
                           </div>
                         </div>
                       </div>
@@ -970,13 +970,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
       {/* ── Revert confirm dialog ─────────────────────────────────────────────── */}
       {revertConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="font-semibold text-slate-900 mb-2">Move back to Unbilled?</h3>
-            <p className="text-sm text-slate-500 mb-5">
+          <div className="bg-surface-lowest rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="font-semibold text-primary mb-2">Move back to Unbilled?</h3>
+            <p className="text-sm text-[#4a5568] mb-5">
               This will reset the billing status and clear the billed date. Your remarks will be kept.
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setRevertConfirm(null)} className="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50">Cancel</button>
+              <button onClick={() => setRevertConfirm(null)} className="px-4 py-2 rounded-lg text-sm text-[#4a5568] border border-outline/20 hover:bg-surface-low">Cancel</button>
               <button onClick={() => moveToUnbilled(revertConfirm)} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600">Move Back</button>
             </div>
           </div>
@@ -986,13 +986,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
       {/* ── Bulk delete confirm dialog ────────────────────────────────────────── */}
       {bulkDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="font-semibold text-slate-900 mb-2">Delete {selectedIds.size} record{selectedIds.size > 1 ? 's' : ''}?</h3>
-            <p className="text-sm text-slate-500 mb-5">
+          <div className="bg-surface-lowest rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="font-semibold text-primary mb-2">Delete {selectedIds.size} record{selectedIds.size > 1 ? 's' : ''}?</h3>
+            <p className="text-sm text-[#4a5568] mb-5">
               This will permanently remove {selectedIds.size} container billing record{selectedIds.size > 1 ? 's' : ''}. This cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setBulkDeleteConfirm(false)} className="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50">Cancel</button>
+              <button onClick={() => setBulkDeleteConfirm(false)} className="px-4 py-2 rounded-lg text-sm text-[#4a5568] border border-outline/20 hover:bg-surface-low">Cancel</button>
               <button onClick={handleBulkDelete} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600">Delete {selectedIds.size}</button>
             </div>
           </div>
@@ -1002,13 +1002,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
       {/* ── Delete confirm dialog ─────────────────────────────────────────────── */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="font-semibold text-slate-900 mb-2">Delete this record?</h3>
-            <p className="text-sm text-slate-500 mb-5">
+          <div className="bg-surface-lowest rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="font-semibold text-primary mb-2">Delete this record?</h3>
+            <p className="text-sm text-[#4a5568] mb-5">
               This will permanently remove this container billing record. This cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50">Cancel</button>
+              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm text-[#4a5568] border border-outline/20 hover:bg-surface-low">Cancel</button>
               <button onClick={() => handleDelete(deleteConfirm)} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600">Delete</button>
             </div>
           </div>
@@ -1018,14 +1018,14 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
       {/* ── Archive confirm dialog ────────────────────────────────────────────── */}
       {archiveConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="font-semibold text-slate-900 mb-2">Archive {formatMonthLabel(archiveMonth)}?</h3>
-            <p className="text-sm text-slate-500 mb-5">
+          <div className="bg-surface-lowest rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="font-semibold text-primary mb-2">Archive {formatMonthLabel(archiveMonth)}?</h3>
+            <p className="text-sm text-[#4a5568] mb-5">
               {archiveCandidates.length} records with invoice dates in {formatMonthLabel(archiveMonth)} will be archived and removed from the active unbilled/billed views. You can still export them from the Summary tab.
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setArchiveConfirm(false)} className="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50">Cancel</button>
-              <button onClick={handleArchive} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-800 hover:bg-slate-700">
+              <button onClick={() => setArchiveConfirm(false)} className="px-4 py-2 rounded-lg text-sm text-[#4a5568] border border-outline/20 hover:bg-surface-low">Cancel</button>
+              <button onClick={handleArchive} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-br from-primary to-primary-container">
                 <Archive size={13} /> Archive
               </button>
             </div>
@@ -1039,7 +1039,7 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
           <div
             key={t.id}
             className={`flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${
-              t.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
+              t.type === 'success' ? 'bg-secondary' : 'bg-red-500'
             }`}
           >
             {t.type === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
@@ -1056,13 +1056,13 @@ export default function CrmBillingTab({ records, onRecordUpdate, onRecordDelete,
 function EmptyState({ message, icon = 'list' }: { message: string; icon?: 'list' | 'check' }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
+      <div className="w-16 h-16 bg-surface-container rounded-2xl flex items-center justify-center mb-4">
         {icon === 'check'
-          ? <CheckCircle2 size={28} className="text-emerald-400" />
-          : <ClipboardList size={28} className="text-slate-400" />
+          ? <CheckCircle2 size={28} className="text-secondary" />
+          : <ClipboardList size={28} className="text-outline" />
         }
       </div>
-      <p className="text-slate-500 text-sm max-w-xs">{message}</p>
+      <p className="text-[#4a5568] text-sm max-w-xs">{message}</p>
     </div>
   );
 }

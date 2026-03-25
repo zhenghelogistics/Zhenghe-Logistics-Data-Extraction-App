@@ -1,7 +1,7 @@
 import { PDFDocument } from "pdf-lib";
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
-import { DocumentData, ExtractionResponse, BLEntry } from "../types";
+import { DocumentData, ExtractionResponse, BLEntry, ExtractionTemplate } from "../types";
 import { AppConfig } from "../config";
 
 // Helper to access nested properties safely with dot notation
@@ -369,7 +369,8 @@ Respond ONLY with valid JSON matching this exact structure:
             "invoice_number": "string or null"
           }
         ]
-      }
+      },
+      "custom_fields": { "field_key": "string or null" }
     }
   ]
 }`;
@@ -488,12 +489,20 @@ You are extracting for the transport team. Follow these rules strictly:
 };
 
 // Build final prompt. Accounts role gets its own clean prompt — no merge/dual-entry rules.
-const buildSystemPrompt = (customInstructions: string[], role?: string): string => {
+const buildSystemPrompt = (customInstructions: string[], role?: string, templates: ExtractionTemplate[] = []): string => {
   let prompt = role === 'accounts' ? ACCOUNTS_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
   if (role && role !== 'accounts' && ROLE_SCOPE[role]) prompt += ROLE_SCOPE[role];
   if (customInstructions.length > 0) {
     const rules = customInstructions.map((rule, i) => `${i + 1}. ${rule}`).join("\n");
     prompt += `\n\nADDITIONAL USER-DEFINED EXTRACTION RULES:\n${rules}`;
+  }
+  const activeTemplates = templates.filter(t => t.is_active && t.fields.length > 0);
+  if (activeTemplates.length > 0) {
+    const section = activeTemplates.map(t => {
+      const fieldLines = t.fields.map(f => `  - ${f.key}: ${f.hint}`).join('\n');
+      return `Template: "${t.name}" — ${t.document_hint}\nFields:\n${fieldLines}`;
+    }).join('\n\n');
+    prompt += `\n\nCUSTOM TEMPLATE EXTRACTION:\nIf a document matches any template below, set document_type to the template name and populate "custom_fields" with the specified keys (string values, null if not found):\n\n${section}`;
   }
   return prompt;
 };
@@ -1041,9 +1050,10 @@ export const extractDocumentData = async (
   file: File,
   customInstructions: string[] = [],
   onProgress?: (stage: string) => void,
-  role?: string
+  role?: string,
+  templates: ExtractionTemplate[] = []
 ): Promise<DocumentData[]> => {
-  const systemPrompt = buildSystemPrompt(customInstructions, role);
+  const systemPrompt = buildSystemPrompt(customInstructions, role, templates);
 
   // Exponential backoff with jitter — waits only when rate limited, not blindly
   const withBackoff = async (fn: () => Promise<DocumentData[]>, chunkLabel: string): Promise<DocumentData[]> => {

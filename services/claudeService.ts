@@ -181,7 +181,7 @@ EXTRACTION RULES FOR "Allied Report" (Transport Team):
 - GROUP BY CONTAINER: For each unique Container/Booking No, create ONE Allied Report entry collecting all its charges across all rows.
 - EXAMPLE: Container CMAU7642286 appears in rows for "DATA ADMIN FEE (IN)" ($5), "DHE IN" ($4), "DHC IN" ($80), and "REPAIR" ($21.35) — these all merge into ONE entry: dhc_in=80, dhe_in=4, data_admin_fee=5, repair=21.35.
 - INVOICE DATE: Extract the date from the "Date" column on the far right of ANY row in the summary table (all rows share the same report date). The format on the document is DD/MM/YYYY HH:MM — convert to YYYY-MM-DD (e.g. "12/11/2025 08:46" → "2025-11-12"). Use this same date for ALL containers extracted from this report. Also set metadata.date to this same value.
-- DHC IN: The amount from any row where Customer Type is "DHC IN" for this container (e.g. "80.00"). Null if not present.
+- DHC IN: The amount from any row where Customer Type is "DHC IN" for this container, PLUS any "FUEL SURCHARGE" amount for the same container — add them together and store the combined total in dhc_in (e.g. DHC IN $80 + FUEL SURCHARGE $15 → dhc_in = "95.00"). Null if neither is present.
 - DHC OUT: The amount from any row where Customer Type is "DHC OUT" for this container. Null if not present.
 - DHE IN: The amount from any row where Customer Type is "DHE IN" for this container (e.g. "4.00"). Null if not present.
 - DHE OUT: The amount from any row where Customer Type is "DHE OUT" for this container. Null if not present.
@@ -197,7 +197,7 @@ EXTRACTION RULES FOR "CDAS Report" (Transport Team):
 - INVOICE DATE: Extract the date from the "Bill Date" column in each row (e.g. "5-Nov-2025"). All rows in the same report share the same Bill Date — use it for every container entry. Convert to YYYY-MM-DD (e.g. "5-Nov-2025" → "2025-11-05"). Also set metadata.date to this same value.
 - CONTAINER NUMBER: From the "Container Number" column.
 - DEPOT REMARK PARSING: The "Depot Remark" column contains semicolon-separated charge pairs like "CHARGE NAME; $AMOUNT". Parse each pair to fill the correct field:
-  - "DHC IN" or "DHC" or "DEPOT HANDLING CHARGE" (no OUT) → dhc_in
+  - "DHC IN" or "DHC" or "DEPOT HANDLING CHARGE" (no OUT) → dhc_in. Also add any "FUEL SURCHARGE" amount in the same row to dhc_in (e.g. DHC IN $80 + FUEL SURCHARGE $15 → dhc_in = "95.00")
   - "DHC OUT" → dhc_out
   - "DHE IN" or "DHE" (no OUT) → dhe_in
   - "DHE OUT" → dhe_out

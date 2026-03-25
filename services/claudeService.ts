@@ -446,7 +446,8 @@ You are extracting for the logistics team. Follow these rules strictly:
 TEAM SCOPE — TRANSPORT TEAM (MANDATORY OVERRIDE):
 You are extracting for the transport team. Follow these rules strictly:
 1. ONLY extract documents of these types: "Allied Report" and "CDAS Report". All other types must be IGNORED.
-2. IGNORE completely: Bill of Lading, Tax Invoices, Logistics Local Charges Reports, Payment Vouchers, Outward Permit Declarations.`,
+2. IGNORE completely: Bill of Lading, Tax Invoices, Logistics Local Charges Reports, Payment Vouchers, Outward Permit Declarations.
+3. OUTPUT COMPACTLY: For every "CDAS Report" entry, output ONLY these keys — "document_type", "metadata", and "cdas_report". Completely omit "logistics_details", "financials", "cargo_details", "payment_voucher_details", "logistics_local_charges", "outward_permit_declaration", and "allied_report". This saves tokens and allows ALL containers to be extracted.`,
 };
 
 // Build final prompt. Accounts role gets its own clean prompt — no merge/dual-entry rules.
@@ -841,7 +842,7 @@ const extractFromChunk = async (
     try {
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
-        max_tokens: 16000,
+        max_tokens: 32000,
         system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         messages: [
           {
@@ -864,6 +865,7 @@ const extractFromChunk = async (
       const text = response.content[0].type === "text" ? response.content[0].text : "";
       if (!text) throw new Error("No data returned from Claude");
       console.group('%c[ZHL] Claude raw response', 'color:#6366f1;font-weight:bold');
+      console.log(`stop_reason: ${response.stop_reason} | output_tokens: ${response.usage?.output_tokens}`);
       console.log(text);
       console.groupEnd();
       const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();

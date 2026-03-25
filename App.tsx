@@ -3,17 +3,15 @@ import { extractDocumentData, validateDocumentData } from './services/claudeServ
 import {
   supabase, fetchDocuments, saveDocument, deleteDocument,
   fetchContainerBilling, insertContainerBillingRows, deleteContainerBilling, deleteManyContainerBilling, ContainerBillingRecord,
-  fetchTemplates,
 } from './services/supabase';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
 import ExportPermitTab from './components/ExportPermitTab';
-import TemplatesTab from './components/TemplatesTab';
 import { generateVoucherPdf, generateCDASVoucherPdf, generateAlliedVoucherPdf } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
-import { ProcessedFile, FileStatus, DocumentData, ExtractionTemplate } from './types';
+import { ProcessedFile, FileStatus, DocumentData } from './types';
 import { AppConfig } from './config';
 import { UserRole, TEAM_NAMES } from './users';
 // @ts-ignore
@@ -22,11 +20,10 @@ import ConfirmationModal from './components/ConfirmationModal';
 import {
   Ship, User, LogOut, Upload, Zap, Download, FileText, Loader2,
   FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
-  Anchor, Package, ShoppingCart, Code2, ClipboardList, ScrollText, Blocks,
+  Anchor, Package, ShoppingCart, Code2, ClipboardList, ScrollText,
 } from 'lucide-react';
 
 const CUSTOM_RULES_STORAGE_KEY = 'zhenghe_custom_rules';
-const PINNED_TEMPLATES_KEY = 'zhenghe_pinned_templates';
 
 const TAB_ICONS: Record<string, React.ReactNode> = {
   'All Files': <FolderOpen size={15} />,
@@ -41,7 +38,6 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
   'Developer Notes': <Code2 size={15} />,
   'CRM Billing': <ClipboardList size={15} />,
   'Export Permit Declaration (PSS)': <ScrollText size={15} />,
-  'Templates': <Blocks size={15} />,
 };
 
 function App() {
@@ -62,13 +58,6 @@ function App() {
   });
 
   const [containerRecords, setContainerRecords] = useState<ContainerBillingRecord[]>([]);
-  const [templates, setTemplates] = useState<ExtractionTemplate[]>([]);
-  const [pinnedTemplateIds, setPinnedTemplateIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(PINNED_TEMPLATES_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -96,25 +85,12 @@ function App() {
     localStorage.setItem(CUSTOM_RULES_STORAGE_KEY, JSON.stringify(customRules));
   }, [customRules]);
 
-  useEffect(() => {
-    localStorage.setItem(PINNED_TEMPLATES_KEY, JSON.stringify(pinnedTemplateIds));
-  }, [pinnedTemplateIds]);
-
-  const handlePinToggle = (id: string) => {
-    setPinnedTemplateIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
   const getTabs = useCallback(() => {
     if (!userRole) return [];
     const roleConfig = AppConfig.roles[userRole as keyof typeof AppConfig.roles];
     const allowedTypes = roleConfig ? roleConfig.allowedTypes : [];
-    const pinnedNames = templates
-      .filter(t => pinnedTemplateIds.includes(t.id))
-      .map(t => t.name);
-    return [...allowedTypes, ...pinnedNames, 'Developer Notes'];
-  }, [userRole, templates, pinnedTemplateIds]);
+    return [...allowedTypes, 'Developer Notes'];
+  }, [userRole]);
 
   const tabs = getTabs();
 
@@ -174,10 +150,6 @@ function App() {
       const containerRows = await fetchContainerBilling();
       setContainerRecords(containerRows);
       addLog(`Loaded ${containerRows.length} container billing records.`);
-
-      const userTemplates = await fetchTemplates();
-      setTemplates(userTemplates);
-      addLog(`Loaded ${userTemplates.length} extraction template(s).`);
     };
     loadDocs();
   }, [userRole]);
@@ -356,7 +328,7 @@ function App() {
       try {
         const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage) => {
           setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage } : f));
-        }, userRole ?? undefined, templates);
+        }, userRole ?? undefined);
         const validationErrors = validateDocumentData(dataList);
         const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
         if (validationErrors.length > 0) {
@@ -401,7 +373,7 @@ function App() {
 
     addLog('Batch processing finished.');
     setIsProcessing(false);
-  }, [files, customRules, templates]);
+  }, [files, customRules]);
 
   const handleBillingUpdate = (fileId: string, updates: Partial<ProcessedFile>) => {
     setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...updates } : f));
@@ -910,25 +882,6 @@ function App() {
             <CrmBillingTab records={containerRecords} onRecordUpdate={handleContainerRecordUpdate} onRecordDelete={handleContainerRecordDelete} onRecordDeleteMany={handleContainerRecordDeleteMany} />
           ) : activeTab === 'Export Permit Declaration (PSS)' ? (
             <ExportPermitTab files={files} />
-          ) : activeTab === 'Templates' ? (
-            <TemplatesTab
-              templates={templates}
-              onTemplatesChange={setTemplates}
-              files={files}
-              currentUserId={userId}
-              pinnedTemplateIds={pinnedTemplateIds}
-              onPinToggle={handlePinToggle}
-            />
-          ) : templates.find(t => t.name === activeTab) ? (
-            <TemplatesTab
-              templates={templates}
-              onTemplatesChange={setTemplates}
-              files={files}
-              currentUserId={userId}
-              pinnedTemplateIds={pinnedTemplateIds}
-              onPinToggle={handlePinToggle}
-              focusedTemplateName={activeTab}
-            />
           ) : !hasFiles ? (
             /* ── Drag & Drop Upload Zone ── */
             <div

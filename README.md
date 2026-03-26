@@ -106,7 +106,3 @@ PDFs are chunked client-side using `pdf-lib` and sent to Claude via the Anthropi
 | — | Deep Ledger design system (Manrope font, `#091426` primary, `#00668a` secondary) |
 | — | Allied + CDAS voucher PDF generation |
 | — | CRM Billing tab with charge validation and archive |
-
----
-
-*100% AI-generated. Every line of code, every design decision, every feature — written by Claude.*

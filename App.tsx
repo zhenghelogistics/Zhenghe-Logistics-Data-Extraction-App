@@ -1,9 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { extractDocumentData, validateDocumentData } from './services/claudeService';
-import {
-  supabase, fetchDocuments, saveDocument, deleteDocument,
-  fetchContainerBilling, insertContainerBillingRows, deleteContainerBilling, deleteManyContainerBilling, ContainerBillingRecord,
-} from './services/supabase';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from './hooks/useAuth';
+import { useFileProcessor } from './hooks/useFileProcessor';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
 import ExportPermitTab from './components/ExportPermitTab';
@@ -11,18 +8,20 @@ import { generateVoucherPdf, generateCDASVoucherPdf, generateAlliedVoucherPdf } 
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
-import { ProcessedFile, FileStatus, DocumentData } from './types';
+import { FileStatus, DocumentData } from './types';
 import { AppConfig } from './config';
-import { UserRole, TEAM_NAMES } from './users';
+import { UserRole } from './users';
 // @ts-ignore
 import JSZip from 'jszip';
 import ConfirmationModal from './components/ConfirmationModal';
 import ToastStack, { Toast } from './components/Toast';
 import {
-  Ship, User, LogOut, Upload, Zap, Download, FileText, Loader2,
+  User, LogOut, Upload, Zap, Download, FileText, Loader2,
   FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
-  Anchor, Package, ShoppingCart, Code2, ClipboardList, ScrollText, RefreshCw,
+  Anchor, Package, ShoppingCart, Code2, ClipboardList, ScrollText,
 } from 'lucide-react';
+
+declare const __COMMIT_HASH__: string;
 
 const CUSTOM_RULES_STORAGE_KEY = 'zhenghe_custom_rules';
 
@@ -42,25 +41,23 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
 };
 
 function App() {
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const isAdmin = userId === 'a43ea670-2ca8-4c0c-8445-7d95e38cdb6c';
-  const [files, setFiles] = useState<ProcessedFile[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('All');
-  const [isSessionLoading, setIsSessionLoading] = useState(true);
-  const [isDragging, setIsDragging] = useState(false);
+  const addLog = (message: string) => {
+    const timestamp = new Date().toISOString();
+    setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
+  };
+
   const [customRules, setCustomRules] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(CUSTOM_RULES_STORAGE_KEY);
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
+  useEffect(() => {
+    localStorage.setItem(CUSTOM_RULES_STORAGE_KEY, JSON.stringify(customRules));
+  }, [customRules]);
 
-  const [containerRecords, setContainerRecords] = useState<ContainerBillingRecord[]>([]);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -70,374 +67,44 @@ function App() {
   };
   const dismissToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
+  const {
+    userRole, setUserRole, isAdmin, isSessionLoading,
+    activeTab, setActiveTab, tabs, handleLogin, handleLogout, getTeamName,
+  } = useAuth(() => { setLogs([]); });
+
+  const {
+    files, isProcessing, containerRecords,
+    deleteModalOpen, setDeleteModalOpen,
+    addFilesToQueue, processFiles, handleReprocess,
+    handleIncotermUpdate, handleFreightTermUpdate,
+    handleDeleteFile, handleBulkDelete, confirmDeleteFile,
+    handleContainerRecordUpdate, handleContainerRecordDelete, handleContainerRecordDeleteMany,
+  } = useFileProcessor({ customRules, userRole, addLog });
+
+  // Deploy update detection
   useEffect(() => {
-    // Capture the path of the currently loaded main bundle (e.g. /assets/index-abc123.js)
     const mainScript = document.querySelector<HTMLScriptElement>('script[src*="/assets/"]');
     if (!mainScript) return;
     const currentPath = new URL(mainScript.src).pathname;
-
     const check = async () => {
       try {
         const res = await fetch(`/?_=${Date.now()}`, { cache: 'no-store' });
         const html = await res.text();
-        // If the current script is no longer referenced in the latest HTML, a new deploy is live
         if (!html.includes(currentPath)) setUpdateAvailable(true);
-      } catch { /* ignore network errors */ }
+      } catch { /* ignore */ }
     };
-    const id = setInterval(check, 10 * 60 * 1000); // check every 10 minutes
+    const id = setInterval(check, 10 * 60 * 1000);
     return () => clearInterval(id);
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(CUSTOM_RULES_STORAGE_KEY, JSON.stringify(customRules));
-  }, [customRules]);
-
-  const getTabs = useCallback(() => {
-    if (!userRole) return [];
-    const roleConfig = AppConfig.roles[userRole as keyof typeof AppConfig.roles];
-    const allowedTypes = roleConfig ? roleConfig.allowedTypes : [];
-    return [...allowedTypes, 'Developer Notes'];
-  }, [userRole]);
-
-  const tabs = getTabs();
-
-  useEffect(() => {
-    if (userRole) {
-      const roleConfig = AppConfig.roles[userRole as keyof typeof AppConfig.roles];
-      setActiveTab(roleConfig ? roleConfig.defaultTab : 'All');
-    }
-  }, [userRole]);
-
-  const addLog = (message: string) => {
-    const timestamp = new Date().toISOString();
-    setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
-  };
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUserId(session.user.id);
-        const storedRole = localStorage.getItem('userRole') as UserRole;
-        setUserRole(storedRole || UserRole.LOGISTICS);
-      }
-      setIsSessionLoading(false);
-    };
-    checkSession();
-  }, []);
-
-  useEffect(() => {
-    if (!userRole) return;
-    const loadDocs = async () => {
-      addLog('Fetching existing documents from database...');
-      const docs = await fetchDocuments();
-      if (docs.length === 0) return;
-      const processedFiles: ProcessedFile[] = docs.map(d => {
-        let parsedData: DocumentData[] | undefined;
-        if (d.extracted_data) {
-          parsedData = typeof d.extracted_data === 'string'
-            ? JSON.parse(d.extracted_data)
-            : d.extracted_data;
-        }
-        return {
-          id: d.id,
-          file: new File([], d.filename, { type: 'application/pdf' }),
-          status: d.status as FileStatus,
-          data: parsedData,
-          uploadedAt: d.created_at,
-          billing_status: d.billing_status ?? 'unbilled',
-          billed_at: d.billed_at ?? null,
-          billing_remarks: d.billing_remarks ?? null,
-          charge_validations: (d.charge_validations as Record<string, boolean>) ?? {},
-        };
-      });
-      setFiles(processedFiles);
-      addLog(`Loaded ${docs.length} documents from database.`);
-
-      const containerRows = await fetchContainerBilling();
-      setContainerRecords(containerRows);
-      addLog(`Loaded ${containerRows.length} container billing records.`);
-    };
-    loadDocs();
-  }, [userRole]);
-
-  const handleLogin = (role: UserRole) => {
-    localStorage.setItem('userRole', role);
-    setUserRole(role);
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('userRole');
-    setUserRole(null);
-    setFiles([]);
-    setLogs([]);
-  };
-
-  const getTeamName = (role: UserRole | null) => {
-    return role ? TEAM_NAMES[role] : 'Logistics Data Controller';
-  };
-
-  const addFilesToQueue = (newFilesArray: File[]) => {
-    const pdfs = newFilesArray.filter(f => f.type === 'application/pdf');
-    if (!pdfs.length) return;
-    const newFiles: ProcessedFile[] = pdfs.map((file: File) => ({
-      id: Math.random().toString(36).substring(7),
-      file,
-      status: FileStatus.PENDING,
-    }));
-    setFiles(prev => [...prev, ...newFiles]);
-    addLog(`Added ${newFiles.length} file(s) to queue.`);
-  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files?.length) return;
     addFilesToQueue(Array.from(event.target.files));
     event.target.value = '';
   };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    addFilesToQueue(Array.from(e.dataTransfer.files));
-  };
-
-  const handleIncotermUpdate = (id: string, docIndex: number, newIncoterm: string) => {
-    setFiles(prev => prev.map(f => {
-      if (f.id !== id || !f.data) return f;
-      const newData = [...f.data];
-      if (newData[docIndex]) {
-        newData[docIndex] = {
-          ...newData[docIndex],
-          metadata: { ...newData[docIndex].metadata, incoterms: newIncoterm },
-        };
-      }
-      return { ...f, data: newData };
-    }));
-  };
-
-  const handleFreightTermUpdate = (id: string, docIndex: number, newFreightTerm: string) => {
-    setFiles(prev => prev.map(f => {
-      if (f.id !== id || !f.data) return f;
-      const newData = [...f.data];
-      if (newData[docIndex]) {
-        newData[docIndex] = {
-          ...newData[docIndex],
-          logistics_local_charges: { ...newData[docIndex].logistics_local_charges, freight_term: newFreightTerm },
-        };
-      }
-      return { ...f, data: newData };
-    }));
-  };
-
-  const handleDeleteFile = (id: string) => {
-    setFileToDelete(id);
-    setDeleteModalOpen(true);
-  };
-
-  const handleBulkDelete = async (ids: string[]) => {
-    if (!window.confirm(`Delete ${ids.length} file(s)? This cannot be undone.`)) return;
-    for (const id of ids) {
-      const result = await deleteDocument(id);
-      if (result.success) {
-        setFiles(prev => prev.filter(f => f.id !== id));
-        setContainerRecords(prev => prev.map(r => r.source_document_id === id ? { ...r, source_document_id: null } : r));
-        addLog(`Deleted file ${id}`);
-      } else {
-        addLog(`Error deleting ${id}: ${result.message}`);
-      }
-    }
-  };
-
-  const confirmDeleteFile = async () => {
-    if (!fileToDelete) return;
-    const id = fileToDelete;
-    addLog(`Attempting to delete file ${id}...`);
-    const result = await deleteDocument(id);
-    if (result.success) {
-      setFiles(prev => prev.filter(f => f.id !== id));
-      // Detach CRM records from the deleted document — keep them, just orphan the source link
-      setContainerRecords(prev => prev.map(r => r.source_document_id === id ? { ...r, source_document_id: null } : r));
-      addLog(`Success: ${result.message}`);
-    } else {
-      addLog(`Error: ${result.message}`);
-      alert(`Failed to delete: ${result.message}`);
-    }
-    setFileToDelete(null);
-  };
-
-  // Charge keys that are non-billable (depot handling fees the transport team doesn't bill for)
-  const NON_BILLABLE_KEYS = new Set(['dhc_in', 'dhc_out', 'dhe_in', 'dhe_out', 'data_admin_fee']);
-
-  const extractContainerRows = (
-    dataList: DocumentData[],
-    filename: string,
-    documentId: string
-  ): Omit<ContainerBillingRecord, 'id' | 'user_id' | 'created_at'>[] => {
-    const rows: Omit<ContainerBillingRecord, 'id' | 'user_id' | 'created_at'>[] = [];
-    const add = (charges: Record<string, string>, k: string, v: string | null | undefined) => {
-      if (v) charges[k] = v;
-    };
-    // Only track containers that have at least one extra-cost (billable) charge
-    const hasBillableCharge = (charges: Record<string, string>) =>
-      Object.keys(charges).some(k => !NON_BILLABLE_KEYS.has(k));
-
-    for (const doc of dataList) {
-      if (doc.document_type === 'Allied Report' && doc.allied_report) {
-        const r = doc.allied_report;
-        const container_date = r.invoice_date ?? doc.metadata?.date ?? null;
-        const charges: Record<string, string> = {};
-        add(charges, 'dhc_in', r.dhc_in); add(charges, 'dhc_out', r.dhc_out);
-        add(charges, 'dhe_in', r.dhe_in); add(charges, 'dhe_out', r.dhe_out);
-        add(charges, 'data_admin_fee', r.data_admin_fee);
-        add(charges, 'washing', r.washing); add(charges, 'repair', r.repair);
-        add(charges, 'detention', r.detention); add(charges, 'demurrage', r.demurrage);
-        if (!hasBillableCharge(charges)) continue;
-        rows.push({ source_document_id: documentId, filename, report_type: 'Allied Report', container_number: r.container_booking_no ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null, container_date, is_archived: false, archive_label: null });
-      }
-      if (doc.document_type === 'CDAS Report' && doc.cdas_report) {
-        const r = doc.cdas_report;
-        const container_date = r.invoice_date ?? doc.metadata?.date ?? null;
-        const charges: Record<string, string> = {};
-        add(charges, 'dhc_in', r.dhc_in); add(charges, 'dhc_out', r.dhc_out);
-        add(charges, 'dhe_in', r.dhe_in); add(charges, 'dhe_out', r.dhe_out);
-        add(charges, 'data_admin_fee', r.data_admin_fee);
-        add(charges, 'washing', r.washing); add(charges, 'repair', r.repair);
-        add(charges, 'detention', r.detention); add(charges, 'demurrage', r.demurrage);
-        if (!hasBillableCharge(charges)) continue;
-        rows.push({ source_document_id: documentId, filename, report_type: 'CDAS Report', container_number: r.container_number ?? null, charges, charge_validations: {}, billing_status: 'unbilled', billed_at: null, billing_remarks: null, container_date, is_archived: false, archive_label: null });
-      }
-    }
-    return rows;
-  };
-
-  const processFiles = useCallback(async () => {
-    setIsProcessing(true);
-    addLog('Starting batch processing...');
-    const pendingFiles = files.filter(f => f.status === FileStatus.PENDING);
-    const concurrencyLimit = 10;
-
-    const processSingleFile = async (fileWrapper: ProcessedFile) => {
-      setFiles(prev => prev.map(f =>
-        f.id === fileWrapper.id ? { ...f, status: FileStatus.PROCESSING } : f
-      ));
-      addLog(`Processing: ${fileWrapper.file.name}`);
-      try {
-        const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage) => {
-          setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage } : f));
-        }, userRole ?? undefined);
-        const validationErrors = validateDocumentData(dataList);
-        const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
-        if (validationErrors.length > 0) {
-          addLog(`Warnings for ${fileWrapper.file.name}: ${validationErrors.join(', ')}`);
-        } else {
-          addLog(`Done: ${fileWrapper.file.name} — ${dataList.length} document(s) found.`);
-        }
-        const savedDoc = await saveDocument(fileWrapper.file.name, newStatus, dataList);
-        setFiles(prev => prev.map(f =>
-          f.id === fileWrapper.id ? {
-            ...f, status: newStatus, data: dataList,
-            validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
-            id: savedDoc?.id || f.id,
-          } : f
-        ));
-        // Auto-insert container billing rows, then refresh full list to catch any upsert conflicts
-        if (savedDoc?.id) {
-          const containerRows = extractContainerRows(dataList, fileWrapper.file.name, savedDoc.id);
-          addLog(`Extracted ${containerRows.length} container row(s) for ${fileWrapper.file.name}.`);
-          if (containerRows.length > 0) {
-            const inserted = await insertContainerBillingRows(containerRows);
-            addLog(`Inserted ${inserted.length} new container billing record(s) for ${fileWrapper.file.name}.`);
-            // Always refresh the full list — handles duplicates that were silently skipped
-            const refreshed = await fetchContainerBilling();
-            setContainerRecords(refreshed);
-          }
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        setFiles(prev => prev.map(f =>
-          f.id === fileWrapper.id ? { ...f, status: FileStatus.ERROR, errorMessage } : f
-        ));
-        addLog(`ERROR processing ${fileWrapper.file.name}: ${errorMessage}`);
-        await saveDocument(fileWrapper.file.name, FileStatus.ERROR, undefined);
-      }
-    };
-
-    for (let i = 0; i < pendingFiles.length; i += concurrencyLimit) {
-      const chunk = pendingFiles.slice(i, i + concurrencyLimit);
-      await Promise.all(chunk.map(f => processSingleFile(f)));
-    }
-
-    addLog('Batch processing finished.');
-    setIsProcessing(false);
-  }, [files, customRules]);
-
-  const handleReprocess = useCallback(async (id: string) => {
-    const fileWrapper = files.find(f => f.id === id);
-    if (!fileWrapper || fileWrapper.file.size === 0) return;
-    setIsProcessing(true);
-    setFiles(prev => prev.map(f =>
-      f.id === id ? { ...f, status: FileStatus.PROCESSING, data: undefined, errorMessage: undefined, validationErrors: undefined, stage: undefined } : f
-    ));
-    addLog(`Re-processing: ${fileWrapper.file.name}`);
-    try {
-      const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage) => {
-        setFiles(prev => prev.map(f => f.id === id ? { ...f, stage } : f));
-      }, userRole ?? undefined);
-      const validationErrors = validateDocumentData(dataList);
-      const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
-      addLog(`Re-done: ${fileWrapper.file.name} — ${dataList.length} document(s).`);
-      const savedDoc = await saveDocument(fileWrapper.file.name, newStatus, dataList);
-      setFiles(prev => prev.map(f =>
-        f.id === id ? { ...f, status: newStatus, data: dataList, validationErrors: validationErrors.length > 0 ? validationErrors : undefined, id: savedDoc?.id || f.id } : f
-      ));
-      if (savedDoc?.id) {
-        const containerRows = extractContainerRows(dataList, fileWrapper.file.name, savedDoc.id);
-        if (containerRows.length > 0) {
-          await insertContainerBillingRows(containerRows);
-          const refreshed = await fetchContainerBilling();
-          setContainerRecords(refreshed);
-        }
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setFiles(prev => prev.map(f => f.id === id ? { ...f, status: FileStatus.ERROR, errorMessage } : f));
-      addLog(`ERROR re-processing ${fileWrapper.file.name}: ${errorMessage}`);
-    }
-    setIsProcessing(false);
-  }, [files, customRules, userRole]);
-
-  const handleBillingUpdate = (fileId: string, updates: Partial<ProcessedFile>) => {
-    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...updates } : f));
-  };
-
-  const handleContainerRecordUpdate = (id: string, updates: Partial<ContainerBillingRecord>) => {
-    setContainerRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
-  };
-
-  const handleContainerRecordDelete = async (id: string) => {
-    try {
-      await deleteContainerBilling(id);
-      setContainerRecords(prev => prev.filter(r => r.id !== id));
-    } catch {
-      addLog(`Error deleting container billing record ${id}`);
-    }
-  };
-
-  const handleContainerRecordDeleteMany = async (ids: string[]) => {
-    await deleteManyContainerBilling(ids);
-    setContainerRecords(prev => prev.filter(r => !ids.includes(r.id)));
-  };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
+  const handleDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); addFilesToQueue(Array.from(e.dataTransfer.files)); };
 
   const handleGenerateCDASVoucher = async (docs: DocumentData[]) => {
     setIsGeneratingPdf(true);
@@ -445,18 +112,13 @@ function App() {
       const blob = await generateCDASVoucherPdf(docs);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = 'cdas_payment_voucher.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = url; a.download = 'cdas_payment_voucher.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to generate CDAS voucher PDF:', err);
       addToast('Failed to generate CDAS voucher PDF. Please try again.');
-    } finally {
-      setIsGeneratingPdf(false);
-    }
+    } finally { setIsGeneratingPdf(false); }
   };
 
   const handleGenerateAlliedVoucher = async (docs: DocumentData[]) => {
@@ -465,22 +127,16 @@ function App() {
       const blob = await generateAlliedVoucherPdf(docs);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = 'allied_payment_voucher.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = url; a.download = 'allied_payment_voucher.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to generate Allied voucher PDF:', err);
       addToast('Failed to generate Allied voucher PDF. Please try again.');
-    } finally {
-      setIsGeneratingPdf(false);
-    }
+    } finally { setIsGeneratingPdf(false); }
   };
 
   const handleGenerateVouchers = async (docs: DocumentData[]) => {
-    // Route container-report vouchers to their own generators
     if (docs[0]?.document_type === 'Allied Report') return handleGenerateAlliedVoucher(docs);
     if (docs[0]?.document_type === 'CDAS Report') return handleGenerateCDASVoucher(docs);
     setIsGeneratingPdf(true);
@@ -492,18 +148,13 @@ function App() {
       a.download = docs.length === 1
         ? `voucher_${docs[0].payment_voucher_details?.pss_invoice_number || 'export'}.pdf`
         : 'payment_vouchers.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to generate voucher PDF:', err);
       addToast('Failed to generate voucher PDF. Please try again.');
-    } finally {
-      setIsGeneratingPdf(false);
-    }
+    } finally { setIsGeneratingPdf(false); }
   };
-
 
   const downloadReport = async () => {
     const allDocuments: { data: DocumentData; filename: string }[] = [];
@@ -596,18 +247,14 @@ function App() {
     };
 
     Object.keys(groups).forEach(type => {
-      const csvContent = generateCSVForType(type, groups[type]);
-      zip.file(`${type.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`, csvContent);
+      zip.file(`${type.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`, generateCSVForType(type, groups[type]));
     });
 
     const content = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(content);
     const link = document.createElement('a');
-    link.href = url;
-    link.download = AppConfig.export.zipFilename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    link.href = url; link.download = AppConfig.export.zipFilename;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
     URL.revokeObjectURL(url);
     addLog('Exported ZIP Report');
   };
@@ -617,11 +264,8 @@ function App() {
     const blob = new Blob([logs.join('\n')], { type: 'text/plain;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
-    link.download = AppConfig.export.logFilename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    link.href = url; link.download = AppConfig.export.logFilename;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
@@ -660,16 +304,9 @@ function App() {
 
       {/* ─── Sidebar ─── */}
       <aside className="w-56 bg-primary flex flex-col flex-shrink-0">
-
-        {/* Brand */}
         <div className="px-4 py-5 border-b border-primary-container/50">
           <div className="flex items-center gap-3">
-            <img
-              src="/pluckd.png"
-              alt="Pluckd"
-              className="h-8 w-auto object-contain flex-shrink-0"
-              style={{ filter: 'brightness(0) invert(1)' }}
-            />
+            <img src="/pluckd.png" alt="Pluckd" className="h-8 w-auto object-contain flex-shrink-0" style={{ filter: 'brightness(0) invert(1)' }} />
             <div>
               <p className="text-white font-bold text-sm leading-none">Pluckd</p>
               <p className="text-surface-container text-xs mt-0.5">By Zhenghe Logistics</p>
@@ -677,36 +314,24 @@ function App() {
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-          <p className="px-3 mb-2 text-[0.6875rem] font-medium text-surface-container uppercase tracking-[0.05em]">
-            Documents
-          </p>
+          <p className="px-3 mb-2 text-[0.6875rem] font-medium text-surface-container uppercase tracking-[0.05em]">Documents</p>
           {mainTabs.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer text-left ${
-                activeTab === tab
-                  ? 'bg-primary-container text-white'
-                  : 'text-surface-container hover:bg-primary-container/60 hover:text-white'
-              }`}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer text-left ${activeTab === tab ? 'bg-primary-container text-white' : 'text-surface-container hover:bg-primary-container/60 hover:text-white'}`}
             >
               <span className="flex-shrink-0">{TAB_ICONS[tab] || <FileText size={15} />}</span>
               <span className="truncate text-xs">{tab}</span>
             </button>
           ))}
-
           {hasDevNotes && (
             <>
               <div className="my-3 border-t border-primary-container/50" />
               <button
                 onClick={() => setActiveTab('Developer Notes')}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer text-left ${
-                  activeTab === 'Developer Notes'
-                    ? 'bg-primary-container text-white'
-                    : 'text-surface-container hover:bg-primary-container/60 hover:text-white'
-                }`}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer text-left ${activeTab === 'Developer Notes' ? 'bg-primary-container text-white' : 'text-surface-container hover:bg-primary-container/60 hover:text-white'}`}
               >
                 <Code2 size={15} className="flex-shrink-0" />
                 <span className="text-xs">Developer Notes</span>
@@ -715,7 +340,6 @@ function App() {
           )}
         </nav>
 
-        {/* User Footer */}
         <div className="px-2 py-3 border-t border-primary-container/50">
           <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
             <div className="w-7 h-7 bg-secondary/20 border border-secondary/30 rounded-full flex items-center justify-center flex-shrink-0">
@@ -732,11 +356,7 @@ function App() {
                 <button
                   key={role}
                   onClick={() => { setUserRole(role); localStorage.setItem('userRole', role); }}
-                  className={`flex-1 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
-                    userRole === role
-                      ? 'bg-secondary text-white'
-                      : 'bg-primary-container/40 text-surface-container hover:text-white'
-                  }`}
+                  className={`flex-1 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${userRole === role ? 'bg-secondary text-white' : 'bg-primary-container/40 text-surface-container hover:text-white'}`}
                 >
                   {role === UserRole.ACCOUNTS ? 'Acct' : role === UserRole.LOGISTICS ? 'Log' : 'Tpt'}
                 </button>
@@ -756,17 +376,13 @@ function App() {
 
       {/* ─── Main Area ─── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-
-        {/* Top Bar */}
         <header className="bg-surface-lowest px-6 py-3 flex-shrink-0">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h1 className="text-sm font-semibold text-primary">{activeTab}</h1>
               <p className="text-xs text-[#4a5568]">AI-powered logistics document extraction</p>
             </div>
-
             <div className="flex items-center gap-2">
-              {/* Live Stats */}
               {hasFiles && (
                 <div className="flex items-center gap-3 pr-3 mr-1">
                   <div className="text-center">
@@ -792,117 +408,58 @@ function App() {
                 </div>
               )}
 
-              {/* Select PDFs */}
-              <label
-                htmlFor="file-upload"
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-low text-primary text-xs font-medium hover:bg-surface-container transition-colors cursor-pointer ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
-              >
+              <label htmlFor="file-upload" className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-low text-primary text-xs font-medium hover:bg-surface-container transition-colors cursor-pointer ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Upload size={14} />
                 Select PDFs
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept="application/pdf"
-                  multiple
-                  className="sr-only"
-                  onChange={handleFileChange}
-                  disabled={isProcessing}
-                />
+                <input id="file-upload" type="file" accept="application/pdf" multiple className="sr-only" onChange={handleFileChange} disabled={isProcessing} />
               </label>
 
-              {/* Process */}
-              <button
-                onClick={processFiles}
-                disabled={isProcessing || pendingCount === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity cursor-pointer"
-              >
-                {isProcessing
-                  ? <Loader2 size={14} className="animate-spin" />
-                  : <Zap size={14} />
-                }
+              <button onClick={processFiles} disabled={isProcessing || pendingCount === 0} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity cursor-pointer">
+                {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
                 {isProcessing ? 'Processing...' : `Process${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
               </button>
 
-              {/* Export */}
-              <button
-                onClick={downloadReport}
-                disabled={completedCount === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity cursor-pointer"
-              >
+              <button onClick={downloadReport} disabled={completedCount === 0} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity cursor-pointer">
                 <Download size={14} />
                 Export
               </button>
 
-              {/* Export CDAS Voucher PDF — only on CDAS Report tab */}
               {activeTab === 'CDAS Report' && (() => {
-                const cdasDocs = files.flatMap(f =>
-                  (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING)
-                    ? (f.data ?? []).filter(d => d.document_type === 'CDAS Report')
-                    : []
-                );
-                return cdasDocs.length > 0 ? (
-                  <button
-                    onClick={() => handleGenerateCDASVoucher(cdasDocs)}
-                    disabled={isGeneratingPdf}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer"
-                  >
+                const docs = files.flatMap(f => (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING) ? (f.data ?? []).filter(d => d.document_type === 'CDAS Report') : []);
+                return docs.length > 0 ? (
+                  <button onClick={() => handleGenerateCDASVoucher(docs)} disabled={isGeneratingPdf} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer">
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export CDAS Voucher'}
                   </button>
                 ) : null;
               })()}
 
-              {/* Export Allied Voucher PDF — only on Allied Report tab */}
               {activeTab === 'Allied Report' && (() => {
-                const alliedDocs = files.flatMap(f =>
-                  (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING)
-                    ? (f.data ?? []).filter(d => d.document_type === 'Allied Report')
-                    : []
-                );
-                return alliedDocs.length > 0 ? (
-                  <button
-                    onClick={() => handleGenerateAlliedVoucher(alliedDocs)}
-                    disabled={isGeneratingPdf}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer"
-                  >
+                const docs = files.flatMap(f => (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING) ? (f.data ?? []).filter(d => d.document_type === 'Allied Report') : []);
+                return docs.length > 0 ? (
+                  <button onClick={() => handleGenerateAlliedVoucher(docs)} disabled={isGeneratingPdf} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer">
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export Allied Voucher'}
                   </button>
                 ) : null;
               })()}
 
-              {/* Export Vouchers PDF — only on Payment Voucher/GL tab */}
               {activeTab === 'Payment Voucher/GL' && (() => {
-                const pvDocs = files.flatMap(f =>
-                  (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING)
-                    ? (f.data ?? []).filter(d => d.document_type === 'Payment Voucher/GL')
-                    : []
-                );
-                return pvDocs.length > 0 ? (
-                  <button
-                    onClick={() => handleGenerateVouchers(pvDocs)}
-                    disabled={isGeneratingPdf}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer"
-                  >
+                const docs = files.flatMap(f => (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING) ? (f.data ?? []).filter(d => d.document_type === 'Payment Voucher/GL') : []);
+                return docs.length > 0 ? (
+                  <button onClick={() => handleGenerateVouchers(docs)} disabled={isGeneratingPdf} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer">
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export Vouchers PDF'}
                   </button>
                 ) : null;
               })()}
 
-              {/* Logs */}
-              <button
-                onClick={downloadLogs}
-                disabled={logs.length === 0}
-                title="Download Logs"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-low text-primary text-xs font-medium hover:bg-surface-container disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              >
+              <button onClick={downloadLogs} disabled={logs.length === 0} title="Download Logs" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-low text-primary text-xs font-medium hover:bg-surface-container disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer">
                 <FileText size={14} />
               </button>
             </div>
           </div>
 
-          {/* Progress Bar */}
           {isProcessing && (
             <div className="mt-3 pb-1">
               <div className="flex items-center justify-between text-xs text-[#4a5568] mb-1.5">
@@ -913,16 +470,12 @@ function App() {
                 <span>{completedCount} of {files.length} complete</span>
               </div>
               <div className="h-1 bg-surface-container rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-secondary rounded-full transition-all duration-500"
-                  style={{ width: `${files.length > 0 ? (completedCount / files.length) * 100 : 0}%` }}
-                />
+                <div className="h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${files.length > 0 ? (completedCount / files.length) * 100 : 0}%` }} />
               </div>
             </div>
           )}
         </header>
 
-        {/* Scrollable Content */}
         <main className="flex-1 overflow-auto p-5">
           <CustomRulesPanel rules={customRules} onRulesChange={setCustomRules} />
 
@@ -933,41 +486,22 @@ function App() {
           ) : activeTab === 'Export Permit Declaration (PSS)' ? (
             <ExportPermitTab files={files} />
           ) : !hasFiles ? (
-            /* ── Drag & Drop Upload Zone ── */
             <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
+              onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
               onClick={() => document.getElementById('file-upload-drop')?.click()}
-              className={`flex flex-col items-center justify-center min-h-96 rounded-2xl border-2 border-dashed transition-all cursor-pointer select-none ${
-                isDragging
-                  ? 'border-secondary bg-secondary-fixed/20 scale-[1.01]'
-                  : 'border-outline/40 bg-surface-lowest hover:border-secondary/40 hover:bg-surface-low'
-              }`}
+              className={`flex flex-col items-center justify-center min-h-96 rounded-2xl border-2 border-dashed transition-all cursor-pointer select-none ${isDragging ? 'border-secondary bg-secondary-fixed/20 scale-[1.01]' : 'border-outline/40 bg-surface-lowest hover:border-secondary/40 hover:bg-surface-low'}`}
             >
               <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 transition-colors ${isDragging ? 'bg-secondary-fixed' : 'bg-surface-container'}`}>
                 <Upload size={28} className={isDragging ? 'text-secondary' : 'text-[#4a5568]'} />
               </div>
-              <p className="text-primary font-semibold text-base mb-1">
-                {isDragging ? 'Drop your PDFs here' : 'Upload PDF Documents'}
-              </p>
-              <p className="text-[#4a5568] text-sm mb-5">
-                Drag & drop files here, or click to browse
-              </p>
+              <p className="text-primary font-semibold text-base mb-1">{isDragging ? 'Drop your PDFs here' : 'Upload PDF Documents'}</p>
+              <p className="text-[#4a5568] text-sm mb-5">Drag & drop files here, or click to browse</p>
               <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-sm font-semibold pointer-events-none">
                 <Upload size={15} />
                 Browse Files
               </div>
               <p className="text-[#4a5568] text-xs mt-4">PDF files only</p>
-              <input
-                id="file-upload-drop"
-                type="file"
-                accept="application/pdf"
-                multiple
-                className="sr-only"
-                onChange={handleFileChange}
-                disabled={isProcessing}
-              />
+              <input id="file-upload-drop" type="file" accept="application/pdf" multiple className="sr-only" onChange={handleFileChange} disabled={isProcessing} />
             </div>
           ) : (
             <ResultsTable

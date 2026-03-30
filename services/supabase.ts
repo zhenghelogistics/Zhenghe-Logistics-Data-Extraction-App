@@ -77,10 +77,14 @@ export const saveDocument = async (
 };
 
 export const updateDocument = async (id: string, updates: Partial<DatabaseDocument>) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
   const { data, error } = await supabase
     .from("documents")
     .update(updates)
     .eq("id", id)
+    .eq("user_id", user.id)
     .select()
     .single();
 
@@ -101,10 +105,14 @@ export const updateBilling = async (
     charge_validations?: Record<string, boolean>;
   }
 ): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
   const { error } = await supabase
     .from('documents')
     .update(updates)
-    .eq('id', id);
+    .eq('id', id)
+    .eq('user_id', user.id);
   if (error) throw new Error(error.message);
 };
 

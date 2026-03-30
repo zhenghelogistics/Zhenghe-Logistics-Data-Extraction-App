@@ -965,6 +965,7 @@ const extractFromChunk = async (
           }
         }
         docs = partialDocs;
+        console.warn(`[ZHL] partial recovery triggered — ${partialDocs.length} doc(s) salvaged from truncated Claude response`);
       }
       return deduplicateByContainer(docs);
     } catch (error: any) {

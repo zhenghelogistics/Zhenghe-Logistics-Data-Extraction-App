@@ -1,76 +1,141 @@
-import React, { useState } from 'react';
-import { BASE_SYSTEM_PROMPT } from "../services/claudeService";
+import React from 'react';
+import { CheckCircle } from 'lucide-react';
+
+interface Update {
+  date: string;
+  title: string;
+  description: string;
+  items: string[];
+}
+
+const UPDATES: Update[] = [
+  {
+    date: '30 Mar 2026',
+    title: 'Housekeeping & Code Quality',
+    description: 'Behind-the-scenes cleanup to keep the app fast and maintainable.',
+    items: [
+      'Removed an unused Google AI library that was installed but never used — smaller app, less clutter',
+      'Deleted a duplicate file that could have caused confusing bugs down the line',
+      'Split the main app file into smaller, focused files — easier to find things when something breaks',
+    ],
+  },
+  {
+    date: '30 Mar 2026',
+    title: 'Error Reporting & Alerts',
+    description: 'When something goes wrong, you\'ll now know exactly what happened and can report it instantly.',
+    items: [
+      'Every error now shows a short error code (e.g. [ERR-RATE-LIMIT]) so it\'s easy to identify the problem',
+      'Click the copy icon next to any failed file to copy a full error report — paste it directly to your developer to get it fixed',
+      'PDF generation failures now show a non-blocking notification instead of a pop-up that freezes the page',
+    ],
+  },
+  {
+    date: '30 Mar 2026',
+    title: 'Automated Tests Added',
+    description: 'The app now has a safety net that catches silent bugs before they reach you.',
+    items: [
+      '15 automated tests now run on every code change',
+      'Specifically guards against container data being mixed up between different companies',
+      'Covers the document merging and deduplication logic that runs on every extraction',
+    ],
+  },
+  {
+    date: '30 Mar 2026',
+    title: 'Schutz Shipment Extraction Fixed',
+    description: 'Export Permit PSS now correctly picks up Schütz GmbH proforma invoices.',
+    items: [
+      'Schutz shipment items (electrodes, coupling, sliding rail) now appear in the Export Permit PSS CSV',
+      'HS codes in the Comm.code.no. format are now read correctly',
+      'EUR currency and Your order / Order No. references are extracted properly',
+    ],
+  },
+  {
+    date: '30 Mar 2026',
+    title: 'Export Permit PSS in ZIP + Re-process Button',
+    description: 'Two small but useful additions to daily workflow.',
+    items: [
+      'Export Permit PSS data is now included when you download the ZIP report',
+      'Any file can now be re-processed without re-uploading — useful if extraction produced unexpected results',
+    ],
+  },
+  {
+    date: '13 Mar 2026',
+    title: 'Export Permit Declaration (PSS) Tab',
+    description: 'New document type for the Shipping Department.',
+    items: [
+      'PSS shipment documents are now extracted into their own tab',
+      'Line items extracted: HS Code, Qty, UOM, Item Description, Product of Origin, Nett Weight, Amount, Currency, PO Number, Invoice Number',
+      'Included in the ZIP export as a separate CSV',
+    ],
+  },
+  {
+    date: '13 Mar 2026',
+    title: 'Templates Feature Removed',
+    description: 'The custom template builder has been removed from the app.',
+    items: [
+      'The feature was unreliable and difficult to maintain',
+      'New document types will be added properly by a developer when genuinely needed',
+      'All existing document types continue to work exactly as before',
+    ],
+  },
+  {
+    date: '13 Mar 2026',
+    title: 'CRM Billing Tab',
+    description: 'Transport team can now track container charges through their full billing lifecycle.',
+    items: [
+      'Allied and CDAS report charges are automatically imported into the billing tab',
+      'Mark containers as billed, add remarks, and archive old records',
+      'Mass delete for bulk cleanup',
+    ],
+  },
+  {
+    date: '13 Mar 2026',
+    title: 'Voucher PDF Generation',
+    description: 'Generate formatted payment voucher PDFs directly from the app.',
+    items: [
+      'Payment Voucher/GL, Allied Report, and CDAS Report tabs each have an Export Voucher PDF button',
+      'PDFs download instantly — no external tools needed',
+    ],
+  },
+  {
+    date: '13 Mar 2026',
+    title: 'Role-Based Access',
+    description: 'Each team only sees what\'s relevant to them.',
+    items: [
+      'Accounts team sees Payment Voucher/GL',
+      'Shipping Department sees Logistics Local Charges, Outward Permit, and Export Permit PSS',
+      'Transport team sees Allied Report, CDAS Report, and CRM Billing',
+    ],
+  },
+];
 
 const DeveloperNotes: React.FC = () => {
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedPrompt(true);
-    setTimeout(() => setCopiedPrompt(false), 2000);
-  };
-
   return (
-    <div className="bg-surface-lowest shadow-sm rounded-xl overflow-hidden mt-8">
-      <div className="px-4 py-5 sm:px-6 bg-surface-low">
-        <h3 className="text-lg leading-6 font-semibold text-primary">Developer Documentation</h3>
-        <p className="mt-1 max-w-2xl text-sm text-[#4a5568]">
-          Technical details, configuration, and AI logic used in this application.
-        </p>
+    <div className="max-w-3xl space-y-4">
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-primary">What's New</h2>
+        <p className="text-sm text-[#4a5568] mt-0.5">A log of every update made to Pluckd, in plain English.</p>
       </div>
 
-      <div className="px-4 py-5 sm:px-6">
-        <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
-
-          <div className="sm:col-span-1">
-            <dt className="text-sm font-medium text-[#4a5568]">Application Architecture</dt>
-            <dd className="mt-1 text-sm text-primary">
-              <ul className="list-disc pl-4 space-y-1">
-                <li><strong>Frontend:</strong> React + TypeScript + Vite</li>
-                <li><strong>Styling:</strong> Tailwind CSS</li>
-                <li><strong>AI Engine:</strong> Anthropic Claude (claude-haiku-4-5)</li>
-                <li><strong>Backend:</strong> Supabase (Auth + Postgres)</li>
-                <li><strong>Export:</strong> JSZip (Client-side ZIP generation)</li>
-              </ul>
-            </dd>
-          </div>
-
-          <div className="sm:col-span-1">
-            <dt className="text-sm font-medium text-[#4a5568]">Recent Changes & Features</dt>
-            <dd className="mt-1 text-sm text-primary">
-              <ul className="list-disc pl-4 space-y-1">
-                <li><strong>Switched to Claude API:</strong> Replaced Gemini with Anthropic Claude for more reliable structured extraction.</li>
-                <li><strong>Custom Rules:</strong> Non-technical users can add their own extraction instructions in plain English.</li>
-                <li><strong>Multi-Document Mode:</strong> Single PDFs containing multiple merged documents are parsed separately.</li>
-                <li><strong>Typed Filtering:</strong> Tabular views specific to document types per role.</li>
-                <li><strong>Dual-Entry Rule:</strong> Tax invoices automatically create both a Logistics and Payment Voucher entry.</li>
-              </ul>
-            </dd>
-          </div>
-
-          <div className="sm:col-span-2">
-            <div className="flex justify-between items-center mb-1">
-              <dt className="text-sm font-medium text-[#4a5568]">System Prompt (AI Instruction)</dt>
-              <button
-                onClick={() => handleCopy(BASE_SYSTEM_PROMPT)}
-                className={`text-xs px-2 py-1 rounded border transition-colors ${
-                  copiedPrompt
-                    ? 'bg-secondary-fixed text-on-secondary-container border-secondary/20'
-                    : 'bg-surface-low text-[#4a5568] border-outline/20 hover:bg-surface-container'
-                }`}
-              >
-                {copiedPrompt ? 'Copied!' : 'Copy to Clipboard'}
-              </button>
+      {UPDATES.map((update, i) => (
+        <div key={i} className="bg-surface-lowest rounded-xl p-5">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-primary">{update.title}</h3>
+              <p className="text-xs text-[#4a5568] mt-0.5">{update.description}</p>
             </div>
-            <dd className="mt-1 text-sm text-primary bg-primary rounded-xl p-4 overflow-x-auto">
-              <pre className="text-xs text-secondary-container font-mono whitespace-pre-wrap">
-                {BASE_SYSTEM_PROMPT}
-              </pre>
-            </dd>
+            <span className="text-[11px] text-[#4a5568] whitespace-nowrap shrink-0 mt-0.5">{update.date}</span>
           </div>
-
-        </dl>
-      </div>
+          <ul className="space-y-1.5">
+            {update.items.map((item, j) => (
+              <li key={j} className="flex items-start gap-2 text-xs text-primary">
+                <CheckCircle size={13} className="text-secondary shrink-0 mt-0.5" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 };

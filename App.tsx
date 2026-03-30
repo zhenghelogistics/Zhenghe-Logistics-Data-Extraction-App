@@ -17,6 +17,7 @@ import { UserRole, TEAM_NAMES } from './users';
 // @ts-ignore
 import JSZip from 'jszip';
 import ConfirmationModal from './components/ConfirmationModal';
+import ToastStack, { Toast } from './components/Toast';
 import {
   Ship, User, LogOut, Upload, Zap, Download, FileText, Loader2,
   FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
@@ -62,6 +63,12 @@ function App() {
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const addToast = (message: string, type: 'error' | 'success' = 'error') => {
+    const id = crypto.randomUUID();
+    setToasts(prev => [...prev, { id, message, type }]);
+  };
+  const dismissToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
   useEffect(() => {
     // Capture the path of the currently loaded main bundle (e.g. /assets/index-abc123.js)
@@ -446,7 +453,7 @@ function App() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to generate CDAS voucher PDF:', err);
-      alert('Failed to generate PDF. Please try again.');
+      addToast('Failed to generate CDAS voucher PDF. Please try again.');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -466,7 +473,7 @@ function App() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to generate Allied voucher PDF:', err);
-      alert('Failed to generate PDF. Please try again.');
+      addToast('Failed to generate Allied voucher PDF. Please try again.');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -491,7 +498,7 @@ function App() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to generate voucher PDF:', err);
-      alert('Failed to generate PDF. Please try again.');
+      addToast('Failed to generate voucher PDF. Please try again.');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -986,6 +993,7 @@ function App() {
         title="Delete Document"
         message="Are you sure you want to delete this document? This action cannot be undone and will remove it for all users."
       />
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

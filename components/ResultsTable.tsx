@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProcessedFile, FileStatus, DocumentData } from '../types';
 import { AppConfig } from '../config';
-import { CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Trash2, FileText, RefreshCw } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Trash2, FileText, RefreshCw, Copy } from 'lucide-react';
 import { UserRole } from '../users';
 
 interface ResultsTableProps {
@@ -20,6 +20,24 @@ interface ResultsTableProps {
 const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, onReprocessFile, isGeneratingPdf, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorPopover, setErrorPopover] = useState<{ fileId: string; errors: string[] } | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyErrorReport = (file: ProcessedFile) => {
+    const time = new Date().toLocaleString('en-SG', { timeZone: 'Asia/Singapore' });
+    const report = [
+      '--- PLUCKD ERROR REPORT ---',
+      `File:    ${file.file.name}`,
+      `Time:    ${time}`,
+      `Message: ${file.errorMessage || 'Processing failed'}`,
+      `Stage:   ${file.stage || 'unknown'}`,
+      '---------------------------',
+      'Paste this into Claude Code to get a fix.',
+    ].join('\n');
+    navigator.clipboard.writeText(report).then(() => {
+      setCopiedId(file.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -329,7 +347,19 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                       </td>
                       <td className="px-3 py-3.5 text-sm text-[#4a5568] max-w-xs">
                         {file.status === FileStatus.ERROR
-                          ? <span className="text-red-500 text-xs">{file.errorMessage || 'Processing failed — try re-uploading'}</span>
+                          ? (
+                            <div className="flex items-start gap-2">
+                              <span className="text-red-500 text-xs font-mono leading-snug">{file.errorMessage || 'Processing failed — try re-uploading'}</span>
+                              <button
+                                type="button"
+                                title="Copy error report"
+                                onClick={() => copyErrorReport(file)}
+                                className="shrink-0 text-outline hover:text-secondary transition-colors cursor-pointer mt-0.5"
+                              >
+                                {copiedId === file.id ? <CheckCircle size={13} className="text-secondary" /> : <Copy size={13} />}
+                              </button>
+                            </div>
+                          )
                           : typesFound}
                       </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">{new Date().toLocaleDateString()}</td>

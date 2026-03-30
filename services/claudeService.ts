@@ -43,6 +43,14 @@ export const validateDocumentData = (dataList: DocumentData[]): string[] => {
   return allErrors;
 };
 
+// Structured error helper — always produces a message starting with [ERR-CODE]
+const makeError = (code: string, detail: string, stage?: string): Error => {
+  const msg = `[${code}] ${detail}${stage ? ` (at: ${stage})` : ''}`;
+  const err = new Error(msg);
+  (err as any).code = code;
+  return err;
+};
+
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -560,7 +568,7 @@ const enforceAccountsLane = (docs: DocumentData[]): DocumentData[] => {
 // in the same file come from the same supplier, merge them into one combined PV with
 // a bl_entries array and a summed total_payable_amount. This is the definitive rule:
 // one PDF = one PV per supplier, always.
-const mergeSameSupplierPVs = (docs: DocumentData[]): DocumentData[] => {
+export const mergeSameSupplierPVs = (docs: DocumentData[]): DocumentData[] => {
   const pvDocs   = docs.filter(d => d.document_type === 'Payment Voucher/GL');
   const otherDocs = docs.filter(d => d.document_type !== 'Payment Voucher/GL');
 
@@ -846,7 +854,7 @@ const mergeChargeFields = (dest: any, src: any) => {
   dest.demurrage      = dest.demurrage      ?? src.demurrage;
 };
 
-const deduplicateByContainer = (docs: DocumentData[]): DocumentData[] => {
+export const deduplicateByContainer = (docs: DocumentData[]): DocumentData[] => {
   const alliedDocs = docs.filter(d => d.document_type === 'Allied Report');
   const cdasDocs   = docs.filter(d => d.document_type === 'CDAS Report');
   const otherDocs  = docs.filter(d => d.document_type !== 'Allied Report' && d.document_type !== 'CDAS Report');
@@ -911,7 +919,7 @@ const extractFromChunk = async (
       });
       const response = await stream.finalMessage();
       const text = response.content[0].type === "text" ? response.content[0].text : "";
-      if (!text) throw new Error("No data returned from Claude");
+      if (!text) throw makeError('ERR-NO-RESPONSE', 'Claude returned an empty response');
       console.group('%c[ZHL] Claude raw response', 'color:#6366f1;font-weight:bold');
       console.log(`stop_reason: ${response.stop_reason} | output_tokens: ${response.usage?.output_tokens}`);
       console.log(text);
@@ -960,7 +968,18 @@ const extractFromChunk = async (
       }
       return deduplicateByContainer(docs);
     } catch (error: any) {
-      if (attempt === maxRetries) throw error;
+      if (attempt === maxRetries) {
+        // Classify the error by HTTP status or type if not already coded
+        if (!(error as any).code) {
+          const status = error?.status ?? error?.response?.status;
+          if (status === 429) throw makeError('ERR-RATE-LIMIT', `Rate limited after ${maxRetries} retries (HTTP 429)`);
+          if (status === 401 || status === 403) throw makeError('ERR-AUTH', `Authentication failed (HTTP ${status})`);
+          if (status >= 500) throw makeError('ERR-API-500', `Claude API server error (HTTP ${status})`);
+          if (error?.name === 'AbortError' || error?.message?.includes('timeout')) throw makeError('ERR-TIMEOUT', 'Request timed out');
+          throw makeError('ERR-API-UNKNOWN', error?.message || 'Unknown API error');
+        }
+        throw error;
+      }
       await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt - 1)));
     }
   }
@@ -1063,7 +1082,15 @@ export const extractDocumentData = async (
         return await fn();
       } catch (err: any) {
         const isRateLimit = err?.status === 429 || /rate.limit|too many/i.test(err?.message ?? '');
-        if (!isRateLimit || attempt === maxAttempts - 1) throw err;
+        if (!isRateLimit || attempt === maxAttempts - 1) {
+          // Annotate with stage if not already a coded error
+          if (!(err as any).code) {
+            throw makeError('ERR-RATE-LIMIT', `Rate limited after ${attempt + 1} attempt(s)`, chunkLabel);
+          }
+          // Re-wrap with stage context
+          const staged = makeError((err as any).code, err.message.replace(/^\[ERR-[A-Z-]+\]\s*/, ''), chunkLabel);
+          throw staged;
+        }
         // base: 2^attempt seconds (1, 2, 4, 8, 16…) + random jitter up to 1s
         const base = Math.pow(2, attempt) * 1000;
         const jitter = Math.random() * 1000;
@@ -1083,7 +1110,12 @@ export const extractDocumentData = async (
   const chunkSize = role === 'accounts' ? 15 : 50;
   // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
   const chunkOverlap = role === 'accounts' ? 3 : 0;
-  const chunks = await splitPdfIntoChunks(file, chunkSize, chunkOverlap);
+  let chunks: Awaited<ReturnType<typeof splitPdfIntoChunks>>;
+  try {
+    chunks = await splitPdfIntoChunks(file, chunkSize, chunkOverlap);
+  } catch (err: any) {
+    throw makeError('ERR-PDF-READ', `Could not read or chunk the PDF: ${err?.message || 'unknown'}`, 'Reading PDF');
+  }
 
   const allDocs: DocumentData[] = [];
   for (let i = 0; i < chunks.length; i++) {

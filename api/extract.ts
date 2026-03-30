@@ -26,6 +26,11 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  if (base64.length > 20_000_000) {
+    res.status(413).json({ error: "File too large — max ~15MB PDF supported" });
+    return;
+  }
+
   if (!process.env.ANTHROPIC_API_KEY) {
     res.status(500).json({ error: "ANTHROPIC_API_KEY is not set in environment variables" });
     return;

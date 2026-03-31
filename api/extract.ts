@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 // Vercel serverless function — API key stays server-side, never exposed to browser
 export default async function handler(req: any, res: any) {

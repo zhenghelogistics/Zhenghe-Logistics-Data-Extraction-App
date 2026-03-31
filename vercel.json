@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/extract.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "api/enrichPSS.ts": {
       "maxDuration": 60

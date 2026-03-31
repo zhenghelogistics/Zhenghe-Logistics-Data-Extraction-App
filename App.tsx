@@ -15,6 +15,7 @@ import { UserRole } from './users';
 import JSZip from 'jszip';
 import ConfirmationModal from './components/ConfirmationModal';
 import ToastStack, { Toast } from './components/Toast';
+import ErrorBoundary from './components/ErrorBoundary';
 import {
   User, LogOut, Upload, Zap, Download, FileText, Loader2,
   FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
@@ -375,6 +376,7 @@ function App() {
       </aside>
 
       {/* ─── Main Area ─── */}
+      <ErrorBoundary>
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-surface-lowest px-6 py-3 flex-shrink-0">
           <div className="flex items-center justify-between gap-4">
@@ -519,6 +521,7 @@ function App() {
           )}
         </main>
       </div>
+      </ErrorBoundary>
 
       <ConfirmationModal
         isOpen={deleteModalOpen}

@@ -42,13 +42,29 @@ export const validateDocumentData = (dataList: DocumentData[]): string[] => {
   return allErrors;
 };
 
-// Structured error helper — always produces a message starting with [ERR-CODE]
-const makeError = (code: string, detail: string, stage?: string): Error => {
-  const msg = `[${code}] ${detail}${stage ? ` (at: ${stage})` : ''}`;
-  const err = new Error(msg);
-  (err as any).code = code;
-  return err;
-};
+export type ExtractionErrorCode =
+  | 'ERR-RATE-LIMIT'
+  | 'ERR-AUTH'
+  | 'ERR-API-500'
+  | 'ERR-API-UNKNOWN'
+  | 'ERR-NO-RESPONSE'
+  | 'ERR-JSON-PARSE'
+  | 'ERR-PDF-READ'
+  | 'ERR-TIMEOUT';
+
+export class ExtractionError extends Error {
+  code: ExtractionErrorCode;
+  stage?: string;
+  constructor(code: ExtractionErrorCode, detail: string, stage?: string) {
+    super(`[${code}] ${detail}${stage ? ` (at: ${stage})` : ''}`);
+    this.name = 'ExtractionError';
+    this.code = code;
+    this.stage = stage;
+  }
+}
+
+const makeError = (code: ExtractionErrorCode, detail: string, stage?: string): ExtractionError =>
+  new ExtractionError(code, detail, stage);
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {

@@ -22,7 +22,7 @@ interface Props {
 const toKey = (label: string) =>
   label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-const ADMIN_USER_ID = 'a43ea670-2ca8-4c0c-8445-7d95e38cdb6c';
+const ADMIN_USER_ID = import.meta.env.VITE_ADMIN_USER_ID;
 
 // ─── Discovery Wizard ─────────────────────────────────────────────────────────
 

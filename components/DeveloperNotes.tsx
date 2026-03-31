@@ -10,6 +10,15 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    date: '31 Mar 2026',
+    title: 'Stability & Security',
+    description: 'The app is now more resilient to crashes and the API key is properly secured.',
+    items: [
+      'If any part of the app crashes, you now see a friendly error message with a "Try again" button instead of a blank white screen',
+      'Claude API key moved fully server-side — it is no longer bundled into the app\'s JavaScript where it could be extracted',
+    ],
+  },
+  {
     date: '30 Mar 2026',
     title: 'Housekeeping & Code Quality',
     description: 'Behind-the-scenes cleanup to keep the app fast and maintainable.',

@@ -906,7 +906,6 @@ const extractFromChunk = async (
       const { text } = await apiRes.json();
       if (!text) throw makeError('ERR-NO-RESPONSE', 'Claude returned an empty response');
       console.group('%c[ZHL] Claude raw response', 'color:#6366f1;font-weight:bold');
-      console.log(`stop_reason: ${response.stop_reason} | output_tokens: ${response.usage?.output_tokens}`);
       console.log(text);
       console.groupEnd();
       const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();

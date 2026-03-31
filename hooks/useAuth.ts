@@ -9,7 +9,7 @@ export function useAuth(onLogout?: () => void) {
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('All');
 
-  const isAdmin = userId === 'a43ea670-2ca8-4c0c-8445-7d95e38cdb6c';
+  const isAdmin = userId === import.meta.env.VITE_ADMIN_USER_ID;
 
   useEffect(() => {
     const checkSession = async () => {

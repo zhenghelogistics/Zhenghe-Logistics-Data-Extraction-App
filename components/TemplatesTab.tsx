@@ -1,5 +1,4 @@
 import React, { useState, useRef, useCallback } from 'react';
-import Anthropic from '@anthropic-ai/sdk';
 import { PDFDocument } from 'pdf-lib';
 import { jsonrepair } from 'jsonrepair';
 import { Plus, Pencil, Trash2, FlaskConical, Download, X, FileText, Copy, Check, Blocks } from 'lucide-react';
@@ -67,7 +66,6 @@ const Wizard: React.FC<WizardProps> = ({ initial, onSave, onClose }) => {
       const arrayBuffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       const total = pdfDoc.getPageCount();
-      const client = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY, dangerouslyAllowBrowser: true });
       const allValues: DiscoveredItem[] = [];
 
       for (let start = 0; start < total; start += 10) {
@@ -81,22 +79,20 @@ const Wizard: React.FC<WizardProps> = ({ initial, onSave, onClose }) => {
           const bytes = await chunk.save();
           const base64 = toBase64(bytes);
 
-          const msg = await client.messages.create({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 1024,
-            system: 'You are a document scanner. Return ONLY a valid JSON array of {"label": "exact label text from document", "value": "the corresponding value"} objects. Include every labelled field you can find.',
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-                  { type: 'text', text: 'List every labelled field and its value. Return as a JSON array.' },
-                ],
-              },
-              { role: 'assistant', content: [{ type: 'text', text: '[' }] },
-            ],
+          const apiRes = await fetch('/api/templateChat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              base64,
+              systemPrompt: 'You are a document scanner. Return ONLY a valid JSON array of {"label": "exact label text from document", "value": "the corresponding value"} objects. Include every labelled field you can find.',
+              userText: 'List every labelled field and its value. Return as a JSON array.',
+              maxTokens: 1024,
+              prefill: '[',
+            }),
           });
-          const raw = '[' + (msg.content[0] as { text: string }).text;
+          if (!apiRes.ok) throw new Error(`HTTP ${apiRes.status}`);
+          const { text } = await apiRes.json();
+          const raw = '[' + text;
           const parsed = JSON.parse(jsonrepair(raw));
           if (Array.isArray(parsed)) allValues.push(...parsed);
         } catch (e) { console.warn('Chunk scan failed:', e); }
@@ -408,9 +404,6 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
       setTesting('Reading document…');
       const arrayBuffer = await file.arrayBuffer();
       const base64 = toBase64(arrayBuffer);
-      const client = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY, dangerouslyAllowBrowser: true });
-
-      const docContent = { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: base64 } };
 
       const fieldLines = template.fields.map(f => {
         const desc = f.hint?.trim() ? ` — ${f.hint}` : '';
@@ -419,38 +412,46 @@ const TestPanel: React.FC<TestPanelProps> = ({ template, onClose, onFixHints }) 
 
       setTesting('Extracting your fields…');
       // Run field extraction + discovery in parallel
-      const [extractionMsg, discoveryMsg] = await Promise.all([
-        client.messages.create({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1024,
-          system: 'You are a JSON extraction API. Respond with ONLY a valid JSON object — no prose, no explanation, no apology. Every key must be present; use null if the value is not found. Your entire response must be parseable by JSON.parse().',
-          messages: [
-            { role: 'user', content: [docContent, { type: 'text', text: `Extract these fields:\n${fieldLines}` }] },
-            { role: 'assistant', content: [{ type: 'text', text: '{' }] },
-          ],
+      const [extractionRes, discoveryRes] = await Promise.all([
+        fetch('/api/templateChat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64,
+            systemPrompt: 'You are a JSON extraction API. Respond with ONLY a valid JSON object — no prose, no explanation, no apology. Every key must be present; use null if the value is not found. Your entire response must be parseable by JSON.parse().',
+            userText: `Extract these fields:\n${fieldLines}`,
+            maxTokens: 1024,
+            prefill: '{',
+          }),
         }),
-        client.messages.create({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 768,
-          system: 'You are a document scanner. Respond with ONLY a valid JSON array — no prose, no explanation.',
-          messages: [
-            { role: 'user', content: [docContent, { type: 'text', text: 'List every clearly labelled value in this document (amounts, dates, IDs, names, codes). Return a JSON array of {"label": "...", "value": "..."} objects. Include all you can find.' }] },
-            { role: 'assistant', content: [{ type: 'text', text: '[' }] },
-          ],
+        fetch('/api/templateChat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64,
+            systemPrompt: 'You are a document scanner. Respond with ONLY a valid JSON array — no prose, no explanation.',
+            userText: 'List every clearly labelled value in this document (amounts, dates, IDs, names, codes). Return a JSON array of {"label": "...", "value": "..."} objects. Include all you can find.',
+            maxTokens: 768,
+            prefill: '[',
+          }),
         }),
       ]);
 
-      // Parse extraction — prepend the prefill '{' that the assistant continued from
-      const rawExtraction = '{' + (extractionMsg.content[0] as { text: string }).text;
+      if (!extractionRes.ok) throw new Error(`Extraction API error: HTTP ${extractionRes.status}`);
+      const { text: extractionText } = await extractionRes.json();
+      const rawExtraction = '{' + extractionText;
       const parsed = JSON.parse(jsonrepair(rawExtraction));
       setTestResults(parsed);
       setAttempts(a => a + 1);
 
       // Parse discovery (optional — don't fail if it errors)
       try {
-        const rawDiscovery = '[' + (discoveryMsg.content[0] as { text: string }).text;
-        const disc = JSON.parse(jsonrepair(rawDiscovery));
-        setDiscovery(Array.isArray(disc) ? disc : []);
+        if (discoveryRes.ok) {
+          const { text: discoveryText } = await discoveryRes.json();
+          const rawDiscovery = '[' + discoveryText;
+          const disc = JSON.parse(jsonrepair(rawDiscovery));
+          setDiscovery(Array.isArray(disc) ? disc : []);
+        }
       } catch { /* discovery is bonus, ignore parse errors */ }
 
     } catch (err: any) {

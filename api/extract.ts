@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+export const maxDuration = 300;
+
 // Vercel serverless function — API key stays server-side, never exposed to browser
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
@@ -7,7 +9,6 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  // Read raw body as stream to handle large PDF base64 payloads
   let body: any;
   try {
     const chunks: Buffer[] = [];
@@ -20,7 +21,7 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const { base64, systemPrompt } = body;
+  const { base64, systemPrompt, role, userText } = body;
   if (!base64 || !systemPrompt) {
     res.status(400).json({ error: "Missing required fields: base64, systemPrompt" });
     return;
@@ -36,43 +37,40 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const client = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  });
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const resolvedUserText = userText ?? (
+    role === "accounts"
+      ? "This PDF may contain Bills of Lading, Tax Invoices/Freight Invoices, AND Customs Permits or Outward Permits. STEP 1: Scan EVERY page. STEP 2: For each Tax Invoice or Freight Invoice page found (carrier letterhead, charge table, Amount Due), output one 'Payment Voucher/GL' entry with that invoice number. STEP 3: For each BL page, output one 'Bill of Lading' entry. STEP 4: Completely ignore Customs Permit / Outward Permit pages. A single PDF with 1 BL + 1 Tax Invoice must produce 2 entries. Do NOT combine invoice numbers. Do NOT sum amounts. Return valid JSON only. No explanation, no markdown."
+      : "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object."
+  );
 
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const response = await client.messages.create({
+      const stream = client.messages.stream({
         model: "claude-sonnet-4-6",
-        max_tokens: 16000,
-        system: systemPrompt,
+        max_tokens: 32000,
+        system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         messages: [
           {
             role: "user",
             content: [
               {
                 type: "document",
-                source: {
-                  type: "base64",
-                  media_type: "application/pdf",
-                  data: base64,
-                },
+                source: { type: "base64", media_type: "application/pdf", data: base64 },
               },
-              {
-                type: "text",
-                text: "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object.",
-              },
+              { type: "text", text: resolvedUserText },
             ],
           },
         ],
       });
 
+      const response = await stream.finalMessage();
       const text = response.content[0].type === "text" ? response.content[0].text : "";
       if (!text) throw new Error("No data returned from Claude");
-      const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-      const result = JSON.parse(clean);
-      res.status(200).json(result);
+
+      res.status(200).json({ text });
       return;
     } catch (error: any) {
       if (attempt === maxRetries) {

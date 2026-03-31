@@ -6,9 +6,8 @@ vi.mock('@anthropic-ai/sdk', () => ({ default: vi.fn() }));
 vi.mock('pdf-lib', () => ({ PDFDocument: { load: vi.fn() } }));
 vi.mock('jsonrepair', () => ({ jsonrepair: (s: string) => s }));
 
-// Stub Vite env vars
 beforeAll(() => {
-  (import.meta as any).env = { VITE_ANTHROPIC_API_KEY: 'test' };
+  (import.meta as any).env = {};
 });
 
 import {

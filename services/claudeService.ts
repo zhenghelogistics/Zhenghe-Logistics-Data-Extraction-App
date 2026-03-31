@@ -1,5 +1,4 @@
 import { PDFDocument } from "pdf-lib";
-import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
 import { DocumentData, ExtractionResponse, BLEntry } from "../types";
 import { AppConfig } from "../config";
@@ -888,37 +887,23 @@ const extractFromChunk = async (
   systemPrompt: string,
   role?: string
 ): Promise<DocumentData[]> => {
-  const client = new Anthropic({
-    apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || "",
-    dangerouslyAllowBrowser: true,
-  });
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const stream = client.messages.stream({
-        model: "claude-sonnet-4-6",
-        max_tokens: 32000,
-        system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "document",
-                source: { type: "base64", media_type: "application/pdf", data: base64 },
-              },
-              {
-                type: "text",
-                text: role === 'accounts'
-                  ? "This PDF may contain Bills of Lading, Tax Invoices/Freight Invoices, AND Customs Permits or Outward Permits. STEP 1: Scan EVERY page. STEP 2: For each Tax Invoice or Freight Invoice page found (carrier letterhead, charge table, Amount Due), output one 'Payment Voucher/GL' entry with that invoice number. STEP 3: For each BL page, output one 'Bill of Lading' entry. STEP 4: Completely ignore Customs Permit / Outward Permit pages. A single PDF with 1 BL + 1 Tax Invoice must produce 2 entries. Do NOT combine invoice numbers. Do NOT sum amounts. Return valid JSON only. No explanation, no markdown."
-                  : "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object.",
-              },
-            ],
-          },
-        ],
+      const apiRes = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, systemPrompt, role }),
       });
-      const response = await stream.finalMessage();
-      const text = response.content[0].type === "text" ? response.content[0].text : "";
+      if (!apiRes.ok) {
+        const err = await apiRes.json().catch(() => ({ error: `HTTP ${apiRes.status}` }));
+        const status = apiRes.status;
+        if (status === 429) throw makeError('ERR-RATE-LIMIT', `Rate limited (HTTP 429)`);
+        if (status === 401 || status === 403) throw makeError('ERR-AUTH', `Authentication failed (HTTP ${status})`);
+        if (status >= 500) throw makeError('ERR-API-500', err.error || `Server error (HTTP ${status})`);
+        throw makeError('ERR-API-UNKNOWN', err.error || `HTTP ${status}`);
+      }
+      const { text } = await apiRes.json();
       if (!text) throw makeError('ERR-NO-RESPONSE', 'Claude returned an empty response');
       console.group('%c[ZHL] Claude raw response', 'color:#6366f1;font-weight:bold');
       console.log(`stop_reason: ${response.stop_reason} | output_tokens: ${response.usage?.output_tokens}`);
@@ -970,12 +955,7 @@ const extractFromChunk = async (
       return deduplicateByContainer(docs);
     } catch (error: any) {
       if (attempt === maxRetries) {
-        // Classify the error by HTTP status or type if not already coded
         if (!(error as any).code) {
-          const status = error?.status ?? error?.response?.status;
-          if (status === 429) throw makeError('ERR-RATE-LIMIT', `Rate limited after ${maxRetries} retries (HTTP 429)`);
-          if (status === 401 || status === 403) throw makeError('ERR-AUTH', `Authentication failed (HTTP ${status})`);
-          if (status >= 500) throw makeError('ERR-API-500', `Claude API server error (HTTP ${status})`);
           if (error?.name === 'AbortError' || error?.message?.includes('timeout')) throw makeError('ERR-TIMEOUT', 'Request timed out');
           throw makeError('ERR-API-UNKNOWN', error?.message || 'Unknown API error');
         }
@@ -1017,33 +997,18 @@ const enrichMissingPSSNumbers = async (
 
   try {
     const base64 = await fileToBase64(file);
-    const client = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || '', dangerouslyAllowBrowser: true });
 
     const listLines = missing.map(m =>
       `- BL ${m.bl_number}${m.carrier_invoice_number ? ` (carrier invoice ${m.carrier_invoice_number})` : ''}`
     ).join('\n');
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 512,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-          {
-            type: 'text',
-            text: `For each Bill of Lading below, find the PSS or SI invoice number that Zhenghe / PSS Logistics stamped or printed on the invoice page. These numbers often start with # (e.g. #25101630).
-
-${listLines}
-
-Return ONLY a JSON object — BL number as key, PSS/SI number (or null) as value:
-{"MEDUUD123456": "#25101234", "MEDUUD999999": null}`,
-          },
-        ],
-      }],
+    const apiRes = await fetch('/api/enrichPSS', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64, listLines }),
     });
-
-    const raw = response.content[0].type === 'text' ? response.content[0].text : '';
+    if (!apiRes.ok) throw new Error(`HTTP ${apiRes.status}`);
+    const { text: raw } = await apiRes.json();
     const pssMap: Record<string, string | null> = JSON.parse(jsonrepair(raw.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim()));
     console.log('[ZHL] enrichMissingPSSNumbers result:', pssMap);
 

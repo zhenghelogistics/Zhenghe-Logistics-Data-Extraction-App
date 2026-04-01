@@ -104,13 +104,12 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   const containerDetail = (entries: ContainerEntry[]) =>
     entries.map(e => `${e.container} $${e.amount}/-`).join(', ');
 
-  const dhcCombinedTotal = dhcTotal + fuelSurchargeTotal;
   const fuelLabel = docs.find(d => d.cdas_report?.fuel_surcharge_label)?.cdas_report?.fuel_surcharge_label || 'FUEL SURCHARGE';
-  const dhcLabel = fuelSurchargeTotal > 0 ? `DHC + ${fuelLabel}` : 'DHC';
 
   const rows: { desc: string; amount: number }[] = [];
-  if (dhcCombinedTotal > 0) rows.push({ desc: dhcLabel, amount: dhcCombinedTotal });
-  if (adminTotal > 0)       rows.push({ desc: 'ADMIN FEE', amount: adminTotal });
+  if (dhcTotal > 0)           rows.push({ desc: 'DHC', amount: dhcTotal });
+  if (fuelSurchargeTotal > 0) rows.push({ desc: fuelLabel, amount: fuelSurchargeTotal });
+  if (adminTotal > 0)         rows.push({ desc: 'ADMIN FEE', amount: adminTotal });
   if (washingTotal > 0)    rows.push({ desc: washingEntries.length ? `WASHING - ${containerDetail(washingEntries)}` : 'WASHING', amount: washingTotal });
   if (repairTotal > 0)     rows.push({ desc: repairEntries.length ? `REPAIR - ${containerDetail(repairEntries)}` : 'REPAIR', amount: repairTotal });
   if (detentionTotal > 0)  rows.push({ desc: detentionEntries.length ? `DETENTION - ${containerDetail(detentionEntries)}` : 'DETENTION', amount: detentionTotal });
@@ -221,18 +220,14 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
   const containerDetail = (entries: ContainerEntry[]) =>
     entries.map(e => `${e.container} $${e.amount}/-`).join(', ');
 
-  // Build DHC row label — use actual extracted labels when present
-  const dhcCombinedTotal = dhcTotal + fuelSurchargeTotal + dynamicPriceFactorTotal;
   const fuelLabel = docs.find(d => d.allied_report?.fuel_surcharge_label)?.allied_report?.fuel_surcharge_label || 'FUEL SURCHARGE';
-  const dpfLabel  = docs.find(d => d.allied_report?.dynamic_price_factor_label)?.allied_report?.dynamic_price_factor_label || 'DPF';
-  const dhcLabelParts = ['DHC'];
-  if (fuelSurchargeTotal > 0) dhcLabelParts.push(fuelLabel);
-  if (dynamicPriceFactorTotal > 0) dhcLabelParts.push(dpfLabel);
-  const dhcLabel = dhcLabelParts.join(' + ');
+  const dpfLabel  = docs.find(d => d.allied_report?.dynamic_price_factor_label)?.allied_report?.dynamic_price_factor_label || 'DYNAMIC PRICE FACTOR';
 
   const rows: { desc: string; amount: number }[] = [];
-  if (dhcCombinedTotal > 0) rows.push({ desc: dhcLabel, amount: dhcCombinedTotal });
-  if (dheTotal > 0)         rows.push({ desc: 'DHE', amount: dheTotal });
+  if (dhcTotal > 0)               rows.push({ desc: 'DHC', amount: dhcTotal });
+  if (fuelSurchargeTotal > 0)     rows.push({ desc: fuelLabel, amount: fuelSurchargeTotal });
+  if (dynamicPriceFactorTotal > 0) rows.push({ desc: dpfLabel, amount: dynamicPriceFactorTotal });
+  if (dheTotal > 0)               rows.push({ desc: 'DHE', amount: dheTotal });
   if (adminTotal > 0)      rows.push({ desc: 'ADMIN FEE', amount: adminTotal });
   if (washingTotal > 0)    rows.push({ desc: washingEntries.length ? `WASHING - ${containerDetail(washingEntries)}` : 'WASHING', amount: washingTotal });
   if (repairTotal > 0)     rows.push({ desc: repairEntries.length ? `REPAIR - ${containerDetail(repairEntries)}` : 'REPAIR', amount: repairTotal });

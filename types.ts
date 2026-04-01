@@ -133,7 +133,9 @@ export interface AlliedReport {
   detention?: string | null;
   demurrage?: string | null;
   fuel_surcharge?: string | null;
+  fuel_surcharge_label?: string | null;
   dynamic_price_factor?: string | null;
+  dynamic_price_factor_label?: string | null;
 }
 
 export interface CdasReport {
@@ -149,6 +151,7 @@ export interface CdasReport {
   detention?: string | null;
   demurrage?: string | null;
   fuel_surcharge?: string | null;
+  fuel_surcharge_label?: string | null;
 }
 
 export interface ExportPermitPSSItem {

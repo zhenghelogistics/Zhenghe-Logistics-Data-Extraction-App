@@ -105,7 +105,8 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
     entries.map(e => `${e.container} $${e.amount}/-`).join(', ');
 
   const dhcCombinedTotal = dhcTotal + fuelSurchargeTotal;
-  const dhcLabel = fuelSurchargeTotal > 0 ? 'DHC + FUEL SURCHARGE' : 'DHC';
+  const fuelLabel = docs.find(d => d.cdas_report?.fuel_surcharge_label)?.cdas_report?.fuel_surcharge_label || 'FUEL SURCHARGE';
+  const dhcLabel = fuelSurchargeTotal > 0 ? `DHC + ${fuelLabel}` : 'DHC';
 
   const rows: { desc: string; amount: number }[] = [];
   if (dhcCombinedTotal > 0) rows.push({ desc: dhcLabel, amount: dhcCombinedTotal });
@@ -220,11 +221,13 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
   const containerDetail = (entries: ContainerEntry[]) =>
     entries.map(e => `${e.container} $${e.amount}/-`).join(', ');
 
-  // Build DHC row label — include surcharge labels only when present
+  // Build DHC row label — use actual extracted labels when present
   const dhcCombinedTotal = dhcTotal + fuelSurchargeTotal + dynamicPriceFactorTotal;
+  const fuelLabel = docs.find(d => d.allied_report?.fuel_surcharge_label)?.allied_report?.fuel_surcharge_label || 'FUEL SURCHARGE';
+  const dpfLabel  = docs.find(d => d.allied_report?.dynamic_price_factor_label)?.allied_report?.dynamic_price_factor_label || 'DPF';
   const dhcLabelParts = ['DHC'];
-  if (fuelSurchargeTotal > 0) dhcLabelParts.push('FUEL SURCHARGE');
-  if (dynamicPriceFactorTotal > 0) dhcLabelParts.push('DPF');
+  if (fuelSurchargeTotal > 0) dhcLabelParts.push(fuelLabel);
+  if (dynamicPriceFactorTotal > 0) dhcLabelParts.push(dpfLabel);
   const dhcLabel = dhcLabelParts.join(' + ');
 
   const rows: { desc: string; amount: number }[] = [];

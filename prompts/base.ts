@@ -135,8 +135,8 @@ EXTRACTION RULES FOR "Allied Report" (Transport Team):
 - DETENTION: The amount from any row where Customer Type is "DETENTION" for this container. Null if not present.
 - WASHING: The amount from any row where Customer Type contains "WASHING" or "FB CHEMICAL WASHING" for this container. Null if not present.
 - DEMURRAGE: The amount from any row where Customer Type is "DEMURRAGE" for this container. Null if not present.
-- FUEL SURCHARGE: The amount from any row where Customer Type is "FUEL SURCHARGE" or "EFS" or "ENERGY FUEL SURCHARGE" for this container. Store separately in fuel_surcharge — do NOT add to dhc_in. Null if not present.
-- DYNAMIC PRICE FACTOR: The amount from any row where Customer Type contains "DYNAMIC PRICE FACTOR" for this container (e.g. "DYNAMIC PRICE FACTOR (IN)"). Store in dynamic_price_factor. Null if not present.
+- FUEL SURCHARGE: The amount from any row where Customer Type is "FUEL SURCHARGE" or "EFS" or "ENERGY FUEL SURCHARGE" for this container. Store the numeric amount in fuel_surcharge and the exact Customer Type text (e.g. "EFS", "FUEL SURCHARGE") in fuel_surcharge_label. Do NOT add to dhc_in. Null if not present.
+- DYNAMIC PRICE FACTOR: The amount from any row where Customer Type contains "DYNAMIC PRICE FACTOR" for this container (e.g. "DYNAMIC PRICE FACTOR (IN)"). Store the numeric amount in dynamic_price_factor and the exact Customer Type text in dynamic_price_factor_label. Null if not present.
 
 EXTRACTION RULES FOR "CDAS Report" (Transport Team):
 - DOCUMENT STRUCTURE: This is a "TRANSPORTER DAILY TRANSACTION REPORT". It has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each section has a transaction table.
@@ -153,7 +153,7 @@ EXTRACTION RULES FOR "CDAS Report" (Transport Team):
   - "REPAIR" or "DAMAGE" → repair
   - "WASHING" or "FB WATER WASHING" or "WATER WASHING" → washing
   - "DEMURRAGE" → demurrage
-  - "FUEL SURCHARGE" or "EFS" or "ENERGY FUEL SURCHARGE" or "FUEL SURCHARGE IN" → fuel_surcharge (store separately, do NOT add to dhc_in)
+  - "FUEL SURCHARGE" or "EFS" or "ENERGY FUEL SURCHARGE" or "FUEL SURCHARGE IN" → fuel_surcharge (numeric amount) and fuel_surcharge_label (exact charge name as it appears, e.g. "EFS", "FUEL SURCHARGE IN"). Store separately, do NOT add to dhc_in.
 - Strip the "$" symbol and return numeric strings only (e.g. "75.00" not "$75.00").
 - SAME CONTAINER ACROSS ROWS (CWT pattern): Some depots list DHC and EFS/FUEL SURCHARGE as separate rows for the same container number. When you see the same container number twice in the same depot section, merge both rows into ONE CDAS entry: dhc_in from the DHC row, fuel_surcharge from the EFS/FUEL SURCHARGE row.
 
@@ -295,7 +295,9 @@ Respond ONLY with valid JSON matching this exact structure:
         "detention": "string or null",
         "demurrage": "string or null",
         "fuel_surcharge": "string or null — amount from FUEL SURCHARGE or EFS rows, stored separately from dhc_in",
-        "dynamic_price_factor": "string or null — amount from DYNAMIC PRICE FACTOR rows"
+        "fuel_surcharge_label": "string or null — exact charge name as printed (e.g. 'EFS', 'FUEL SURCHARGE')",
+        "dynamic_price_factor": "string or null — amount from DYNAMIC PRICE FACTOR rows",
+        "dynamic_price_factor_label": "string or null — exact charge name as printed (e.g. 'DYNAMIC PRICE FACTOR (IN)')"
       },
       "cdas_report": {
         "container_number": "string or null",
@@ -309,7 +311,8 @@ Respond ONLY with valid JSON matching this exact structure:
         "repair": "string or null",
         "detention": "string or null",
         "demurrage": "string or null",
-        "fuel_surcharge": "string or null — amount from FUEL SURCHARGE, EFS, or ENERGY FUEL SURCHARGE in Depot Remark, stored separately from dhc_in"
+        "fuel_surcharge": "string or null — amount from FUEL SURCHARGE, EFS, or ENERGY FUEL SURCHARGE in Depot Remark, stored separately from dhc_in",
+        "fuel_surcharge_label": "string or null — exact charge name as it appears in Depot Remark (e.g. 'EFS', 'FUEL SURCHARGE IN', 'FUEL SURCHARGE')"
       },
       "export_permit_pss": {
         "items": [

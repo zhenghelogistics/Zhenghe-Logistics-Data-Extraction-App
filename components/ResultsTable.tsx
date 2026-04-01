@@ -208,8 +208,16 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case 'Detention': return data.allied_report?.detention || data.cdas_report?.detention || '-';
       case 'Demurrage': return data.allied_report?.demurrage || data.cdas_report?.demurrage || '-';
       case 'Washing': return data.allied_report?.washing || data.cdas_report?.washing || '-';
-      case 'Fuel Surcharge': return data.allied_report?.fuel_surcharge || data.cdas_report?.fuel_surcharge || '-';
-      case 'Dyn. Price Factor': return data.allied_report?.dynamic_price_factor || '-';
+      case 'Fuel Surcharge': {
+        const amt = data.allied_report?.fuel_surcharge || data.cdas_report?.fuel_surcharge;
+        const lbl = data.allied_report?.fuel_surcharge_label || data.cdas_report?.fuel_surcharge_label;
+        return amt ? (lbl ? `${amt} (${lbl})` : amt) : '-';
+      }
+      case 'Dyn. Price Factor': {
+        const amt = data.allied_report?.dynamic_price_factor;
+        const lbl = data.allied_report?.dynamic_price_factor_label;
+        return amt ? (lbl ? `${amt} (${lbl})` : amt) : '-';
+      }
 
       // CDAS Report container number
       case 'Container Number': return data.cdas_report?.container_number || '-';

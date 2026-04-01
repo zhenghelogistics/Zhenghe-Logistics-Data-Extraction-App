@@ -126,15 +126,17 @@ EXTRACTION RULES FOR "Allied Report" (Transport Team):
 - GROUP BY CONTAINER: For each unique Container/Booking No, create ONE Allied Report entry collecting all its charges across all rows.
 - EXAMPLE: Container CMAU7642286 appears in rows for "DATA ADMIN FEE (IN)" ($5), "DHE IN" ($4), "DHC IN" ($80), and "REPAIR" ($21.35) — these all merge into ONE entry: dhc_in=80, dhe_in=4, data_admin_fee=5, repair=21.35.
 - INVOICE DATE: Extract the date from the "Date" column on the far right of ANY row in the summary table (all rows share the same report date). The format on the document is DD/MM/YYYY HH:MM — convert to YYYY-MM-DD (e.g. "12/11/2025 08:46" → "2025-11-12"). Use this same date for ALL containers extracted from this report. Also set metadata.date to this same value.
-- DHC IN: The amount from any row where Customer Type is "DHC IN" for this container, PLUS any "FUEL SURCHARGE" amount for the same container — add them together and store the combined total in dhc_in (e.g. DHC IN $80 + FUEL SURCHARGE $15 → dhc_in = "95.00"). Null if neither is present.
+- DHC IN: The amount from any row where Customer Type is "DHC IN" for this container. Store the base DHC amount only — do NOT add fuel surcharge or dynamic price factor here. Null if not present.
 - DHC OUT: The amount from any row where Customer Type is "DHC OUT" for this container. Null if not present.
 - DHE IN: The amount from any row where Customer Type is "DHE IN" for this container (e.g. "4.00"). Null if not present.
 - DHE OUT: The amount from any row where Customer Type is "DHE OUT" for this container. Null if not present.
 - DATA ADMIN FEE: The amount from any row where Customer Type is "DATA ADMIN FEE (IN)" or "DATA ADMIN FEE (OUT)" for this container (e.g. "5.00"). Null if not present.
 - REPAIR: The amount from any row where Customer Type is "REPAIR" for this container. Null if not present.
 - DETENTION: The amount from any row where Customer Type is "DETENTION" for this container. Null if not present.
-- WASHING: The amount from any row where Customer Type is "WASHING" for this container. Null if not present.
+- WASHING: The amount from any row where Customer Type contains "WASHING" or "FB CHEMICAL WASHING" for this container. Null if not present.
 - DEMURRAGE: The amount from any row where Customer Type is "DEMURRAGE" for this container. Null if not present.
+- FUEL SURCHARGE: The amount from any row where Customer Type is "FUEL SURCHARGE" or "EFS" or "ENERGY FUEL SURCHARGE" for this container. Store separately in fuel_surcharge — do NOT add to dhc_in. Null if not present.
+- DYNAMIC PRICE FACTOR: The amount from any row where Customer Type contains "DYNAMIC PRICE FACTOR" for this container (e.g. "DYNAMIC PRICE FACTOR (IN)"). Store in dynamic_price_factor. Null if not present.
 
 EXTRACTION RULES FOR "CDAS Report" (Transport Team):
 - DOCUMENT STRUCTURE: This is a "TRANSPORTER DAILY TRANSACTION REPORT". It has multiple depot sections (e.g. CHUAN LI CONTAINER, Cogent Container Depot, CWT Tuas, TONG CONTAINERS DEPOT). Each section has a transaction table.
@@ -142,7 +144,7 @@ EXTRACTION RULES FOR "CDAS Report" (Transport Team):
 - INVOICE DATE: Extract the date from the "Bill Date" column in each row (e.g. "5-Nov-2025"). All rows in the same report share the same Bill Date — use it for every container entry. Convert to YYYY-MM-DD (e.g. "5-Nov-2025" → "2025-11-05"). Also set metadata.date to this same value.
 - CONTAINER NUMBER: From the "Container Number" column.
 - DEPOT REMARK PARSING: The "Depot Remark" column contains semicolon-separated charge pairs like "CHARGE NAME; $AMOUNT". Parse each pair to fill the correct field:
-  - "DHC IN" or "DHC" or "DEPOT HANDLING CHARGE" (no OUT) → dhc_in. Also add any "FUEL SURCHARGE" amount in the same row to dhc_in (e.g. DHC IN $80 + FUEL SURCHARGE $15 → dhc_in = "95.00")
+  - "DHC IN" or "DHC" or "DEPOT HANDLING CHARGE" (no OUT) → dhc_in (base amount only — do NOT add fuel surcharge here)
   - "DHC OUT" → dhc_out
   - "DHE IN" or "DHE" (no OUT) → dhe_in
   - "DHE OUT" → dhe_out
@@ -151,7 +153,9 @@ EXTRACTION RULES FOR "CDAS Report" (Transport Team):
   - "REPAIR" or "DAMAGE" → repair
   - "WASHING" or "FB WATER WASHING" or "WATER WASHING" → washing
   - "DEMURRAGE" → demurrage
+  - "FUEL SURCHARGE" or "EFS" or "ENERGY FUEL SURCHARGE" or "FUEL SURCHARGE IN" → fuel_surcharge (store separately, do NOT add to dhc_in)
 - Strip the "$" symbol and return numeric strings only (e.g. "75.00" not "$75.00").
+- SAME CONTAINER ACROSS ROWS (CWT pattern): Some depots list DHC and EFS/FUEL SURCHARGE as separate rows for the same container number. When you see the same container number twice in the same depot section, merge both rows into ONE CDAS entry: dhc_in from the DHC row, fuel_surcharge from the EFS/FUEL SURCHARGE row.
 
 EXTRACTION RULES FOR "Export Permit Declaration (PSS)" (Logistics/Shipping Team):
 - DOCUMENT STRUCTURE: Either (A) a PSS shipment bundle — Purchase Order(s), Commercial Invoice, Packing List, Loading Report, and/or supporting docs; OR (B) a standalone Proforma Invoice / Delivery Note from an overseas supplier to a Singapore receiver.
@@ -289,7 +293,9 @@ Respond ONLY with valid JSON matching this exact structure:
         "washing": "string or null",
         "repair": "string or null",
         "detention": "string or null",
-        "demurrage": "string or null"
+        "demurrage": "string or null",
+        "fuel_surcharge": "string or null — amount from FUEL SURCHARGE or EFS rows, stored separately from dhc_in",
+        "dynamic_price_factor": "string or null — amount from DYNAMIC PRICE FACTOR rows"
       },
       "cdas_report": {
         "container_number": "string or null",
@@ -302,7 +308,8 @@ Respond ONLY with valid JSON matching this exact structure:
         "washing": "string or null",
         "repair": "string or null",
         "detention": "string or null",
-        "demurrage": "string or null"
+        "demurrage": "string or null",
+        "fuel_surcharge": "string or null — amount from FUEL SURCHARGE, EFS, or ENERGY FUEL SURCHARGE in Depot Remark, stored separately from dhc_in"
       },
       "export_permit_pss": {
         "items": [

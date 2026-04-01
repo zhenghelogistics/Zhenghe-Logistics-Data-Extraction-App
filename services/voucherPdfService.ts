@@ -77,12 +77,14 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   const detentionEntries: ContainerEntry[] = [];
   let demurrageTotal = 0;
   const demurrageEntries: ContainerEntry[] = [];
+  let fuelSurchargeTotal = 0;
 
   for (const doc of docs) {
     const c = doc.cdas_report;
     if (!c) continue;
     // DHC + DHE lumped together, no container breakdown
     dhcTotal   += parse(c.dhc_in) + parse(c.dhc_out) + parse(c.dhe_in) + parse(c.dhe_out);
+    fuelSurchargeTotal += parse(c.fuel_surcharge);
     // Admin fee lump, no breakdown
     adminTotal += parse(c.data_admin_fee);
     // Washing: per-container amount shown
@@ -102,9 +104,12 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   const containerDetail = (entries: ContainerEntry[]) =>
     entries.map(e => `${e.container} $${e.amount}/-`).join(', ');
 
+  const dhcCombinedTotal = dhcTotal + fuelSurchargeTotal;
+  const dhcLabel = fuelSurchargeTotal > 0 ? 'DHC + FUEL SURCHARGE' : 'DHC';
+
   const rows: { desc: string; amount: number }[] = [];
-  if (dhcTotal > 0)        rows.push({ desc: 'DHC', amount: dhcTotal });
-  if (adminTotal > 0)      rows.push({ desc: 'ADMIN FEE', amount: adminTotal });
+  if (dhcCombinedTotal > 0) rows.push({ desc: dhcLabel, amount: dhcCombinedTotal });
+  if (adminTotal > 0)       rows.push({ desc: 'ADMIN FEE', amount: adminTotal });
   if (washingTotal > 0)    rows.push({ desc: washingEntries.length ? `WASHING - ${containerDetail(washingEntries)}` : 'WASHING', amount: washingTotal });
   if (repairTotal > 0)     rows.push({ desc: repairEntries.length ? `REPAIR - ${containerDetail(repairEntries)}` : 'REPAIR', amount: repairTotal });
   if (detentionTotal > 0)  rows.push({ desc: detentionEntries.length ? `DETENTION - ${containerDetail(detentionEntries)}` : 'DETENTION', amount: detentionTotal });
@@ -191,6 +196,8 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
   const detentionEntries: ContainerEntry[] = [];
   let demurrageTotal = 0;
   const demurrageEntries: ContainerEntry[] = [];
+  let fuelSurchargeTotal = 0;
+  let dynamicPriceFactorTotal = 0;
 
   for (const doc of docs) {
     const a = doc.allied_report;
@@ -198,6 +205,8 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
     dhcTotal  += parse(a.dhc_in) + parse(a.dhc_out);
     dheTotal  += parse(a.dhe_in) + parse(a.dhe_out);
     adminTotal += parse(a.data_admin_fee);
+    fuelSurchargeTotal += parse(a.fuel_surcharge);
+    dynamicPriceFactorTotal += parse(a.dynamic_price_factor);
     const w = parse(a.washing);
     if (w > 0) { washingTotal += w; if (a.container_booking_no) washingEntries.push({ container: a.container_booking_no, amount: w }); }
     const r = parse(a.repair);
@@ -211,9 +220,16 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
   const containerDetail = (entries: ContainerEntry[]) =>
     entries.map(e => `${e.container} $${e.amount}/-`).join(', ');
 
+  // Build DHC row label — include surcharge labels only when present
+  const dhcCombinedTotal = dhcTotal + fuelSurchargeTotal + dynamicPriceFactorTotal;
+  const dhcLabelParts = ['DHC'];
+  if (fuelSurchargeTotal > 0) dhcLabelParts.push('FUEL SURCHARGE');
+  if (dynamicPriceFactorTotal > 0) dhcLabelParts.push('DPF');
+  const dhcLabel = dhcLabelParts.join(' + ');
+
   const rows: { desc: string; amount: number }[] = [];
-  if (dhcTotal > 0)        rows.push({ desc: 'DHC', amount: dhcTotal });
-  if (dheTotal > 0)        rows.push({ desc: 'DHE', amount: dheTotal });
+  if (dhcCombinedTotal > 0) rows.push({ desc: dhcLabel, amount: dhcCombinedTotal });
+  if (dheTotal > 0)         rows.push({ desc: 'DHE', amount: dheTotal });
   if (adminTotal > 0)      rows.push({ desc: 'ADMIN FEE', amount: adminTotal });
   if (washingTotal > 0)    rows.push({ desc: washingEntries.length ? `WASHING - ${containerDetail(washingEntries)}` : 'WASHING', amount: washingTotal });
   if (repairTotal > 0)     rows.push({ desc: repairEntries.length ? `REPAIR - ${containerDetail(repairEntries)}` : 'REPAIR', amount: repairTotal });

@@ -72,13 +72,13 @@ export const AppConfig = {
       columns: ['Container #', 'Type', 'Status', 'Charges', 'Washing Fees'],
     },
     'Allied Report': {
-      columns: ['Container/Booking No', 'DHC In', 'DHC Out', 'DHE In', 'DHE Out', 'Data Admin Fee', 'Washing', 'Repair', 'Detention', 'Demurrage'],
+      columns: ['Container/Booking No', 'DHC In', 'DHC Out', 'DHE In', 'DHE Out', 'Data Admin Fee', 'Washing', 'Repair', 'Detention', 'Demurrage', 'Fuel Surcharge', 'Dyn. Price Factor'],
     },
     'CDAC Report': {
       columns: ['Container Number', 'Repair', 'Detention', 'Demurage', 'Admin Fees', 'Washing', 'DHC'],
     },
     'CDAS Report': {
-      columns: ['Container Number', 'DHC In', 'DHC Out', 'DHE In', 'DHE Out', 'Data Admin Fee', 'Washing', 'Repair', 'Detention', 'Demurrage'],
+      columns: ['Container Number', 'DHC In', 'DHC Out', 'DHE In', 'DHE Out', 'Data Admin Fee', 'Washing', 'Repair', 'Detention', 'Demurrage', 'Fuel Surcharge'],
     },
     'Export Permit Declaration (PSS)': {
       columns: ['A. HS Code', 'B. Qty', 'C. UOM', 'D. Item Description', 'E. Product of Origin', 'F. Nett Weight (KGS)', 'G. Nett Wt Unit', 'H. Amount', 'I. Currency', 'J. PO Number', 'K. Invoice Number'],

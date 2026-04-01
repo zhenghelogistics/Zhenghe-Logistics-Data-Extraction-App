@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ProcessedFile, FileStatus, DocumentData } from '../types';
 import { AppConfig } from '../config';
 import { CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Trash2, FileText, RefreshCw, Copy } from 'lucide-react';
+import { LumaSpin } from './ui/luma-spin';
 import { UserRole } from '../users';
 
 interface ResultsTableProps {
@@ -466,47 +467,22 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
           <tbody className="bg-surface-lowest">
             {/* Render Processing Files first (if in All tab) */}
             {processingFiles.map(file => (
-               <tr key={file.id} className="hover:bg-surface-low transition-colors">
-                 <td className="whitespace-nowrap py-3.5 pl-4 pr-3 text-sm text-secondary sm:pl-5 font-medium">
-                   {file.status === FileStatus.PROCESSING ? 'Processing...' : file.status === FileStatus.PENDING ? 'Pending' : 'Error'}
-                 </td>
-                 <td colSpan={dynamicHeaders.length - 4} className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">
-                   {file.status === FileStatus.ERROR
-                     ? <span className="text-red-500">{file.errorMessage || 'Unknown Error'}</span>
-                     : <span className="inline-flex items-center gap-1.5"><Loader2 size={11} className="animate-spin shrink-0" />{file.stage || 'Analysis in progress'}</span>}
-                 </td>
-                 <td className="whitespace-nowrap px-3 py-3.5 text-sm text-[#4a5568]">{file.file.name}</td>
-                 <td className="whitespace-nowrap px-3 py-3.5 text-sm">
-                   <div className="relative inline-block">
-                     {renderStatusBadge(file.status as FileStatus, file.validationErrors, file.id)}
-                     {errorPopover?.fileId === file.id && (
-                       <div className="absolute z-50 left-0 top-full mt-1 w-80 bg-surface-lowest border border-amber-100 rounded-lg shadow-lg p-3">
-                         <div className="flex items-center justify-between mb-2">
-                           <span className="text-xs font-semibold text-amber-700">Extraction warnings</span>
-                           <button type="button" onClick={() => setErrorPopover(null)} className="text-outline hover:text-primary text-xs">✕</button>
-                         </div>
-                         <ul className="space-y-1">
-                           {errorPopover.errors.map((e, i) => (
-                             <li key={i} className="text-xs text-primary bg-amber-50 rounded px-2 py-1">{e}</li>
-                           ))}
-                         </ul>
-                       </div>
-                     )}
-                   </div>
-                 </td>
-                 <td className="whitespace-nowrap px-3 py-3.5 text-sm text-right">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteFile(file.id);
-                      }}
-                      className="text-outline hover:text-red-600 cursor-pointer transition-colors"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                 </td>
-               </tr>
+              <tr key={file.id}>
+                <td colSpan={dynamicHeaders.length + 1} className="py-8 px-4">
+                  {file.status === FileStatus.ERROR ? (
+                    <div className="flex items-center gap-2 justify-center text-sm text-red-500">
+                      <XCircle size={14} />
+                      {file.errorMessage || 'Unknown Error'}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3">
+                      <LumaSpin color="#091426" />
+                      <p className="text-sm font-medium text-primary">{file.stage || 'Analysis in progress'}</p>
+                      <p className="text-xs text-[#4a5568]">{file.file.name}</p>
+                    </div>
+                  )}
+                </td>
+              </tr>
             ))}
 
             {/* Render Completed/Warning Rows */}

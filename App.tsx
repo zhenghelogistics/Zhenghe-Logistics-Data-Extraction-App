@@ -16,6 +16,7 @@ import JSZip from 'jszip';
 import ConfirmationModal from './components/ConfirmationModal';
 import ToastStack, { Toast } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
+import { LumaSpin } from './components/ui/luma-spin';
 import {
   User, LogOut, Upload, Zap, Download, FileText, Loader2,
   FolderOpen, LayoutDashboard, Receipt, FileCheck2, CreditCard,
@@ -280,7 +281,7 @@ function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-primary">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-secondary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <LumaSpin color="white" />
           <p className="text-surface-container text-sm">Loading session...</p>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as Sentry from '@sentry/react';
 import { useAuth } from './hooks/useAuth';
 import { useFileProcessor } from './hooks/useFileProcessor';
 import ResultsTable from './components/ResultsTable';
@@ -429,7 +430,7 @@ function App() {
 
               {/* SENTRY TEST — remove after verifying errors appear in Sentry dashboard */}
               <button
-                onClick={() => { throw new Error('Sentry test error — safe to ignore'); }}
+                onClick={() => Sentry.captureException(new Error('Sentry test error — safe to ignore'))}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-colors cursor-pointer"
               >
                 🧪 Test Sentry

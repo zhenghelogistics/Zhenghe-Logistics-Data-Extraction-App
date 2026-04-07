@@ -10,6 +10,7 @@ Sentry.init({
   environment: import.meta.env.MODE,
   integrations: [Sentry.browserTracingIntegration()],
   tracesSampleRate: 0.2,
+  sendDefaultPii: true,
 });
 
 const rootElement = document.getElementById('root');

@@ -1,8 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import * as Sentry from '@sentry/react';
 import './index.css';
 import App from './App';
+
+Sentry.init({
+  dsn: import.meta.env.VITE_SENTRY_DSN,
+  environment: import.meta.env.MODE,
+  integrations: [Sentry.browserTracingIntegration()],
+  tracesSampleRate: 0.2,
+});
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

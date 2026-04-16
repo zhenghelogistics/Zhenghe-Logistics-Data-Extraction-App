@@ -640,9 +640,9 @@ export const extractDocumentData = async (
   onProgress?.('Reading PDF...');
   // Accounts docs can have many BL+Invoice pairs per file — use smaller chunks so
   // each API call has ~3-5 documents rather than 20+, avoiding output token truncation.
-  // Scanned OPD/SI PDFs (logistics) are image-heavy — Claude does OCR per page, timing out at 15.
-  // Logistics uses 8 pages (~4 SIs per batch); accounts uses 15; transport (table rows) uses 30.
-  const chunkSize = role === 'logistics' ? 8 : role === 'accounts' ? 15 : 30;
+  // Accounts docs can have many BL+Invoice pairs per file — use smaller chunks so
+  // each API call has ~3-5 documents rather than 20+, avoiding output token truncation.
+  const chunkSize = role === 'accounts' ? 15 : 30;
   // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
   const chunkOverlap = role === 'accounts' ? 3 : 0;
   let chunks: Awaited<ReturnType<typeof splitPdfIntoChunks>>;

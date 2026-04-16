@@ -642,7 +642,7 @@ export const extractDocumentData = async (
   // each API call has ~3-5 documents rather than 20+, avoiding output token truncation.
   // Accounts docs can have many BL+Invoice pairs per file — use smaller chunks so
   // each API call has ~3-5 documents rather than 20+, avoiding output token truncation.
-  const chunkSize = role === 'accounts' ? 15 : 30;
+  const chunkSize = role === 'transport' ? 30 : 15;
   // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
   const chunkOverlap = role === 'accounts' ? 3 : 0;
   let chunks: Awaited<ReturnType<typeof splitPdfIntoChunks>>;

@@ -467,6 +467,7 @@ const extractFromChunk = async (
         const status = apiRes.status;
         if (status === 429) throw makeError('ERR-RATE-LIMIT', `Rate limited (HTTP 429)`);
         if (status === 401 || status === 403) throw makeError('ERR-AUTH', `Authentication failed (HTTP ${status})`);
+        if (status === 504) throw makeError('ERR-TIMEOUT', `Gateway timeout — PDF chunk too large or Claude took too long (HTTP 504)`);
         if (status >= 500) throw makeError('ERR-API-500', err.error || `Server error (HTTP ${status})`);
         throw makeError('ERR-API-UNKNOWN', err.error || `HTTP ${status}`);
       }
@@ -639,7 +640,7 @@ export const extractDocumentData = async (
   onProgress?.('Reading PDF...');
   // Accounts docs can have many BL+Invoice pairs per file — use smaller chunks so
   // each API call has ~3-5 documents rather than 20+, avoiding output token truncation.
-  const chunkSize = role === 'accounts' ? 15 : 50;
+  const chunkSize = role === 'accounts' ? 15 : 30;
   // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
   const chunkOverlap = role === 'accounts' ? 3 : 0;
   let chunks: Awaited<ReturnType<typeof splitPdfIntoChunks>>;

@@ -21,6 +21,39 @@ const UPDATES: Update[] = [
     ],
   },
   {
+    date: '16 Apr 2026',
+    title: 'Large PDF Processing Improvements',
+    description: 'Large logistics PDFs are less likely to time out during extraction.',
+    items: [
+      'Logistics PDFs are now split into smaller batches before sending to Claude — reduces the chance of hitting the 60-second server time limit',
+      'Timeout errors now show a clear [ERR-TIMEOUT] code with the batch number so you know exactly where it failed',
+      'Very large files (e.g. 90+ page OPD bundles) may still time out — splitting the file into smaller PDFs before uploading is the recommended workaround for now',
+    ],
+  },
+  {
+    date: '15 Apr 2026',
+    title: 'Logistics Local Charges Extraction Fixes',
+    description: 'Several extraction bugs affecting the Shipping Department\'s Local Charges table have been fixed.',
+    items: [
+      'Forwarder-issued invoices now correctly use the House BL number — previously they sometimes used the Master BL number',
+      'ISOCC (International Seal) is no longer incorrectly included in Seal Fee or Other Charges — it is not a local charge',
+      'For OOCL multi-BL invoices, the per-unit seal rate is now applied to every BL entry, not just the first one',
+      'ADV MFST CHGR (Advance Manifest Charge) is now captured in column L with correct USD→SGD conversion',
+      'Surrender Fee and Food Grade are no longer included in the charges summary — they are not local charges',
+    ],
+  },
+  {
+    date: '1 Apr 2026',
+    title: 'Fuel Surcharge & Dynamic Price Factor (Transport Team)',
+    description: 'Allied and CDAS surcharges are now tracked separately and shown correctly on voucher PDFs.',
+    items: [
+      'Fuel Surcharge (EFS) and Dynamic Price Factor are now extracted as their own fields — no longer silently added into the DHC amount',
+      'The transport table shows new Fuel Surcharge and Dynamic Price Factor columns, showing the exact charge name from the document (e.g. "EFS", "DYNAMIC PRICE FACTOR (IN)")',
+      'Voucher PDFs now list each surcharge on its own line with the correct label and amount',
+      'The processing animation has been improved — file names and current stage are now shown clearly while extraction is running',
+    ],
+  },
+  {
     date: '31 Mar 2026',
     title: 'Stability & Security',
     description: 'The app is now more resilient to crashes and the API key is properly secured.',

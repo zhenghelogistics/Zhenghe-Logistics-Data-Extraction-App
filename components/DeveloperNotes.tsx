@@ -10,6 +10,17 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    date: '17 Apr 2026',
+    title: 'ONE BL Filing Charges Fixed',
+    description: 'AMS ADVANCE, ESD ENTRY SUMMARY, and EES EUROPE now land in the correct column with proper SGD conversion.',
+    items: [
+      'These ONE carrier charge codes were not recognised as ENS/AMS-type charges — they were incorrectly placed in column K (BL Printed Fee) instead of column L (ENS/AMS/SCMC)',
+      'USD amounts are now converted to SGD using the exchange rate printed on the BL (e.g. AMS ADVANCE USD 35 × 1.2753 = SGD 44.64)',
+      'When multiple filing charges appear on the same BL (e.g. ESD + EES EUROPE), they are now summed into a single SGD total in column L',
+      'Column K is now explicitly guarded — only charges labeled "PRINTED BL" or "BL PRINTED FEE" will populate it',
+    ],
+  },
+  {
     date: '31 Mar 2026',
     title: 'Stability & Security',
     description: 'The app is now more resilient to crashes and the API key is properly secured.',

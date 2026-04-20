@@ -638,11 +638,7 @@ export const extractDocumentData = async (
   };
 
   onProgress?.('Reading PDF...');
-  // Accounts docs can have many BL+Invoice pairs per file — use smaller chunks so
-  // each API call has ~3-5 documents rather than 20+, avoiding output token truncation.
-  // Accounts docs can have many BL+Invoice pairs per file — use smaller chunks so
-  // each API call has ~3-5 documents rather than 20+, avoiding output token truncation.
-  const chunkSize = role === 'transport' ? 30 : role === 'logistics' ? 8 : 15;
+  const chunkSize = role === 'transport' ? 30 : role === 'logistics' ? 15 : 15;
   // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
   const chunkOverlap = role === 'accounts' ? 3 : 0;
   let chunks: Awaited<ReturnType<typeof splitPdfIntoChunks>>;
@@ -652,17 +648,22 @@ export const extractDocumentData = async (
     throw makeError('ERR-PDF-READ', `Could not read or chunk the PDF: ${err?.message || 'unknown'}`, 'Reading PDF');
   }
 
-  const allDocs: DocumentData[] = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const label = chunks.length > 1
-      ? `Sending to Claude (batch ${i + 1} of ${chunks.length})`
-      : 'Sending to Claude';
-    onProgress?.(`${label}...`);
-    const result = await withBackoff(
-      () => extractFromChunk(chunks[i].base64, systemPrompt, role),
-      label
-    );
-    allDocs.push(...result);
+  const totalChunks = chunks.length;
+  onProgress?.(totalChunks > 1 ? `Sending to Claude (${totalChunks} batches in parallel)...` : 'Sending to Claude...');
+
+  const chunkSettled = await Promise.allSettled(
+    chunks.map((chunk, i) => {
+      const label = totalChunks > 1 ? `batch ${i + 1} of ${totalChunks}` : 'Sending to Claude';
+      return withBackoff(() => extractFromChunk(chunk.base64, systemPrompt, role), label);
+    })
+  );
+
+  // Collect successful chunks — don't let one bad chunk discard everyone else's results
+  const allDocs: DocumentData[] = chunkSettled.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+  const failedChunks = chunkSettled.filter(r => r.status === 'rejected');
+  if (failedChunks.length > 0 && allDocs.length === 0) {
+    // All chunks failed — surface the first error
+    throw (failedChunks[0] as PromiseRejectedResult).reason;
   }
 
   onProgress?.('Processing results...');

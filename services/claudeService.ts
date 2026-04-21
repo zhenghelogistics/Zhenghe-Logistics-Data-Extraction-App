@@ -638,7 +638,7 @@ export const extractDocumentData = async (
   };
 
   onProgress?.('Reading PDF...');
-  const chunkSize = role === 'transport' ? 30 : role === 'logistics' ? 15 : 15;
+  const chunkSize = role === 'transport' ? 30 : role === 'logistics' ? 10 : 15;
   // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
   // logistics: 1-page overlap so 2-page SIs that straddle chunk boundaries are complete in the next chunk
   const chunkOverlap = role === 'accounts' ? 3 : role === 'logistics' ? 1 : 0;

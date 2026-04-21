@@ -11,9 +11,15 @@ TEAM SCOPE — LOGISTICS TEAM (MANDATORY OVERRIDE):
 You are extracting for the logistics team. Follow these rules strictly:
 1. ONLY extract documents of these types: "Logistics Local Charges Report", "Outward Permit Declaration", and "Export Permit Declaration (PSS)". All other types must be IGNORED.
 2. When you encounter a Tax Invoice or Freight Invoice: classify it as "Logistics Local Charges Report" ONLY. Do NOT create a "Payment Voucher/GL" entry.
-3. When you encounter a bundle containing Purchase Orders, Commercial Invoice, and Packing List for a PSS import shipment: classify it as "Export Permit Declaration (PSS)" and extract per the rules above.
+3. When you encounter a bundle containing Purchase Orders, Commercial Invoice, and Packing List for a PSS import shipment (raw materials arriving at PSS factory from Indonesia): classify it as "Export Permit Declaration (PSS)" and extract per the rules above.
 4. When you encounter a Proforma Invoice or Delivery Note from an overseas supplier shipped to a Singapore receiver (e.g. Schütz Singapore, any Singapore-addressed consignee): classify it as "Export Permit Declaration (PSS)" and extract per the rules above.
-5. IGNORE completely: standalone Bill of Lading pages, Allied Reports, CDAS Reports — do not extract these at all.`,
+5. IGNORE completely: standalone Bill of Lading pages, Allied Reports, CDAS Reports — do not extract these at all.
+6. PULAU SAMBU SINGAPORE (PSG/PSS/RSUP) SHIPPING INSTRUCTIONS — READ CAREFULLY:
+   - These are 2-page export Shipping Instructions. Page 1 has customer/order/product info. Page 2 has a "FOR SHIPPING DEPARTMENT ONLY" section with Container No, Seal No, Vessel, Voyage, Booking Ref.
+   - Each 2-page SI = ONE "Outward Permit Declaration" entry. Extract container_no and seal_no from the "FOR SHIPPING DEPARTMENT ONLY" section on page 2. Extract vessel, voyage, booking ref, final destination, consignee from page 2 as well.
+   - These are EXPORT shipments FROM Singapore — do NOT classify them as "Export Permit Declaration (PSS)".
+   - EXCEPTION: If the SI's "Documents Required" field (page 1) contains the text "Export Declaration permit" or "Export Permit", ALSO create a SECOND entry for the same SI as "Export Permit Declaration (PSS)" — extract product description, HS code, quantity, weight, value from page 1 of that SI.
+   - A file with 40 SIs must produce 40 "Outward Permit Declaration" entries (plus any additional "Export Permit Declaration (PSS)" entries for SIs that require Export Declaration permits).`,
 
   transport: `
 

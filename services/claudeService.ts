@@ -342,11 +342,11 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
     } else if (doc.document_type === "Outward Permit Declaration") {
       const opd = doc.outward_permit_declaration;
       const containerNo = opd?.container_no?.trim().toUpperCase();
-      const seqNo = opd?.sequence_no ? String(opd.sequence_no).trim() : null;
-      const poNo = opd?.bl_number?.trim().toUpperCase() || (opd as any)?.customer_order_info?.purchase_order?.trim().toUpperCase();
-      // Use container_no as key if valid, else fall back to sequence_no or purchase_order
+      // Only deduplicate on container_no — multiple SIs can share the same BL number
+      // (multi-container shipments), so using bl_number as a fallback key would silently
+      // drop valid SIs. Without a container, keep every entry unconditionally.
       const isValidContainer = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
-      const key = isValidContainer ? `OPD_${containerNo}` : seqNo ? `OPD_SEQ_${seqNo}` : poNo ? `OPD_PO_${poNo}` : `OPD_${Math.random()}`;
+      const key = isValidContainer ? `OPD_${containerNo}` : `OPD_${Math.random()}`;
       if (!uniqueDocs.has(key)) uniqueDocs.set(key, doc);
     } else if (doc.document_type === 'Allied Report') {
       // Allied/CDAS Reports are deduplicated exclusively by deduplicateByContainer.

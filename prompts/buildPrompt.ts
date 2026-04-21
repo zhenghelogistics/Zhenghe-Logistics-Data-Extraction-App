@@ -32,8 +32,8 @@ You are extracting for the transport team. Follow these rules strictly:
 
 // Build final prompt. Accounts and logistics roles get their own lean prompts.
 export const buildSystemPrompt = (customInstructions: string[], role?: string): string => {
-  let prompt = role === 'accounts' ? ACCOUNTS_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
-  if (role && role !== 'accounts' && ROLE_SCOPE[role]) prompt += ROLE_SCOPE[role];
+  let prompt = role === 'accounts' ? ACCOUNTS_SYSTEM_PROMPT : role === 'logistics' ? LOGISTICS_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
+  if (role && role !== 'accounts' && role !== 'logistics' && ROLE_SCOPE[role]) prompt += ROLE_SCOPE[role];
   if (customInstructions.length > 0) {
     const rules = customInstructions.map((rule, i) => `${i + 1}. ${rule}`).join('\n');
     prompt += `\n\nADDITIONAL USER-DEFINED EXTRACTION RULES:\n${rules}`;

@@ -43,6 +43,9 @@ SPECIAL RULE FOR ONE (OCEAN NETWORK EXPRESS) FREIGHTED BLs:
 
 EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
 - DOCUMENT STRUCTURE: An OPD file typically contains multiple 2-page Shipping Instructions (SI) followed by a B/L Draft summary page. Each SI covers EXACTLY ONE container. Create ONE separate Outward Permit Declaration entry for EACH Shipping Instruction found. Do NOT create a separate entry for the B/L Draft summary page — use it for reference only (e.g. for BL number, carrier). For CONTAINER NO and SEAL NO, look in the "FOR SHIPPING DEPARTMENT ONLY" section at the bottom of page 2 of each SI (labeled "Container / Seal No: CONTAINER / SEAL").
+- PSG/PSS/RSUP SHIPPING INSTRUCTIONS: Documents on PULAU SAMBU SINGAPORE letterhead are export Shipping Instructions — each 2-page SI must become ONE "Outward Permit Declaration" entry. Page 1 has product/order/consignee info. Page 2 has the "FOR SHIPPING DEPARTMENT ONLY" section — extract container_no, seal_no, vessel, voyage, booking ref from there. These are EXPORT shipments from Singapore — NOT "Export Permit Declaration (PSS)".
+- EXCEPTION: If a PSG/PSS SI's "Documents Required" field (page 1) contains "Export Declaration permit" or "Export Permit", ALSO create a SECOND entry for that SI as "Export Permit Declaration (PSS)" with the product/HS code/weight/value from page 1.
+- A PDF with 40 SIs MUST produce 40 "Outward Permit Declaration" entries minimum. Do not skip any SI.
 - BL NUMBER: Booking reference / BL number from BL draft or Shipping Instruction (SI). Use the HBL if present, otherwise MBL.
 - CARRIER: Carrier/shipping line name from SI or BL draft letterhead.
 - CONSIGNEE: Consignee name and address from BL draft or SI.

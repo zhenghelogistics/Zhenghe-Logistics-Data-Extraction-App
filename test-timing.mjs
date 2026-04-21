@@ -33,7 +33,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 }
 
 // ─── Chunk sizes (mirrors claudeService.ts) ──────────────────────────────────
-const CHUNK_SIZE = role === "transport" ? 30 : role === "logistics" ? 10 : 15;
+const CHUNK_SIZE = role === "transport" ? 30 : role === "logistics" ? 8 : 15;
 const CHUNK_OVERLAP = role === "accounts" ? 3 : role === "logistics" ? 1 : 0;
 
 // ─── System prompts (inline minimal version for timing — same token ballpark) ─

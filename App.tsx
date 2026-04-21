@@ -275,6 +275,9 @@ function App() {
   const completedCount = files.filter(f => f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING).length;
   const processingCount = files.filter(f => f.status === FileStatus.PROCESSING).length;
   const errorCount = files.filter(f => f.status === FileStatus.ERROR).length;
+  const processingFile = files.find(f => f.status === FileStatus.PROCESSING);
+  const chunkProgress = processingFile?.progress ?? 0;
+  const chunkStage = processingFile?.stage ?? 'Analysing…';
   const hasFiles = files.length > 0;
 
   if (isSessionLoading) {
@@ -469,12 +472,12 @@ function App() {
               <div className="flex items-center justify-between text-xs text-[#4a5568] mb-1.5">
                 <span className="flex items-center gap-1.5">
                   <Loader2 size={11} className="animate-spin" />
-                  Processing {processingCount} file{processingCount !== 1 ? 's' : ''}...
+                  {chunkProgress > 0 ? chunkStage : `Processing ${processingCount} file${processingCount !== 1 ? 's' : ''}...`}
                 </span>
-                <span>{completedCount} of {files.length} complete</span>
+                <span>{chunkProgress > 0 ? `${chunkProgress}%` : `${completedCount} of ${files.length} complete`}</span>
               </div>
               <div className="h-1 bg-surface-container rounded-full overflow-hidden">
-                <div className="h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${files.length > 0 ? (completedCount / files.length) * 100 : 0}%` }} />
+                <div className="h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${chunkProgress > 0 ? chunkProgress : (files.length > 0 ? (completedCount / files.length) * 100 : 0)}%` }} />
               </div>
             </div>
           )}

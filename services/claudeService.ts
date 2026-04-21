@@ -340,11 +340,13 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
         uniqueDocs.set(key, doc);
       }
     } else if (doc.document_type === "Outward Permit Declaration") {
-      // Deduplicate OPD entries by container number; discard rows without a valid container (e.g. B/L Draft summary page)
-      const containerNo = doc.outward_permit_declaration?.container_no?.trim().toUpperCase();
+      const opd = doc.outward_permit_declaration;
+      const containerNo = opd?.container_no?.trim().toUpperCase();
+      const seqNo = opd?.sequence_no ? String(opd.sequence_no).trim() : null;
+      const poNo = opd?.bl_number?.trim().toUpperCase() || (opd as any)?.customer_order_info?.purchase_order?.trim().toUpperCase();
+      // Use container_no as key if valid, else fall back to sequence_no or purchase_order
       const isValidContainer = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
-      if (!isValidContainer) return;
-      const key = `OPD_${containerNo}`;
+      const key = isValidContainer ? `OPD_${containerNo}` : seqNo ? `OPD_SEQ_${seqNo}` : poNo ? `OPD_PO_${poNo}` : `OPD_${Math.random()}`;
       if (!uniqueDocs.has(key)) uniqueDocs.set(key, doc);
     } else if (doc.document_type === 'Allied Report') {
       // Allied/CDAS Reports are deduplicated exclusively by deduplicateByContainer.
@@ -638,7 +640,7 @@ export const extractDocumentData = async (
   };
 
   onProgress?.('Reading PDF...');
-  const chunkSize = role === 'transport' ? 30 : role === 'logistics' ? 10 : 15;
+  const chunkSize = role === 'transport' ? 30 : role === 'logistics' ? 8 : 15;
   // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
   // logistics: 1-page overlap so 2-page SIs that straddle chunk boundaries are complete in the next chunk
   const chunkOverlap = role === 'accounts' ? 3 : role === 'logistics' ? 1 : 0;

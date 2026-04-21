@@ -123,8 +123,8 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
       ));
       addLog(`Processing: ${fileWrapper.file.name}`);
       try {
-        const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage) => {
-          setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage } : f));
+        const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
+          setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage, progress } : f));
         }, userRole ?? undefined);
         const validationErrors = validateDocumentData(dataList);
         const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
@@ -175,12 +175,12 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
     if (!fileWrapper || fileWrapper.file.size === 0) return;
     setIsProcessing(true);
     setFiles(prev => prev.map(f =>
-      f.id === id ? { ...f, status: FileStatus.PROCESSING, data: undefined, errorMessage: undefined, validationErrors: undefined, stage: undefined } : f
+      f.id === id ? { ...f, status: FileStatus.PROCESSING, data: undefined, errorMessage: undefined, validationErrors: undefined, stage: undefined, progress: undefined } : f
     ));
     addLog(`Re-processing: ${fileWrapper.file.name}`);
     try {
-      const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage) => {
-        setFiles(prev => prev.map(f => f.id === id ? { ...f, stage } : f));
+      const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
+        setFiles(prev => prev.map(f => f.id === id ? { ...f, stage, progress } : f));
       }, userRole ?? undefined);
       const validationErrors = validateDocumentData(dataList);
       const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;

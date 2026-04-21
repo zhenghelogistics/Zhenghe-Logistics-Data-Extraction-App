@@ -602,7 +602,7 @@ const enrichMissingPSSNumbers = async (
 export const extractDocumentData = async (
   file: File,
   customInstructions: string[] = [],
-  onProgress?: (stage: string) => void,
+  onProgress?: (stage: string, progress?: number) => void,
   role?: string
 ): Promise<DocumentData[]> => {
   const systemPrompt = buildSystemPrompt(customInstructions, role);
@@ -650,12 +650,18 @@ export const extractDocumentData = async (
   }
 
   const totalChunks = chunks.length;
-  onProgress?.(totalChunks > 1 ? `Sending to Claude (${totalChunks} batches in parallel)...` : 'Sending to Claude...');
+  onProgress?.(totalChunks > 1 ? `Analysing 0 of ${totalChunks} batches…` : 'Sending to Claude…', 0);
 
+  let doneChunks = 0;
   const chunkSettled = await Promise.allSettled(
     chunks.map((chunk, i) => {
       const label = totalChunks > 1 ? `batch ${i + 1} of ${totalChunks}` : 'Sending to Claude';
-      return withBackoff(() => extractFromChunk(chunk.base64, systemPrompt, role), label);
+      return withBackoff(() => extractFromChunk(chunk.base64, systemPrompt, role), label).then(result => {
+        doneChunks++;
+        const pct = Math.round((doneChunks / totalChunks) * 90); // reserve last 10% for post-processing
+        onProgress?.(`Analysing ${doneChunks} of ${totalChunks} batch${totalChunks > 1 ? 'es' : ''}…`, pct);
+        return result;
+      });
     })
   );
 
@@ -667,7 +673,7 @@ export const extractDocumentData = async (
     throw (failedChunks[0] as PromiseRejectedResult).reason;
   }
 
-  onProgress?.('Processing results...');
+  onProgress?.('Processing results…', 95);
 
   const logDocs = (label: string, docs: DocumentData[], color: string) => {
     console.group(`%c[ZHL] ${label}`, `color:${color};font-weight:bold`);

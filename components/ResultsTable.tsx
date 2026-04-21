@@ -485,10 +485,24 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                       {file.errorMessage || 'Unknown Error'}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center gap-3">
+                    <div className="flex flex-col items-center gap-3 w-full max-w-xs">
                       <LumaSpin color="#091426" />
                       <p className="text-sm font-medium text-primary">{file.stage || 'Analysis in progress'}</p>
-                      <p className="text-xs text-[#4a5568]">{file.file.name}</p>
+                      {file.progress != null && (
+                        <div className="w-full">
+                          <div className="flex justify-between text-xs text-[#4a5568] mb-1">
+                            <span>{file.file.name}</span>
+                            <span>{file.progress}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-surface-low rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all duration-500"
+                              style={{ width: `${file.progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {file.progress == null && <p className="text-xs text-[#4a5568]">{file.file.name}</p>}
                     </div>
                   )}
                 </td>

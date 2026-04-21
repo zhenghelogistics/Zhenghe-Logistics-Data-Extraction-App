@@ -42,6 +42,8 @@ export default async function handler(req: any, res: any) {
   const resolvedUserText = userText ?? (
     role === "accounts"
       ? "This PDF may contain Bills of Lading, Tax Invoices/Freight Invoices, AND Customs Permits or Outward Permits. STEP 1: Scan EVERY page. STEP 2: For each Tax Invoice or Freight Invoice page found (carrier letterhead, charge table, Amount Due), output one 'Payment Voucher/GL' entry with that invoice number. STEP 3: For each BL page, output one 'Bill of Lading' entry. STEP 4: Completely ignore Customs Permit / Outward Permit pages. A single PDF with 1 BL + 1 Tax Invoice must produce 2 entries. Do NOT combine invoice numbers. Do NOT sum amounts. Return valid JSON only. No explanation, no markdown."
+      : role === "logistics"
+      ? "This PDF contains logistics documents — it may include multiple Shipping Instructions from PULAU SAMBU SINGAPORE. STEP 1: Scan EVERY single page — do not stop early. STEP 2: For EACH Shipping Instruction (2-page document with PULAU SAMBU SINGAPORE letterhead), create ONE separate 'Outward Permit Declaration' entry — find the container number and seal number in the 'FOR SHIPPING DEPARTMENT ONLY' section on page 2 of each SI. STEP 3: If this chunk has 15 Shipping Instructions, output 15 separate entries. Do NOT combine multiple SIs into one entry. Do NOT skip any SI. Return valid JSON only. No explanation, no markdown."
       : "Extract all documents from this PDF and return valid JSON only. No explanation, no markdown — just the JSON object."
   );
 

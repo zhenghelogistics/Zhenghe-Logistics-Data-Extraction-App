@@ -33,8 +33,8 @@ if (!process.env.ANTHROPIC_API_KEY) {
 }
 
 // ─── Chunk sizes (mirrors claudeService.ts) ──────────────────────────────────
-const CHUNK_SIZE = role === "transport" ? 30 : role === "logistics" ? 15 : 15;
-const CHUNK_OVERLAP = role === "accounts" ? 3 : 0;
+const CHUNK_SIZE = role === "transport" ? 30 : role === "logistics" ? 10 : 15;
+const CHUNK_OVERLAP = role === "accounts" ? 3 : role === "logistics" ? 1 : 0;
 
 // ─── System prompts (inline minimal version for timing — same token ballpark) ─
 // For 100% accuracy swap these for the real prompts from prompts/base.ts
@@ -46,7 +46,7 @@ const SYSTEM_PROMPTS = {
 
 const USER_TEXTS = {
   accounts: "This PDF may contain Bills of Lading, Tax Invoices/Freight Invoices, AND Customs Permits. Extract all entries. Return valid JSON only. No explanation, no markdown.",
-  logistics: "Extract all logistics documents from this PDF and return valid JSON only. No explanation, no markdown.",
+  logistics: "This PDF contains logistics documents — it may include multiple Shipping Instructions from PULAU SAMBU SINGAPORE. STEP 1: Scan EVERY single page — do not stop early. STEP 2: For EACH Shipping Instruction (2-page document with PULAU SAMBU SINGAPORE letterhead and a SHIPPING INSTRUCTION header), create ONE separate 'Outward Permit Declaration' entry. Find the container number and seal number in the 'FOR SHIPPING DEPARTMENT ONLY' section on page 2 of each SI. STEP 3: Count how many SIs you see, then output that exact number of separate entries — one per SI. Do NOT combine multiple SIs into one entry. Do NOT skip any SI. CRITICAL: Respond ONLY with valid JSON using EXACTLY this top-level structure: {\"documents\": [...]} — every extracted document goes inside the documents array. No other top-level keys. No explanation, no markdown.",
   transport: "Extract all Allied Reports and CDAS Reports from this PDF and return valid JSON only. No explanation, no markdown.",
 };
 

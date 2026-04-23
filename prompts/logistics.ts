@@ -42,15 +42,16 @@ SPECIAL RULE FOR ONE (OCEAN NETWORK EXPRESS) FREIGHTED BLs:
 - When the carrier is ONE and the BL is freighted (has ocean freight charges), ALL charges (THC, Seal Fee, BL Fee, ENS, Others) must be taken from the PREPAID column only.
 
 EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
-- DOCUMENT STRUCTURE: An OPD file typically contains multiple 2-page Shipping Instructions (SI) followed by a B/L Draft summary page. Each SI covers EXACTLY ONE container. Create ONE separate Outward Permit Declaration entry for EACH Shipping Instruction found. Do NOT create a separate entry for the B/L Draft summary page — use it for reference only (e.g. for BL number, carrier). For CONTAINER NO and SEAL NO, look in the "FOR SHIPPING DEPARTMENT ONLY" section at the bottom of page 2 of each SI (labeled "Container / Seal No: CONTAINER / SEAL").
-- PSG/PSS/RSUP SHIPPING INSTRUCTIONS: Documents on PULAU SAMBU SINGAPORE letterhead are export Shipping Instructions — each 2-page SI must become ONE "Outward Permit Declaration" entry. Page 1 has product/order/consignee info. Page 2 has the "FOR SHIPPING DEPARTMENT ONLY" section — extract container_no, seal_no, vessel, voyage, booking ref from there. These are EXPORT shipments from Singapore — NOT "Export Permit Declaration (PSS)".
-- EXCEPTION: If a PSG/PSS SI's "Documents Required" field (page 1) contains "Export Declaration permit" or "Export Permit", ALSO create a SECOND entry for that SI as "Export Permit Declaration (PSS)" with the product/HS code/weight/value from page 1.
-- A PDF with 40 SIs MUST produce 40 "Outward Permit Declaration" entries minimum. Do not skip any SI.
-- BL NUMBER: Booking reference / BL number from BL draft or Shipping Instruction (SI). Use the HBL if present, otherwise MBL.
-- CARRIER: Carrier/shipping line name from SI or BL draft letterhead.
-- CONSIGNEE: Consignee name and address from BL draft or SI.
-- CONTAINER NO: Single container number from the "FOR SHIPPING DEPARTMENT ONLY" section of THIS SI's page 2 (e.g. TCKU1234567). One value only — not a list.
-- SEAL NO: Single seal number from the "FOR SHIPPING DEPARTMENT ONLY" section of THIS SI's page 2 (e.g. EMCSEC1524). One value only — not a list.
+- DOCUMENT STRUCTURE: A Shipping Instruction (SI) batch file contains multiple 2-page SIs followed by a B/L Draft summary page. Each SI covers ONE container. Create ONE "Outward Permit Declaration" entry per SI found. Do NOT create a separate entry for the B/L Draft summary page — use it only as a reference for BL number and carrier. CONTAINER NO and SEAL NO come from the "FOR SHIPPING DEPARTMENT ONLY" section at the bottom of page 2 of each SI.
+- ONE ENTRY PER SI: Create one OPD entry for every SI found. Do not skip any SI regardless of whether it has a complete container/seal number.
+- PENDING / UNCONFIRMED BOOKINGS: If the "FOR SHIPPING DEPARTMENT ONLY" section shows "/" or is blank for container_no and/or seal_no, set those fields to null — do NOT skip the SI. The shipment is real; the booking is just not yet confirmed.
+- MULTI-SHIPPER SIs (PSG + RSUP on the same container): Some SIs carry goods from TWO exporters — PSG (PULAU SAMBU SINGAPORE) and RSUP — in the same container. When an SI has separate sections for PSG goods AND RSUP goods, create TWO separate OPD entries sharing the same container_no, seal_no, vessel, voyage, and bl_number. Each entry gets its own exporter, consignee, description, hs_code, quantities, and values from its respective section. The PSG section will be on PULAU SAMBU SINGAPORE letterhead; the RSUP section will be labelled "RSUP" or show a different exporter name.
+- PSS/PSG EXPORT PERMIT EXCEPTION: If an SI's "Documents Required" field (page 1) contains "Export Declaration permit" or "Export Permit", ALSO create a second entry for that SI as "Export Permit Declaration (PSS)" — extract product/HS code/weight/value from page 1 of that SI.
+- BL NUMBER: Booking reference / BL number from the BL draft or SI. Use HBL if present, otherwise MBL.
+- CARRIER: Use the FULL carrier name exactly as printed on the SI or BL draft. If the carrier is a co-loader (e.g. "EURO PAC / CMA CGA"), use the combined format "CARRIER1 / CARRIER2" consistently for ALL entries derived from the same SI — do not shorten to just one carrier for some rows.
+- CONSIGNEE: Consignee name and address from the BL draft or SI. For multi-shipper SIs, each shipper's section has its own consignee.
+- CONTAINER NO: Single container number from the "FOR SHIPPING DEPARTMENT ONLY" section of THIS SI's page 2 (e.g. TCKU1234567). One value only. Null if blank or "/".
+- SEAL NO: Single seal number from the "FOR SHIPPING DEPARTMENT ONLY" section of THIS SI's page 2 (e.g. EMCSEC1524). One value only. Null if blank or "/".
 - CTNR TYPE: Container type and count from BL draft or SI (e.g. "1 x 20GP", "2 x 40HC").
 - FINAL DESTINATION (PORT CODE): Final destination from SI field "Final Destination" or BL draft field "Place of Delivery". Show the port code if visible (e.g. "BEAU" for Beaufort, "PKMPW" for Port Klang), otherwise show the full port name.
 - VESSEL NAME: Vessel name from BL draft or SI.
@@ -85,7 +86,8 @@ EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
     COCONUT CANDY → 17049099 (ID)
     DRINKING WATER → 22011010 (ID)
   * Otherwise: Extract the HS code directly from the document as provided. Numbers only (e.g. 84137000).
-- DESCRIPTION (formatted): From INVOICE item description. Format as: [QTY as whole integer] [UOM] [ITEM DESCRIPTION]. Remove all decimals from quantity (e.g. 1.000 → 1). Example: "1 UNIT CENTRIFUGAL PUMP TYPE: WI+35/35 IN/OUTLET: SMS 76/51 MM". If descriptions across INVOICE, PACKING LIST, BL, and PO do not match, leave this blank.
+  * MULTI-PRODUCT: If the SI has multiple product lines with different HS codes, use the HS code of the product with the largest quantity. If quantities are equal, use the first product's HS code.
+- DESCRIPTION (formatted): From INVOICE item description. Format as: [QTY as whole integer] [UOM] [ITEM DESCRIPTION]. Remove all decimals from quantity (e.g. 1.000 → 1). Example: "1920 CTNS KARA CLASSIC UHT COCONUT MILK 400ML". MULTI-PRODUCT: If a shipper's section has multiple product lines, concatenate them with " / " (e.g. "960 CTNS COCONUT CREAM 200ML / 480 CTNS COCONUT WATER 330ML"). Never leave blank just because there are multiple products — always list all of them. Leave blank ONLY if descriptions across INVOICE, PACKING LIST, BL, and PO genuinely contradict each other.
 - NET WEIGHT: Nett Weight Grand Total from PACKING LIST column "Nett Weight (kgs)". Number only, no units.
 - VALUE AMOUNT ('item_price_amount'): Total Amount / Extended Price from INVOICE. Number only, no currency. e.g. "1500.00".
 - VALUE CURRENCY ('item_price_currency'): Currency code from INVOICE value. e.g. "USD".

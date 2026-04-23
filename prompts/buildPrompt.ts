@@ -19,7 +19,7 @@ You are extracting for the logistics team. Follow these rules strictly:
    - Each 2-page SI = ONE "Outward Permit Declaration" entry. Extract container_no and seal_no from the "FOR SHIPPING DEPARTMENT ONLY" section on page 2. Extract vessel, voyage, booking ref, final destination, consignee from page 2 as well.
    - These are EXPORT shipments FROM Singapore — do NOT classify them as "Export Permit Declaration (PSS)".
    - EXCEPTION: If the SI's "Documents Required" field (page 1) contains the text "Export Declaration permit" or "Export Permit", ALSO create a SECOND entry for the same SI as "Export Permit Declaration (PSS)" — extract product description, HS code, quantity, weight, value from page 1 of that SI.
-   - A file with 40 SIs must produce 40 "Outward Permit Declaration" entries (plus any additional "Export Permit Declaration (PSS)" entries for SIs that require Export Declaration permits).`,
+   - Create ONE "Outward Permit Declaration" entry per SI found. Do not skip any SI, even if container/seal fields are blank.`,
 
   transport: `
 

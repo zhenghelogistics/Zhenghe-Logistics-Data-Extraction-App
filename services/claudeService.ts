@@ -301,14 +301,25 @@ const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
   return [...docs, ...synthesized];
 };
 
-// Remove OPD ghost rows and orphan pre-entries.
-// A null-container OPD is an orphan pre-entry if it has NO consignee — real SIs
-// (including pending bookings and RSUP multi-shipper entries) always have a
-// named consignee. Rows with no consignee are either BL Draft artifacts or
-// pre-entry stubs with no attribution.
+// Remove OPD ghost rows and orphan pre-entries:
+// 1. Entries with no consignee AND no description AND no container — pure garbage rows.
+// 2. Null-container OPDs that are superseded by a container-having entry for the same consignee —
+//    these are pre-booking placeholders where the confirmed SI was also extracted.
 const removeOrphanOPDs = (docs: DocumentData[]): DocumentData[] => {
   const opds  = docs.filter(d => d.document_type === 'Outward Permit Declaration');
   const other = docs.filter(d => d.document_type !== 'Outward Permit Declaration');
+
+  // Collect consignee prefixes that already have a confirmed container
+  const confirmedConsignees = new Set<string>();
+  for (const doc of opds) {
+    const opd = doc.outward_permit_declaration;
+    const containerNo = opd?.container_no?.trim().toUpperCase() ?? '';
+    const isValid = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
+    if (isValid) {
+      const consignee = (opd?.consignee ?? '').trim().toUpperCase().substring(0, 40);
+      if (consignee) confirmedConsignees.add(consignee);
+    }
+  }
 
   const filtered = opds.filter(doc => {
     const opd = doc.outward_permit_declaration;
@@ -316,84 +327,21 @@ const removeOrphanOPDs = (docs: DocumentData[]): DocumentData[] => {
     const isValid = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
     if (isValid) return true; // Always keep container-confirmed entries
 
-    const consignee = (opd?.consignee ?? '').trim();
+    const consignee    = (opd?.consignee    ?? '').trim();
+    const description  = (opd?.description  ?? '').trim();
+    const bl           = (opd?.bl_number    ?? '').trim();
 
-    // Drop: null-container OPDs with no consignee — these are pre-entry stubs
-    // or BL Draft artifacts, never a real SI. RSUP multi-shipper entries and
-    // pending bookings always have a consignee populated.
-    if (!consignee) return false;
+    // Drop: completely empty (no consignee, no description, no meaningful BL)
+    if (!consignee && !description && bl.length < 4) return false;
+
+    // Drop: orphan pre-entry whose consignee is already covered by a container entry
+    const consigneeKey = consignee.toUpperCase().substring(0, 40);
+    if (consignee && confirmedConsignees.has(consigneeKey)) return false;
 
     return true;
   });
 
   return [...other, ...filtered];
-};
-
-// For multi-shipper containers: RSUP SIs share container/seal with their PSG
-// counterpart. If an OPD entry has correct product data but null container/seal,
-// propagate from a sibling entry with the same BL number (first pass) or same
-// consignee prefix (fallback). Safe: only fills null fields, never overwrites.
-const propagateContainerToRSUP = (docs: DocumentData[]): DocumentData[] => {
-  const opds  = docs.filter(d => d.document_type === 'Outward Permit Declaration');
-  const other = docs.filter(d => d.document_type !== 'Outward Permit Declaration');
-
-  type ContainerData = { container_no: string; seal_no: string | null; container_type: string | null };
-
-  const blMap       = new Map<string, ContainerData>();
-  const consigneeMap = new Map<string, ContainerData>();
-
-  for (const doc of opds) {
-    const opd = doc.outward_permit_declaration;
-    const containerNo = opd?.container_no?.trim().toUpperCase() ?? '';
-    const isValid = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
-    if (!isValid) continue;
-
-    const data: ContainerData = {
-      container_no:   opd!.container_no!,
-      seal_no:        opd!.seal_no        ?? null,
-      container_type: opd!.container_type ?? null,
-    };
-
-    const bl = (opd!.bl_number ?? '').trim().toUpperCase().replace(/\s+/g, '');
-    if (bl.length >= 4) blMap.set(bl, data);
-
-    const consigneeKey = (opd!.consignee ?? '').trim().toUpperCase().substring(0, 30);
-    if (consigneeKey.length >= 5) consigneeMap.set(consigneeKey, data);
-  }
-
-  const patched = opds.map(doc => {
-    const opd = doc.outward_permit_declaration;
-    if (!opd) return doc;
-    const containerNo = opd.container_no?.trim().toUpperCase() ?? '';
-    const isValid = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
-    if (isValid) return doc; // Already has container
-
-    let source: ContainerData | undefined;
-
-    // Try BL match first
-    const bl = (opd.bl_number ?? '').trim().toUpperCase().replace(/\s+/g, '');
-    if (bl.length >= 4) source = blMap.get(bl);
-
-    // Fallback: consignee match
-    if (!source) {
-      const consigneeKey = (opd.consignee ?? '').trim().toUpperCase().substring(0, 30);
-      if (consigneeKey.length >= 5) source = consigneeMap.get(consigneeKey);
-    }
-
-    if (!source) return doc;
-
-    return {
-      ...doc,
-      outward_permit_declaration: {
-        ...opd,
-        container_no:   opd.container_no   || source.container_no,
-        seal_no:        opd.seal_no        || source.seal_no,
-        container_type: opd.container_type || source.container_type,
-      },
-    };
-  });
-
-  return [...other, ...patched];
 };
 
 // Helper to remove duplicate documents
@@ -796,8 +744,6 @@ export const extractDocumentData = async (
   } else if (role === 'logistics') {
     processed = removeOrphanOPDs(allDocs);
     logDocs(`After removeOrphanOPDs (${processed.length} docs)`, processed, '#ec4899');
-    processed = propagateContainerToRSUP(processed);
-    logDocs(`After propagateContainerToRSUP (${processed.length} docs)`, processed, '#f97316');
   } else if (role === 'transport') {
     processed = allDocs;
   } else {

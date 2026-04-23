@@ -342,11 +342,14 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
     } else if (doc.document_type === "Outward Permit Declaration") {
       const opd = doc.outward_permit_declaration;
       const containerNo = opd?.container_no?.trim().toUpperCase();
-      // Only deduplicate on container_no — multiple SIs can share the same BL number
-      // (multi-container shipments), so using bl_number as a fallback key would silently
-      // drop valid SIs. Without a container, keep every entry unconditionally.
+      // Multi-shipper containers: two SIs (different exporters) legitimately share the same
+      // container number. Include a normalised exporter in the key so both entries survive.
+      // Without a valid container, keep every entry unconditionally (random key).
       const isValidContainer = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
-      const key = isValidContainer ? `OPD_${containerNo}` : `OPD_${Math.random()}`;
+      const exporter = (opd?.exporter ?? '').trim().toUpperCase().replace(/\s+/g, '_');
+      const key = isValidContainer
+        ? `OPD_${containerNo}_${exporter || 'UNKNOWN'}`
+        : `OPD_${Math.random()}`;
       if (!uniqueDocs.has(key)) uniqueDocs.set(key, doc);
     } else if (doc.document_type === 'Allied Report') {
       // Allied/CDAS Reports are deduplicated exclusively by deduplicateByContainer.

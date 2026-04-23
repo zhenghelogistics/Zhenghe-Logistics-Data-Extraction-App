@@ -301,6 +301,49 @@ const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
   return [...docs, ...synthesized];
 };
 
+// Remove OPD ghost rows and orphan pre-entries:
+// 1. Entries with no consignee AND no description AND no container — pure garbage rows.
+// 2. Null-container OPDs that are superseded by a container-having entry for the same consignee —
+//    these are pre-booking placeholders where the confirmed SI was also extracted.
+const removeOrphanOPDs = (docs: DocumentData[]): DocumentData[] => {
+  const opds  = docs.filter(d => d.document_type === 'Outward Permit Declaration');
+  const other = docs.filter(d => d.document_type !== 'Outward Permit Declaration');
+
+  // Collect consignee prefixes that already have a confirmed container
+  const confirmedConsignees = new Set<string>();
+  for (const doc of opds) {
+    const opd = doc.outward_permit_declaration;
+    const containerNo = opd?.container_no?.trim().toUpperCase() ?? '';
+    const isValid = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
+    if (isValid) {
+      const consignee = (opd?.consignee ?? '').trim().toUpperCase().substring(0, 40);
+      if (consignee) confirmedConsignees.add(consignee);
+    }
+  }
+
+  const filtered = opds.filter(doc => {
+    const opd = doc.outward_permit_declaration;
+    const containerNo = opd?.container_no?.trim().toUpperCase() ?? '';
+    const isValid = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
+    if (isValid) return true; // Always keep container-confirmed entries
+
+    const consignee    = (opd?.consignee    ?? '').trim();
+    const description  = (opd?.description  ?? '').trim();
+    const bl           = (opd?.bl_number    ?? '').trim();
+
+    // Drop: completely empty (no consignee, no description, no meaningful BL)
+    if (!consignee && !description && bl.length < 4) return false;
+
+    // Drop: orphan pre-entry whose consignee is already covered by a container entry
+    const consigneeKey = consignee.toUpperCase().substring(0, 40);
+    if (consignee && confirmedConsignees.has(consigneeKey)) return false;
+
+    return true;
+  });
+
+  return [...other, ...filtered];
+};
+
 // Helper to remove duplicate documents
 const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
   const uniqueDocs = new Map<string, DocumentData>();
@@ -698,7 +741,10 @@ export const extractDocumentData = async (
     logDocs(`After mergeSameSupplierPVs (${processed.length} docs)`, processed, '#8b5cf6');
     processed = await enrichMissingPSSNumbers(processed, file, onProgress);
     logDocs(`After enrichMissingPSSNumbers (${processed.length} docs)`, processed, '#f43f5e');
-  } else if (role === 'logistics' || role === 'transport') {
+  } else if (role === 'logistics') {
+    processed = removeOrphanOPDs(allDocs);
+    logDocs(`After removeOrphanOPDs (${processed.length} docs)`, processed, '#ec4899');
+  } else if (role === 'transport') {
     processed = allDocs;
   } else {
     processed = ensurePaymentVouchers(allDocs);

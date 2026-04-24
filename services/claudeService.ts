@@ -441,11 +441,13 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
       if (!uniqueDocs.has(key)) {
         uniqueDocs.set(key, doc);
       } else {
-        // Keep the more complete entry for genuine duplicates (overlap chunks)
+        // Later chunk wins on tie: overlap pages are seen first by the earlier chunk with
+        // less context, so the later chunk's version is more accurate. Strict > still
+        // replaces when the later entry is clearly more complete.
         const existing = uniqueDocs.get(key)!;
         const existingFields = Object.values(existing.outward_permit_declaration || {}).filter(v => v != null && (v as string).toString().trim().length > 0).length;
         const currentFields = Object.values(opd || {}).filter(v => v != null && (v as string).toString().trim().length > 0).length;
-        if (currentFields > existingFields) uniqueDocs.set(key, doc);
+        if (currentFields >= existingFields) uniqueDocs.set(key, doc);
       }
     } else if (doc.document_type === 'Allied Report') {
       // Allied/CDAS Reports are deduplicated exclusively by deduplicateByContainer.

@@ -123,17 +123,28 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
       ));
       addLog(`Processing: ${fileWrapper.file.name}`);
       try {
-        const { documents: dataList, warnings: extractionWarnings, status: extractionStatus } =
-          await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
+        let firstResult = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
+          setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage, progress } : f));
+        }, userRole ?? undefined);
+
+        // Auto-retry once transparently when partial — most transient failures resolve on retry
+        if (firstResult.status === 'partial') {
+          addLog(`Auto-retrying ${fileWrapper.file.name} (${firstResult.warnings.length} batch(es) failed — trying again)...`);
+          setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage: 'Retrying…', progress: 0 } : f));
+          const retry = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
             setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage, progress } : f));
           }, userRole ?? undefined);
+          if (retry.documents.length >= firstResult.documents.length) firstResult = retry;
+        }
+
+        const { documents: dataList, warnings: extractionWarnings, status: extractionStatus } = firstResult;
         const validationErrors = validateDocumentData(dataList);
         const hasWarnings = validationErrors.length > 0 || extractionWarnings.length > 0;
         const newStatus = extractionStatus === 'failed' ? FileStatus.ERROR
           : hasWarnings || extractionStatus === 'partial' ? FileStatus.WARNING
           : FileStatus.COMPLETED;
         if (extractionWarnings.length > 0) {
-          addLog(`⚠️ Partial extraction for ${fileWrapper.file.name}: ${extractionWarnings.join(' | ')}`);
+          addLog(`⚠️ Partial extraction for ${fileWrapper.file.name} after auto-retry: ${extractionWarnings.join(' | ')}`);
         }
         if (validationErrors.length > 0) {
           addLog(`Validation warnings for ${fileWrapper.file.name}: ${validationErrors.join(', ')}`);

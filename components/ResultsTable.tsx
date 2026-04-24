@@ -80,7 +80,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
   });
 
   // Helper to render status badge
-  const renderStatusBadge = (status: FileStatus, validationErrors?: string[], fileId?: string) => {
+  const renderStatusBadge = (status: FileStatus, validationErrors?: string[], fileId?: string, extractionWarnings?: string[]) => {
     switch (status) {
       case FileStatus.COMPLETED:
         return (
@@ -89,21 +89,29 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
             Done
           </span>
         );
-      case FileStatus.WARNING:
+      case FileStatus.WARNING: {
+        const hasExtractionWarnings = extractionWarnings && extractionWarnings.length > 0;
+        const allWarnings = [...(extractionWarnings ?? []), ...(validationErrors ?? [])];
         return (
           <button
             type="button"
-            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 cursor-pointer hover:bg-amber-100 transition-colors"
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+              hasExtractionWarnings
+                ? 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+            }`}
             onClick={() => {
-              if (fileId && validationErrors && validationErrors.length > 0) {
-                setErrorPopover(prev => prev?.fileId === fileId ? null : { fileId, errors: validationErrors });
+              if (fileId && allWarnings.length > 0) {
+                setErrorPopover(prev => prev?.fileId === fileId ? null : { fileId, errors: allWarnings });
               }
             }}
           >
             <AlertTriangle size={14} className="mr-1" />
-            Warning {validationErrors && validationErrors.length > 0 && `(${validationErrors.length})`}
+            {hasExtractionWarnings ? 'Incomplete' : 'Warning'}
+            {allWarnings.length > 0 && ` (${allWarnings.length})`}
           </button>
         );
+      }
       case FileStatus.PROCESSING:
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-fixed text-secondary">
@@ -340,18 +348,30 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                       </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm">
                         <div className="relative inline-block">
-                          {renderStatusBadge(file.status as FileStatus, file.validationErrors, file.id)}
+                          {renderStatusBadge(file.status as FileStatus, file.validationErrors, file.id, file.extractionWarnings)}
                           {errorPopover?.fileId === file.id && (
                             <div className="absolute z-50 left-0 top-full mt-1 w-80 bg-surface-lowest border border-amber-100 rounded-lg shadow-lg p-3">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-amber-700">Extraction warnings</span>
+                                <span className="text-xs font-semibold text-amber-700">
+                                  {file.extractionWarnings?.length ? 'Some entries may be missing' : 'Warnings'}
+                                </span>
                                 <button type="button" onClick={() => setErrorPopover(null)} className="text-outline hover:text-primary text-xs">✕</button>
                               </div>
-                              <ul className="space-y-1">
+                              <ul className="space-y-1 mb-3">
                                 {errorPopover.errors.map((e, i) => (
                                   <li key={i} className="text-xs text-primary bg-amber-50 rounded px-2 py-1">{e}</li>
                                 ))}
                               </ul>
+                              {file.extractionWarnings?.length > 0 && file.file.size > 0 && onReprocessFile && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setErrorPopover(null); onReprocessFile(file.id); }}
+                                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+                                >
+                                  <RefreshCw size={12} />
+                                  Retry extraction
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>

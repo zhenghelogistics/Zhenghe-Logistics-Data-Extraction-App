@@ -577,7 +577,22 @@ const extractFromChunk = async (
       console.group('%c[ZHL] Claude raw response', 'color:#6366f1;font-weight:bold');
       console.log(text);
       console.groupEnd();
-      const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+      // Claude sometimes outputs reasoning/analysis before the JSON, then wraps the JSON in a
+      // ```json ... ``` code block. Extract the code block content if present; otherwise find
+      // the first { that begins the JSON object.
+      let clean: string;
+      const codeFence = text.match(/```json\s*([\s\S]*?)```/i);
+      if (codeFence) {
+        clean = codeFence[1].trim();
+      } else {
+        clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+        const jsonStart = clean.indexOf('{"documents"');
+        if (jsonStart > 0) clean = clean.slice(jsonStart);
+        else if (!clean.startsWith('{') && !clean.startsWith('[')) {
+          const firstBrace = clean.indexOf('{');
+          if (firstBrace > 0) clean = clean.slice(firstBrace);
+        }
+      }
       let docs: DocumentData[] = [];
       try {
         const result = JSON.parse(jsonrepair(clean)) as ExtractionResponse;

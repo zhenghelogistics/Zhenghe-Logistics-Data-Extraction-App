@@ -53,6 +53,7 @@ export default async function handler(req: any, res: any) {
       const stream = client.messages.stream({
         model: "claude-sonnet-4-6",
         max_tokens: 32000,
+        temperature: 0,
         system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         messages: [
           {

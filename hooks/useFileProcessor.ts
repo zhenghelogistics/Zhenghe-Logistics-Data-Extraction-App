@@ -123,14 +123,22 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
       ));
       addLog(`Processing: ${fileWrapper.file.name}`);
       try {
-        const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
-          setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage, progress } : f));
-        }, userRole ?? undefined);
+        const { documents: dataList, warnings: extractionWarnings, status: extractionStatus } =
+          await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
+            setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage, progress } : f));
+          }, userRole ?? undefined);
         const validationErrors = validateDocumentData(dataList);
-        const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
+        const hasWarnings = validationErrors.length > 0 || extractionWarnings.length > 0;
+        const newStatus = extractionStatus === 'failed' ? FileStatus.ERROR
+          : hasWarnings || extractionStatus === 'partial' ? FileStatus.WARNING
+          : FileStatus.COMPLETED;
+        if (extractionWarnings.length > 0) {
+          addLog(`⚠️ Partial extraction for ${fileWrapper.file.name}: ${extractionWarnings.join(' | ')}`);
+        }
         if (validationErrors.length > 0) {
-          addLog(`Warnings for ${fileWrapper.file.name}: ${validationErrors.join(', ')}`);
-        } else {
+          addLog(`Validation warnings for ${fileWrapper.file.name}: ${validationErrors.join(', ')}`);
+        }
+        if (!hasWarnings && extractionStatus === 'complete') {
           addLog(`Done: ${fileWrapper.file.name} — ${dataList.length} document(s) found.`);
         }
         const savedDoc = await saveDocument(fileWrapper.file.name, newStatus, dataList);
@@ -138,6 +146,7 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
           f.id === fileWrapper.id ? {
             ...f, status: newStatus, data: dataList,
             validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+            extractionWarnings: extractionWarnings.length > 0 ? extractionWarnings : undefined,
             id: savedDoc?.id || f.id,
           } : f
         ));
@@ -179,15 +188,27 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
     ));
     addLog(`Re-processing: ${fileWrapper.file.name}`);
     try {
-      const dataList = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
-        setFiles(prev => prev.map(f => f.id === id ? { ...f, stage, progress } : f));
-      }, userRole ?? undefined);
+      const { documents: dataList, warnings: extractionWarnings, status: extractionStatus } =
+        await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
+          setFiles(prev => prev.map(f => f.id === id ? { ...f, stage, progress } : f));
+        }, userRole ?? undefined);
       const validationErrors = validateDocumentData(dataList);
-      const newStatus = validationErrors.length > 0 ? FileStatus.WARNING : FileStatus.COMPLETED;
+      const hasWarnings = validationErrors.length > 0 || extractionWarnings.length > 0;
+      const newStatus = extractionStatus === 'failed' ? FileStatus.ERROR
+        : hasWarnings || extractionStatus === 'partial' ? FileStatus.WARNING
+        : FileStatus.COMPLETED;
+      if (extractionWarnings.length > 0) {
+        addLog(`⚠️ Partial extraction for ${fileWrapper.file.name}: ${extractionWarnings.join(' | ')}`);
+      }
       addLog(`Re-done: ${fileWrapper.file.name} — ${dataList.length} document(s).`);
       const savedDoc = await saveDocument(fileWrapper.file.name, newStatus, dataList);
       setFiles(prev => prev.map(f =>
-        f.id === id ? { ...f, status: newStatus, data: dataList, validationErrors: validationErrors.length > 0 ? validationErrors : undefined, id: savedDoc?.id || f.id } : f
+        f.id === id ? {
+          ...f, status: newStatus, data: dataList,
+          validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+          extractionWarnings: extractionWarnings.length > 0 ? extractionWarnings : undefined,
+          id: savedDoc?.id || f.id,
+        } : f
       ));
       if (savedDoc?.id) {
         const containerRows = extractContainerRows(dataList, fileWrapper.file.name, savedDoc.id);

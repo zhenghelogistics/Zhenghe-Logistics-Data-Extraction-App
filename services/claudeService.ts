@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { jsonrepair } from "jsonrepair";
-import { DocumentData, ExtractionResponse, BLEntry } from "../types";
+import { DocumentData, ExtractionResponse, BLEntry, ExtractionResult, ExtractionStatus, ChunkDiagnostic } from "../types";
 import { AppConfig } from "../config";
 import { BASE_SYSTEM_PROMPT } from "../prompts/base";
 import { buildSystemPrompt } from "../prompts/buildPrompt";
@@ -376,11 +376,17 @@ const removeOrphanOPDs = (docs: DocumentData[]): DocumentData[] => {
     const bl           = (opd?.bl_number    ?? '').trim();
 
     // Drop: completely empty (no consignee, no description, no meaningful BL)
-    if (!consignee && !description && bl.length < 4) return false;
+    if (!consignee && !description && bl.length < 4) {
+      console.warn('[ZHL] dropping_orphan_opd', { reason: 'no_data', consignee, description, bl });
+      return false;
+    }
 
     // Drop: orphan pre-entry whose consignee is already covered by a container entry
     const consigneeKey = consignee.toUpperCase().substring(0, 40);
-    if (consignee && confirmedConsignees.has(consigneeKey)) return false;
+    if (consignee && confirmedConsignees.has(consigneeKey)) {
+      console.warn('[ZHL] dropping_orphan_opd', { reason: 'consignee_covered', consignee, bl });
+      return false;
+    }
 
     return true;
   });
@@ -722,7 +728,7 @@ export const extractDocumentData = async (
   customInstructions: string[] = [],
   onProgress?: (stage: string, progress?: number) => void,
   role?: string
-): Promise<DocumentData[]> => {
+): Promise<ExtractionResult> => {
   const systemPrompt = buildSystemPrompt(customInstructions, role);
 
   // Exponential backoff with jitter — waits only when rate limited, not blindly
@@ -771,25 +777,64 @@ export const extractDocumentData = async (
   const totalChunks = chunks.length;
   onProgress?.(totalChunks > 1 ? `Analysing 0 of ${totalChunks} batches…` : 'Sending to Claude…', 0);
 
+  // Concurrency limiter: max 3 simultaneous Anthropic calls to avoid TPM rate limits
+  const MAX_CONCURRENT = 3;
+  let activeSlots = 0;
+  const slotQueue: Array<() => void> = [];
+  const acquireSlot = (): Promise<void> => new Promise(res => {
+    if (activeSlots < MAX_CONCURRENT) { activeSlots++; res(); }
+    else slotQueue.push(() => { activeSlots++; res(); });
+  });
+  const releaseSlot = () => { activeSlots--; if (slotQueue.length) slotQueue.shift()!(); };
+
   let doneChunks = 0;
   const chunkSettled = await Promise.allSettled(
-    chunks.map((chunk, i) => {
+    chunks.map(async (chunk, i) => {
+      await acquireSlot();
+      const start = Date.now();
       const label = totalChunks > 1 ? `batch ${i + 1} of ${totalChunks}` : 'Sending to Claude';
-      return withBackoff(() => extractFromChunk(chunk.base64, systemPrompt, role), label).then(result => {
+      try {
+        const docs = await withBackoff(() => extractFromChunk(chunk.base64, systemPrompt, role), label);
         doneChunks++;
-        const pct = Math.round((doneChunks / totalChunks) * 90); // reserve last 10% for post-processing
+        const pct = Math.round((doneChunks / totalChunks) * 90);
         onProgress?.(`Analysing ${doneChunks} of ${totalChunks} batch${totalChunks > 1 ? 'es' : ''}…`, pct);
-        return result;
-      });
+        return { docs, pages: chunk.pages, durationMs: Date.now() - start };
+      } finally {
+        releaseSlot();
+      }
     })
   );
 
-  // Collect successful chunks — don't let one bad chunk discard everyone else's results
-  const allDocs: DocumentData[] = chunkSettled.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-  const failedChunks = chunkSettled.filter(r => r.status === 'rejected');
-  if (failedChunks.length > 0 && allDocs.length === 0) {
-    // All chunks failed — surface the first error
-    throw (failedChunks[0] as PromiseRejectedResult).reason;
+  // Build diagnostics and collect docs — a failed chunk surfaces as a warning, not a silent drop
+  const allDocs: DocumentData[] = [];
+  const chunkDiagnostics: ChunkDiagnostic[] = [];
+  const extractionWarnings: string[] = [];
+
+  chunkSettled.forEach((result, i) => {
+    if (result.status === 'fulfilled') {
+      allDocs.push(...result.value.docs);
+      chunkDiagnostics.push({
+        chunkIndex: i, pages: result.value.pages,
+        status: 'success', durationMs: result.value.durationMs,
+        docsReturned: result.value.docs.length,
+      });
+    } else {
+      const err = result.reason as any;
+      const errMsg: string = err?.message || 'Unknown error';
+      const errCode: string | undefined = err?.code;
+      extractionWarnings.push(`Batch ${i + 1} (pages ${chunks[i].pages}) failed after retries — some entries may be missing. Reason: ${errMsg}`);
+      chunkDiagnostics.push({
+        chunkIndex: i, pages: chunks[i].pages,
+        status: 'failed', durationMs: 0, docsReturned: 0,
+        errorCode: errCode, errorMessage: errMsg,
+      });
+      console.warn(`[ZHL] chunk ${i + 1} failed (pages ${chunks[i].pages}):`, errMsg);
+    }
+  });
+
+  const failedCount = chunkSettled.filter(r => r.status === 'rejected').length;
+  if (failedCount > 0 && allDocs.length === 0) {
+    throw (chunkSettled.find(r => r.status === 'rejected') as PromiseRejectedResult).reason;
   }
 
   onProgress?.('Processing results…', 95);
@@ -801,7 +846,7 @@ export const extractDocumentData = async (
     console.groupEnd();
   };
 
-  logDocs(`Raw from Claude (${allDocs.length} docs)`, allDocs, '#f59e0b');
+  logDocs(`Raw from Claude (${allDocs.length} docs, ${failedCount} chunk(s) failed)`, allDocs, '#f59e0b');
 
   let processed: DocumentData[];
   if (role === 'accounts') {
@@ -822,5 +867,10 @@ export const extractDocumentData = async (
 
   const final = deduplicateByContainer(deduplicateDocuments(processed));
   logDocs(`Final output (${final.length} docs)`, final, '#10b981');
-  return final;
+
+  const extractionStatus: ExtractionStatus =
+    failedCount === 0 ? 'complete' :
+    final.length === 0 ? 'failed' : 'partial';
+
+  return { status: extractionStatus, documents: final, warnings: extractionWarnings, chunkDiagnostics };
 };

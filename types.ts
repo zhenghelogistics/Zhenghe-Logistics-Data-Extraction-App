@@ -207,6 +207,25 @@ export interface ExtractionResponse {
   documents: DocumentData[];
 }
 
+export type ExtractionStatus = 'complete' | 'partial' | 'failed';
+
+export interface ChunkDiagnostic {
+  chunkIndex: number;
+  pages: string;
+  status: 'success' | 'failed';
+  durationMs: number;
+  docsReturned: number;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+export interface ExtractionResult {
+  status: ExtractionStatus;
+  documents: DocumentData[];
+  warnings: string[];
+  chunkDiagnostics: ChunkDiagnostic[];
+}
+
 export interface ProcessedFile {
   id: string;
   file: File;
@@ -214,6 +233,7 @@ export interface ProcessedFile {
   data?: DocumentData[];
   errorMessage?: string;
   validationErrors?: string[];
+  extractionWarnings?: string[];
   uploadedAt?: string; // ISO string from Supabase created_at
   stage?: string; // Current extraction stage shown during processing
   progress?: number; // 0–100 percentage shown during processing

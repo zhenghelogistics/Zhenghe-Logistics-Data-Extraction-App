@@ -36,17 +36,24 @@ if (!process.env.ANTHROPIC_API_KEY) {
 const CHUNK_SIZE = role === "transport" ? 30 : role === "logistics" ? 8 : 15;
 const CHUNK_OVERLAP = role === "accounts" ? 3 : role === "logistics" ? 1 : 0;
 
-// ─── System prompts (inline minimal version for timing — same token ballpark) ─
-// For 100% accuracy swap these for the real prompts from prompts/base.ts
+// ─── Load real system prompts from prompts/*.ts ──────────────────────────────
+function loadPrompt(file, varName) {
+  const src = readFileSync(resolve(file), "utf8");
+  const match = src.match(new RegExp(`${varName}\\s*=\\s*\`([\\s\\S]*?)\`\\s*;?\\s*$`));
+  if (!match) throw new Error(`Could not parse ${varName} from ${file}`);
+  return match[1];
+}
+
 const SYSTEM_PROMPTS = {
-  accounts: "You are a Senior Logistics Data Controller. Extract all documents (Bills of Lading, Tax Invoices, Payment Vouchers) from this PDF. Return valid JSON only.",
-  logistics: "You are a Senior Logistics Data Controller. Extract Logistics Local Charges Reports, Outward Permit Declarations, and Export Permit Declarations (PSS) from this PDF. Return valid JSON only.",
-  transport: "You are a Senior Logistics Data Controller. Extract Allied Reports and CDAS Reports from this PDF. Return valid JSON only.",
+  accounts: loadPrompt("prompts/accounts.ts", "ACCOUNTS_SYSTEM_PROMPT"),
+  logistics: loadPrompt("prompts/logistics.ts", "LOGISTICS_SYSTEM_PROMPT"),
+  transport: loadPrompt("prompts/base.ts", "BASE_SYSTEM_PROMPT"),
 };
 
+// ─── User messages — exact match to api/extract.ts ───────────────────────────
 const USER_TEXTS = {
-  accounts: "This PDF may contain Bills of Lading, Tax Invoices/Freight Invoices, AND Customs Permits. Extract all entries. Return valid JSON only. No explanation, no markdown.",
-  logistics: "Extract all Shipping Instructions from this PDF. STEP 1: Scan every page — do not stop early. STEP 2: For each SI found — identified by a SHIPPING INSTRUCTION header and a 'FOR SHIPPING DEPARTMENT ONLY' section on its second page, regardless of which company or exporter it belongs to — create one entry with document_type 'Outward Permit Declaration'. Put all data inside the outward_permit_declaration object, with container_no and seal_no from the 'FOR SHIPPING DEPARTMENT ONLY' section. STEP 3: For any SI whose Documents Required field says 'Export Declaration permit' or 'Export Permit', also create a second entry with document_type 'Export Permit Declaration (PSS)' — populate export_permit_pss.items with one item per product line using fields: item_description, hs_code, quantity (integer), uom, amount, currency, po_number, invoice_number. STEP 4: One OPD per SI — do NOT skip any SI regardless of exporter or letterhead. CRITICAL: Use document_type (not type). Return ONLY {\"documents\": [...]}. No markdown.",
+  accounts: "This PDF may contain Bills of Lading, Tax Invoices/Freight Invoices, AND Customs Permits or Outward Permits. STEP 1: Scan EVERY page. STEP 2: For each Tax Invoice or Freight Invoice page found (carrier letterhead, charge table, Amount Due), output one 'Payment Voucher/GL' entry with that invoice number. STEP 3: For each BL page, output one 'Bill of Lading' entry. STEP 4: Completely ignore Customs Permit / Outward Permit pages. A single PDF with 1 BL + 1 Tax Invoice must produce 2 entries. Do NOT combine invoice numbers. Do NOT sum amounts. Return valid JSON only. No explanation, no markdown.",
+  logistics: "Extract all Shipping Instructions from this PDF. STEP 1: Scan every page — do not stop early. STEP 2: For each SI found — identified by a SHIPPING INSTRUCTION header and a 'FOR SHIPPING DEPARTMENT ONLY' section (which may appear at the bottom of the first page or on a separate second page), regardless of which company or exporter it belongs to — create one entry with document_type 'Outward Permit Declaration'. Put all data inside the outward_permit_declaration object, with container_no and seal_no from that SI's own 'FOR SHIPPING DEPARTMENT ONLY' section. STEP 3: For any SI whose Documents Required field says 'Export Declaration permit' or 'Export Permit', also create a second entry with document_type 'Export Permit Declaration (PSS)' — populate export_permit_pss.items with one item per product line using fields: item_description, hs_code, quantity (integer), uom, amount, currency, po_number, invoice_number. STEP 4: One OPD per SI — do NOT skip any SI regardless of exporter or letterhead. CRITICAL: Use document_type (not type). Return ONLY {\"documents\": [...]}. No markdown.",
   transport: "Extract all Allied Reports and CDAS Reports from this PDF and return valid JSON only. No explanation, no markdown.",
 };
 

@@ -13,12 +13,13 @@ interface ResultsTableProps {
   onBulkDelete: (ids: string[]) => void;
   onGenerateVoucher?: (docs: DocumentData[]) => void;
   onReprocessFile?: (id: string) => void;
+  onRetryFailedChunks?: (id: string) => void;
   isGeneratingPdf?: boolean;
   activeTab: string;
   userRole: UserRole | null;
 }
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, onReprocessFile, isGeneratingPdf, activeTab, userRole }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, onReprocessFile, onRetryFailedChunks, isGeneratingPdf, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorPopover, setErrorPopover] = useState<{ fileId: string; errors: string[] } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -362,14 +363,23 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                                   <li key={i} className="text-xs text-primary bg-amber-50 rounded px-2 py-1">{e}</li>
                                 ))}
                               </ul>
-                              {file.extractionWarnings?.length > 0 && file.file.size > 0 && onReprocessFile && (
+                              {file.extractionWarnings?.length > 0 && file.file.size > 0 && (onRetryFailedChunks || onReprocessFile) && (
                                 <button
                                   type="button"
-                                  onClick={() => { setErrorPopover(null); onReprocessFile(file.id); }}
+                                  onClick={() => {
+                                    setErrorPopover(null);
+                                    if (onRetryFailedChunks && file.failedChunkIndices?.length) {
+                                      onRetryFailedChunks(file.id);
+                                    } else if (onReprocessFile) {
+                                      onReprocessFile(file.id);
+                                    }
+                                  }}
                                   className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold transition-colors cursor-pointer"
                                 >
                                   <RefreshCw size={12} />
-                                  Retry extraction
+                                  {file.failedChunkIndices?.length
+                                    ? `Retry ${file.failedChunkIndices.length} failed batch${file.failedChunkIndices.length > 1 ? 'es' : ''}`
+                                    : 'Retry extraction'}
                                 </button>
                               )}
                             </div>

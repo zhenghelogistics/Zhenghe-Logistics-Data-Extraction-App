@@ -158,6 +158,7 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
             ...f, status: newStatus, data: dataList,
             validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
             extractionWarnings: extractionWarnings.length > 0 ? extractionWarnings : undefined,
+            failedChunkIndices: firstResult.chunkDiagnostics.filter(d => d.status === 'failed').map(d => d.chunkIndex),
             id: savedDoc?.id || f.id,
           } : f
         ));
@@ -316,10 +317,59 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
     setContainerRecords(prev => prev.filter(r => !ids.includes(r.id)));
   };
 
+  const handleRetryFailedChunks = useCallback(async (id: string) => {
+    const fileWrapper = files.find(f => f.id === id);
+    if (!fileWrapper || fileWrapper.file.size === 0 || !fileWrapper.failedChunkIndices?.length) return;
+    setIsProcessing(true);
+    setFiles(prev => prev.map(f =>
+      f.id === id ? { ...f, status: FileStatus.PROCESSING, stage: 'Retrying failed batches…', progress: 0 } : f
+    ));
+    addLog(`Retrying ${fileWrapper.failedChunkIndices.length} failed batch(es) for: ${fileWrapper.file.name}`);
+    try {
+      const { documents: dataList, warnings: extractionWarnings, status: extractionStatus, chunkDiagnostics } =
+        await extractDocumentData(
+          fileWrapper.file, customRules,
+          (stage, progress) => setFiles(prev => prev.map(f => f.id === id ? { ...f, stage, progress } : f)),
+          userRole ?? undefined,
+          fileWrapper.failedChunkIndices,
+          fileWrapper.data,
+        );
+      const validationErrors = validateDocumentData(dataList);
+      const hasWarnings = validationErrors.length > 0 || extractionWarnings.length > 0;
+      const newStatus = extractionStatus === 'failed' ? FileStatus.ERROR
+        : hasWarnings || extractionStatus === 'partial' ? FileStatus.WARNING
+        : FileStatus.COMPLETED;
+      const savedDoc = await saveDocument(fileWrapper.file.name, newStatus, dataList);
+      setFiles(prev => prev.map(f =>
+        f.id === id ? {
+          ...f, status: newStatus, data: dataList,
+          validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+          extractionWarnings: extractionWarnings.length > 0 ? extractionWarnings : undefined,
+          failedChunkIndices: chunkDiagnostics.filter(d => d.status === 'failed').map(d => d.chunkIndex),
+          id: savedDoc?.id || f.id,
+        } : f
+      ));
+      addLog(`Retry done: ${fileWrapper.file.name} — ${dataList.length} document(s).`);
+      if (savedDoc?.id) {
+        const containerRows = extractContainerRows(dataList, fileWrapper.file.name, savedDoc.id);
+        if (containerRows.length > 0) {
+          await insertContainerBillingRows(containerRows);
+          const refreshed = await fetchContainerBilling();
+          setContainerRecords(refreshed);
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setFiles(prev => prev.map(f => f.id === id ? { ...f, status: FileStatus.ERROR, errorMessage } : f));
+      addLog(`ERROR retrying chunks for ${fileWrapper.file.name}: ${errorMessage}`);
+    }
+    setIsProcessing(false);
+  }, [files, customRules, userRole]);
+
   return {
     files, setFiles, isProcessing, containerRecords, setContainerRecords,
     deleteModalOpen, setDeleteModalOpen, fileToDelete,
-    addFilesToQueue, processFiles, handleReprocess,
+    addFilesToQueue, processFiles, handleReprocess, handleRetryFailedChunks,
     handleIncotermUpdate, handleFreightTermUpdate,
     handleDeleteFile, handleBulkDelete, confirmDeleteFile,
     handleBillingUpdate, handleContainerRecordUpdate,

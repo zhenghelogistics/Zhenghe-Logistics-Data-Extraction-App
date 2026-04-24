@@ -234,6 +234,7 @@ export interface ProcessedFile {
   errorMessage?: string;
   validationErrors?: string[];
   extractionWarnings?: string[];
+  failedChunkIndices?: number[];
   uploadedAt?: string; // ISO string from Supabase created_at
   stage?: string; // Current extraction stage shown during processing
   progress?: number; // 0–100 percentage shown during processing

@@ -727,7 +727,9 @@ export const extractDocumentData = async (
   file: File,
   customInstructions: string[] = [],
   onProgress?: (stage: string, progress?: number) => void,
-  role?: string
+  role?: string,
+  chunkFilter?: number[],      // when set, only process these chunk indices
+  existingDocs?: DocumentData[], // when set, merge with these before pipeline
 ): Promise<ExtractionResult> => {
   const systemPrompt = buildSystemPrompt(customInstructions, role);
 
@@ -787,18 +789,24 @@ export const extractDocumentData = async (
   });
   const releaseSlot = () => { activeSlots--; if (slotQueue.length) slotQueue.shift()!(); };
 
+  // When retrying specific chunks, only process those indices
+  const chunksToProcess = chunkFilter
+    ? chunks.map((chunk, i) => ({ chunk, i })).filter(({ i }) => chunkFilter.includes(i))
+    : chunks.map((chunk, i) => ({ chunk, i }));
+  const activeTotal = chunksToProcess.length;
+
   let doneChunks = 0;
   const chunkSettled = await Promise.allSettled(
-    chunks.map(async (chunk, i) => {
+    chunksToProcess.map(async ({ chunk, i }) => {
       await acquireSlot();
       const start = Date.now();
-      const label = totalChunks > 1 ? `batch ${i + 1} of ${totalChunks}` : 'Sending to Claude';
+      const label = activeTotal > 1 ? `batch ${i + 1} of ${totalChunks}` : 'Sending to Claude';
       try {
         const docs = await withBackoff(() => extractFromChunk(chunk.base64, systemPrompt, role), label);
         doneChunks++;
-        const pct = Math.round((doneChunks / totalChunks) * 90);
-        onProgress?.(`Analysing ${doneChunks} of ${totalChunks} batch${totalChunks > 1 ? 'es' : ''}…`, pct);
-        return { docs, pages: chunk.pages, durationMs: Date.now() - start };
+        const pct = Math.round((doneChunks / activeTotal) * 90);
+        onProgress?.(`Analysing ${doneChunks} of ${activeTotal} batch${activeTotal > 1 ? 'es' : ''}…`, pct);
+        return { docs, pages: chunk.pages, durationMs: Date.now() - start, chunkIndex: i };
       } finally {
         releaseSlot();
       }
@@ -806,15 +814,17 @@ export const extractDocumentData = async (
   );
 
   // Build diagnostics and collect docs — a failed chunk surfaces as a warning, not a silent drop
-  const allDocs: DocumentData[] = [];
+  const allDocs: DocumentData[] = existingDocs ? [...existingDocs] : [];
   const chunkDiagnostics: ChunkDiagnostic[] = [];
   const extractionWarnings: string[] = [];
 
-  chunkSettled.forEach((result, i) => {
+  chunkSettled.forEach((result, settledIdx) => {
+    const originalIndex = chunksToProcess[settledIdx].i;
+    const originalPages = chunksToProcess[settledIdx].chunk.pages;
     if (result.status === 'fulfilled') {
       allDocs.push(...result.value.docs);
       chunkDiagnostics.push({
-        chunkIndex: i, pages: result.value.pages,
+        chunkIndex: originalIndex, pages: originalPages,
         status: 'success', durationMs: result.value.durationMs,
         docsReturned: result.value.docs.length,
       });
@@ -822,13 +832,13 @@ export const extractDocumentData = async (
       const err = result.reason as any;
       const errMsg: string = err?.message || 'Unknown error';
       const errCode: string | undefined = err?.code;
-      extractionWarnings.push(`Batch ${i + 1} (pages ${chunks[i].pages}) failed after retries — some entries may be missing. Reason: ${errMsg}`);
+      extractionWarnings.push(`Batch ${originalIndex + 1} (pages ${originalPages}) failed after retries — some entries may be missing. Reason: ${errMsg}`);
       chunkDiagnostics.push({
-        chunkIndex: i, pages: chunks[i].pages,
+        chunkIndex: originalIndex, pages: originalPages,
         status: 'failed', durationMs: 0, docsReturned: 0,
         errorCode: errCode, errorMessage: errMsg,
       });
-      console.warn(`[ZHL] chunk ${i + 1} failed (pages ${chunks[i].pages}):`, errMsg);
+      console.warn(`[ZHL] chunk ${originalIndex + 1} failed (pages ${originalPages}):`, errMsg);
     }
   });
 

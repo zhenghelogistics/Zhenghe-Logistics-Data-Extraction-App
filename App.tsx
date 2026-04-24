@@ -77,7 +77,7 @@ function App() {
   const {
     files, isProcessing, containerRecords,
     deleteModalOpen, setDeleteModalOpen,
-    addFilesToQueue, processFiles, handleReprocess,
+    addFilesToQueue, processFiles, handleReprocess, handleRetryFailedChunks,
     handleIncotermUpdate, handleFreightTermUpdate,
     handleDeleteFile, handleBulkDelete, confirmDeleteFile,
     handleContainerRecordUpdate, handleContainerRecordDelete, handleContainerRecordDeleteMany,
@@ -519,6 +519,7 @@ function App() {
               onBulkDelete={handleBulkDelete}
               onGenerateVoucher={handleGenerateVouchers}
               onReprocessFile={handleReprocess}
+              onRetryFailedChunks={handleRetryFailedChunks}
               isGeneratingPdf={isGeneratingPdf}
               activeTab={activeTab}
               userRole={userRole}

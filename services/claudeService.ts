@@ -301,6 +301,10 @@ const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
   return [...docs, ...synthesized];
 };
 
+// ISO 6346 container number: 4 uppercase letters (owner code + category) + 6 or 7 digits.
+// Rejects free-text strings like "2 X 40' HC CONTAINERS" that are not real container IDs.
+const isValidContainerNo = (s: string): boolean => /^[A-Z]{4}\d{6,7}$/.test(s.trim().toUpperCase());
+
 // Claude sometimes outputs OPD fields nested in sub-objects (customer_order_info, product_info,
 // shipping_info, vessel_voyage_info, shipping_department) instead of flat top-level fields.
 // Promote all key fields up to top level so dedup, orphan removal, and display can rely on them.
@@ -336,7 +340,7 @@ const normalizeOPDContainers = (docs: DocumentData[]): DocumentData[] => {
     // Promote products from product_info array
     if (!o.products?.length && pi.length) promoted.products = pi;
     // Promote container_no and seal_no
-    if (container && container.length > 3 && container !== '-') {
+    if (isValidContainerNo(container)) {
       promoted.container_no = container;
       promoted.seal_no = o.seal_no || sd.seal_no || vvi0.seal_no || null;
     }
@@ -357,8 +361,7 @@ const removeOrphanOPDs = (docs: DocumentData[]): DocumentData[] => {
   const confirmedConsignees = new Set<string>();
   for (const doc of opds) {
     const opd = doc.outward_permit_declaration;
-    const containerNo = opd?.container_no?.trim().toUpperCase() ?? '';
-    const isValid = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
+    const isValid = isValidContainerNo(opd?.container_no ?? '');
     if (isValid) {
       const consignee = (opd?.consignee ?? '').trim().toUpperCase().substring(0, 40);
       if (consignee) confirmedConsignees.add(consignee);
@@ -367,8 +370,7 @@ const removeOrphanOPDs = (docs: DocumentData[]): DocumentData[] => {
 
   const filtered = opds.filter(doc => {
     const opd = doc.outward_permit_declaration;
-    const containerNo = opd?.container_no?.trim().toUpperCase() ?? '';
-    const isValid = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
+    const isValid = isValidContainerNo(opd?.container_no ?? '');
     if (isValid) return true; // Always keep container-confirmed entries
 
     const consignee    = (opd?.consignee    ?? '').trim();
@@ -434,8 +436,8 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
       }
     } else if (doc.document_type === "Outward Permit Declaration") {
       const opd = doc.outward_permit_declaration;
-      const containerNo = opd?.container_no?.trim().toUpperCase();
-      const isValidContainer = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
+      const containerNo = opd?.container_no?.trim().toUpperCase() ?? '';
+      const isValidContainer = isValidContainerNo(containerNo);
       // PSG and RSUP SIs share the same container number AND same exporter letterhead — use factory
       // (PSG/RSUP) as the differentiator. Falls back to description prefix for non-factory SIs.
       const factory = (opd?.factory ?? '').trim().toUpperCase();

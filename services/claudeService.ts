@@ -301,6 +301,50 @@ const ensurePaymentVouchers = (docs: DocumentData[]): DocumentData[] => {
   return [...docs, ...synthesized];
 };
 
+// Claude sometimes outputs OPD fields nested in sub-objects (customer_order_info, product_info,
+// shipping_info, vessel_voyage_info, shipping_department) instead of flat top-level fields.
+// Promote all key fields up to top level so dedup, orphan removal, and display can rely on them.
+const normalizeOPDContainers = (docs: DocumentData[]): DocumentData[] => {
+  return docs.map(doc => {
+    if (doc.document_type !== 'Outward Permit Declaration') return doc;
+    const opd = doc.outward_permit_declaration as any;
+    if (!opd) return doc;
+
+    const o = opd;
+    const coi  = o.customer_order_info  ?? {};
+    const si   = o.shipping_info        ?? {};
+    const sd   = o.shipping_department  ?? {};
+    const vvi0 = (o.vessel_voyage_info  ?? [])[0] ?? {};
+    const pi   = o.product_info         ?? o.products ?? [];
+
+    // Container: try all nested locations
+    const existingContainer = o.container_no?.trim() ?? '';
+    const container = (existingContainer && existingContainer.length > 3 && existingContainer !== '-')
+      ? existingContainer
+      : (sd.container_no?.trim() || vvi0.container_no?.trim() || '');
+
+    const promoted: Record<string, any> = { ...opd };
+
+    // Promote client
+    if (!o.client)      promoted.client      = coi.client ?? coi.invoice_to_buyer ?? si.invoice_to ?? null;
+    // Promote consignee
+    if (!o.consignee)   promoted.consignee   = si.consignee ?? coi.consignee ?? null;
+    // Promote purchase_order
+    if (!o.purchase_order) promoted.purchase_order = coi.purchase_order ?? null;
+    // Promote final_destination
+    if (!o.final_destination) promoted.final_destination = si.final_destination ?? vvi0.final_destination ?? null;
+    // Promote products from product_info array
+    if (!o.products?.length && pi.length) promoted.products = pi;
+    // Promote container_no and seal_no
+    if (container && container.length > 3 && container !== '-') {
+      promoted.container_no = container;
+      promoted.seal_no = o.seal_no || sd.seal_no || vvi0.seal_no || null;
+    }
+
+    return { ...doc, outward_permit_declaration: promoted };
+  });
+};
+
 // Remove OPD ghost rows and orphan pre-entries:
 // 1. Entries with no consignee AND no description AND no container — pure garbage rows.
 // 2. Null-container OPDs that are superseded by a container-having entry for the same consignee —
@@ -328,7 +372,7 @@ const removeOrphanOPDs = (docs: DocumentData[]): DocumentData[] => {
     if (isValid) return true; // Always keep container-confirmed entries
 
     const consignee    = (opd?.consignee    ?? '').trim();
-    const description  = (opd?.description  ?? '').trim();
+    const description  = (opd?.description ?? (opd as any)?.products?.[0]?.description ?? (opd as any)?.product_description ?? '').trim();
     const bl           = (opd?.bl_number    ?? '').trim();
 
     // Drop: completely empty (no consignee, no description, no meaningful BL)
@@ -385,15 +429,24 @@ const deduplicateDocuments = (docs: DocumentData[]): DocumentData[] => {
     } else if (doc.document_type === "Outward Permit Declaration") {
       const opd = doc.outward_permit_declaration;
       const containerNo = opd?.container_no?.trim().toUpperCase();
-      // Multi-shipper containers: two SIs (different exporters) legitimately share the same
-      // container number. Include a normalised exporter in the key so both entries survive.
-      // Without a valid container, keep every entry unconditionally (random key).
       const isValidContainer = containerNo && containerNo !== '-' && containerNo.length > 3 && !containerNo.includes(',');
-      const exporter = (opd?.exporter ?? '').trim().toUpperCase().replace(/\s+/g, '_');
+      // PSG and RSUP SIs share the same container number AND same exporter letterhead — use factory
+      // (PSG/RSUP) as the differentiator. Falls back to description prefix for non-factory SIs.
+      const factory = (opd?.factory ?? '').trim().toUpperCase();
+      const descPrefix = (opd?.products?.[0]?.description ?? opd?.description ?? '').trim().toUpperCase().substring(0, 15).replace(/\s+/g, '_');
+      const suffix = factory || descPrefix || 'NODESC';
       const key = isValidContainer
-        ? `OPD_${containerNo}_${exporter || 'UNKNOWN'}`
+        ? `OPD_${containerNo}_${suffix}`
         : `OPD_${Math.random()}`;
-      if (!uniqueDocs.has(key)) uniqueDocs.set(key, doc);
+      if (!uniqueDocs.has(key)) {
+        uniqueDocs.set(key, doc);
+      } else {
+        // Keep the more complete entry for genuine duplicates (overlap chunks)
+        const existing = uniqueDocs.get(key)!;
+        const existingFields = Object.values(existing.outward_permit_declaration || {}).filter(v => v != null && (v as string).toString().trim().length > 0).length;
+        const currentFields = Object.values(opd || {}).filter(v => v != null && (v as string).toString().trim().length > 0).length;
+        if (currentFields > existingFields) uniqueDocs.set(key, doc);
+      }
     } else if (doc.document_type === 'Allied Report') {
       // Allied/CDAS Reports are deduplicated exclusively by deduplicateByContainer.
       // Using metadata.reference_number here would collapse all containers sharing the same invoice
@@ -686,11 +739,11 @@ export const extractDocumentData = async (
   };
 
   onProgress?.('Reading PDF...');
-  const chunkSize = role === 'transport' ? 30 : role === 'logistics' ? 6 : 15;
+  const chunkSize = role === 'transport' ? 30 : role === 'logistics' ? 8 : 15;
   // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
   // logistics: 0 overlap — SIs are exactly 2 pages, so 6-page chunk boundaries always fall
   //            between SIs (pages 6→7, 12→13…), never inside one. Overlap causes duplicates.
-  const chunkOverlap = role === 'accounts' ? 3 : 0;
+  const chunkOverlap = role === 'accounts' ? 3 : role === 'logistics' ? 1 : 0;
   let chunks: Awaited<ReturnType<typeof splitPdfIntoChunks>>;
   try {
     chunks = await splitPdfIntoChunks(file, chunkSize, chunkOverlap);
@@ -742,7 +795,7 @@ export const extractDocumentData = async (
     processed = await enrichMissingPSSNumbers(processed, file, onProgress);
     logDocs(`After enrichMissingPSSNumbers (${processed.length} docs)`, processed, '#f43f5e');
   } else if (role === 'logistics') {
-    processed = removeOrphanOPDs(allDocs);
+    processed = removeOrphanOPDs(normalizeOPDContainers(allDocs));
     logDocs(`After removeOrphanOPDs (${processed.length} docs)`, processed, '#ec4899');
   } else if (role === 'transport') {
     processed = allDocs;

@@ -129,12 +129,21 @@ export async function generateCDASVoucherPdf(docs: DocumentData[]): Promise<Blob
   setField('Date', dateDisplay);
   setField('CASH CHEQUE No', 'CIMB - GIRO');
 
-  rows.forEach((row, i) => {
-    const rowNum = i + 1;
-    if (rowNum > 6) return;
-    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 40 ? 7.5 : 11.5);
-    setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
+  const CDAS_MAX_ROWS = 6;
+  rows.slice(0, CDAS_MAX_ROWS - 1).forEach((row, i) => {
+    setField(`row${i + 1}_desc`, row.desc, row.desc.length > 40 ? 7.5 : 11.5);
+    setField(`SGD USDRow${i + 1}`, row.amount.toFixed(2));
   });
+  const cdasOverflow = rows.slice(CDAS_MAX_ROWS - 1);
+  if (cdasOverflow.length === 1) {
+    setField(`row${CDAS_MAX_ROWS}_desc`, cdasOverflow[0].desc, cdasOverflow[0].desc.length > 40 ? 7.5 : 11.5);
+    setField(`SGD USDRow${CDAS_MAX_ROWS}`, cdasOverflow[0].amount.toFixed(2));
+  } else if (cdasOverflow.length > 1) {
+    const combinedDesc = cdasOverflow.map(r => r.desc).join('; ');
+    const combinedAmount = cdasOverflow.reduce((s, r) => s + r.amount, 0);
+    setField(`row${CDAS_MAX_ROWS}_desc`, combinedDesc, 7.5);
+    setField(`SGD USDRow${CDAS_MAX_ROWS}`, combinedAmount.toFixed(2));
+  }
 
   setField('SGD  USD Total', grandTotal.toFixed(2));
   try { form.getCheckBox('sgd_check').check(); } catch { /* skip */ }
@@ -247,12 +256,21 @@ export async function generateAlliedVoucherPdf(docs: DocumentData[]): Promise<Bl
   setField('Date', dateDisplay);
   setField('CASH CHEQUE No', 'CIMB - GIRO');
 
-  rows.forEach((row, i) => {
-    const rowNum = i + 1;
-    if (rowNum > 6) return;
-    setField(`row${rowNum}_desc`, row.desc, row.desc.length > 40 ? 7.5 : 11.5);
-    setField(`SGD USDRow${rowNum}`, row.amount.toFixed(2));
+  const ALLIED_MAX_ROWS = 6;
+  rows.slice(0, ALLIED_MAX_ROWS - 1).forEach((row, i) => {
+    setField(`row${i + 1}_desc`, row.desc, row.desc.length > 40 ? 7.5 : 11.5);
+    setField(`SGD USDRow${i + 1}`, row.amount.toFixed(2));
   });
+  const alliedOverflow = rows.slice(ALLIED_MAX_ROWS - 1);
+  if (alliedOverflow.length === 1) {
+    setField(`row${ALLIED_MAX_ROWS}_desc`, alliedOverflow[0].desc, alliedOverflow[0].desc.length > 40 ? 7.5 : 11.5);
+    setField(`SGD USDRow${ALLIED_MAX_ROWS}`, alliedOverflow[0].amount.toFixed(2));
+  } else if (alliedOverflow.length > 1) {
+    const combinedDesc = alliedOverflow.map(r => r.desc).join('; ');
+    const combinedAmount = alliedOverflow.reduce((s, r) => s + r.amount, 0);
+    setField(`row${ALLIED_MAX_ROWS}_desc`, combinedDesc, 7.5);
+    setField(`SGD USDRow${ALLIED_MAX_ROWS}`, combinedAmount.toFixed(2));
+  }
 
   setField('SGD  USD Total', grandTotal.toFixed(2));
   try { form.getCheckBox('sgd_check').check(); } catch { /* skip */ }

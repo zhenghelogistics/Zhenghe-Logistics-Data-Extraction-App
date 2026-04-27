@@ -52,7 +52,7 @@ EXTRACTION RULES FOR "Logistics Local Charges Report":
   * 40RF → for codes: 40RF, 40' refer
   * 40RFHC → for codes: 40HR, 40RH, 40RQ, 4RH, 40 reefer high cube
 - G. CONTAINER QTY: From BL or Invoice.
-- H. (SGD) THC: Look for T.H.C, THC, Terminal Handling Charge. Extract the PER CONTAINER UNIT charge (not the total). e.g. if 2 containers × $150 each, return "150.00".
+- H. (SGD) THC: Look for T.H.C, THC, Terminal Handling Charge. Extract the PER CONTAINER UNIT charge (not the total). e.g. if 2 containers × $150 each, return "150.00". If THC is in USD, convert to SGD using the exchange rate shown on the document (e.g. THC USD 205.00 × 1.2743 = SGD 261.23 → return "261.23"). Always return the SGD equivalent.
 - I. (SGD) SEAL FEE: Capture "SLF Seal Fee" and "HI SEC SEAL CHG". Do NOT include "ISL International Seal Fee", "ISOCC", or any other seal-related charges — these are NOT local charges and must be ignored entirely. Extract the PER SEAL UNIT charge (not the total). e.g. if 5 seals × $15 each = $75 total, return "15.00". MULTI-BL INVOICES: When one invoice covers multiple BLs (e.g. 6 BLs) and has a single seal charge line (e.g. HI SEC SEAL CHG basis 5 × $15), apply the per-unit rate to EVERY BL entry, not just the first one.
 - J. (SGD) BL FEE: Bill of Lading / Document Fee.
 - K. (SGD) BL PRINTED FEE: ONLY for charges explicitly labeled "PRINTED BL" or "BL PRINTED FEE". Do NOT place AMS, ENS, ESD, EES, manifest filing, or entry summary charges here — those belong in column L. Leave blank if none.

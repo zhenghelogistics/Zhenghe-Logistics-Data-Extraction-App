@@ -105,7 +105,7 @@ EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
     COCONUT CANDY → 17049099 (ID)
     DRINKING WATER → 22011010 (ID)
   * Otherwise: Extract the HS code directly from the document as provided. Numbers only (e.g. 84137000).
-- DESCRIPTION (formatted): From INVOICE item description. Format as: [QTY as whole integer] [UOM] [ITEM DESCRIPTION]. Remove all decimals from quantity (e.g. 1.000 → 1). Example: "1 UNIT CENTRIFUGAL PUMP TYPE: WI+35/35 IN/OUTLET: SMS 76/51 MM". If descriptions across INVOICE, PACKING LIST, BL, and PO do not match, leave this blank.
+- DESCRIPTION (formatted): From INVOICE item description. Format as: [QTY as whole integer] [UOM] [ITEM DESCRIPTION]. Remove all decimals from quantity (e.g. 1.000 → 1). Example: "1 UNIT CENTRIFUGAL PUMP TYPE: WI+35/35 IN/OUTLET: SMS 76/51 MM". EXCLUDE any NPBB shipping mark reference from the description — any text starting with "NPBB:" (e.g. "NPBB:02948/CML/032026 (RSUP)") is a shipping mark, not part of the item description; strip it entirely. If descriptions across INVOICE, PACKING LIST, BL, and PO do not match, leave this blank.
 - NET WEIGHT: Nett Weight Grand Total from PACKING LIST column "Nett Weight (kgs)". Number only, no units.
 - VALUE AMOUNT ('item_price_amount'): Total Amount / Extended Price from INVOICE. Number only, no currency. e.g. "1500.00".
 - VALUE CURRENCY ('item_price_currency'): Currency code from INVOICE value. e.g. "USD".
@@ -116,7 +116,7 @@ EXTRACTION RULES FOR "Outward Permit Declaration" (Shipping Team):
 - INVOICE DESCRIPTION (raw): Copy the item description exactly as written in the INVOICE. No formatting.
 - PACKING LIST DESCRIPTION (raw): Copy the item description exactly as written in the PACKING LIST. No formatting.
 - BL DESCRIPTION (raw): Copy the item description exactly as written in the BILL OF LADING. No formatting.
-- PO DESCRIPTION (raw): Copy the item description exactly as written in the PURCHASE ORDER. No formatting.
+- PO DESCRIPTION (raw): Copy the item description exactly as written in the PURCHASE ORDER. No formatting. Exclude any NPBB shipping mark line (text starting with "NPBB:") — it is not part of the description.
 - DESCRIPTION MATCH: Compare all four raw descriptions above. Do they all refer to the same item? Output "MATCH" or "MISMATCH - [which document differs]". Be strict.
 - COUNTRY OF ORIGIN: From PURCHASE ORDER item description field "Product Of Origin". Full country name in capitals e.g. "GERMANY".
 
@@ -160,15 +160,15 @@ EXTRACTION RULES FOR "CDAS Report" (Transport Team):
 EXTRACTION RULES FOR "Export Permit Declaration (PSS)" (Logistics/Shipping Team):
 - DOCUMENT STRUCTURE: Either (A) a PSS shipment bundle — Purchase Order(s), Commercial Invoice, Packing List, Loading Report, and/or supporting docs; OR (B) a standalone Proforma Invoice / Delivery Note from an overseas supplier to a Singapore receiver.
 - ONE ENTRY TOTAL: Produce EXACTLY ONE "Export Permit Declaration (PSS)" entry for the entire document. Set metadata.reference_number to the Invoice Number.
-- ONE ITEM PER INVOICE LINE: "export_permit_pss.items" has one entry per line item on the invoice.
-- JOIN KEY (for bundle format): Match items across documents using the item/part code (e.g. MC-ARG-PRM-xxxxx) found in both Invoice and PO.
+- INVOICE IS THE ANCHOR — CRITICAL: The number of output items MUST equal exactly the number of line items on the INVOICE. Do NOT create separate entries for PO line items or Packing List line items. The PO and Packing List are reference-only documents — read them to fill fields (hs_code, product_of_origin, nett_weight) on the invoice-anchored rows, but NEVER create additional rows from them.
+- JOIN KEY (for bundle format): Match PO and PL data to each invoice line by (1) item/part code (e.g. MC-THW-PRM-00001) if it appears on both documents, OR (2) description similarity if no shared code exists. If you cannot confidently match a PO/PL line to an invoice line, leave those fields null — do not create a new row.
 - hs_code: HS/Tariff code for this item. Numbers only (e.g. "84483200"). Sources in priority order:
   1. Explicit "HS CODE:" or "Tariff Code:" label on any document in the bundle.
   2. "Comm.code.no.:" field on Proforma Invoice / Delivery Note — extract only the numeric portion before any space (e.g. "Comm.code.no.: 831190 COO DE" → "831190").
   3. Tariff/HS column on PO.
 - quantity: Quantity from Invoice. INTEGER ONLY — strip all decimals (1.000 → "1", 50.000 → "50").
 - uom: Unit of Measure from Invoice (e.g. "UNIT", "SET", "PCS", "KGS", "Pc").
-- item_description: Full item description from Invoice verbatim.
+- item_description: Full item description from Invoice verbatim. Exclude any NPBB shipping mark reference — any text starting with "NPBB:" (e.g. "NPBB:02948/CML/032026 (RSUP)") is a shipping mark, not part of the description; strip it entirely.
 - product_of_origin: Full country name in CAPITALS. Sources in priority order:
   1. "Product Of Origin" column on PO.
   2. Country code suffix in "Comm.code.no.:" field (e.g. "COO DE" → "GERMANY", "COO CN" → "CHINA", "COO ID" → "INDONESIA", "COO SG" → "SINGAPORE"). Map ISO-2 codes to full English country names.

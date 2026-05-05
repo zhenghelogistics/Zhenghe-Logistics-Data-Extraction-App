@@ -1,13 +1,13 @@
 {
   "functions": {
     "api/extract.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/enrichPSS.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/templateChat.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   }
 }

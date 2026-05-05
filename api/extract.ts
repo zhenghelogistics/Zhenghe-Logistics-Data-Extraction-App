@@ -50,6 +50,9 @@ export default async function handler(req: any, res: any) {
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      // Stream the response so the connection stays alive during long Claude calls.
+      // This prevents proxy/CDN idle-timeout on large PSS bundles.
+      let fullText = "";
       const stream = client.messages.stream({
         model: "claude-sonnet-4-6",
         max_tokens: 32000,
@@ -69,11 +72,18 @@ export default async function handler(req: any, res: any) {
         ],
       });
 
-      const response = await stream.finalMessage();
-      const text = response.content[0].type === "text" ? response.content[0].text : "";
-      if (!text) throw new Error("No data returned from Claude");
+      for await (const event of stream) {
+        if (
+          event.type === "content_block_delta" &&
+          event.delta.type === "text_delta"
+        ) {
+          fullText += event.delta.text;
+        }
+      }
 
-      res.status(200).json({ text });
+      if (!fullText) throw new Error("No data returned from Claude");
+
+      res.status(200).json({ text: fullText });
       return;
     } catch (error: any) {
       if (attempt === maxRetries) {

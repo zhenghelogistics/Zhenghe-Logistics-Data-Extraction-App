@@ -160,8 +160,13 @@ EXTRACTION RULES FOR "CDAS Report" (Transport Team):
 EXTRACTION RULES FOR "Export Permit Declaration (PSS)" (Logistics/Shipping Team):
 - DOCUMENT STRUCTURE: Either (A) a PSS shipment bundle — Purchase Order(s), Commercial Invoice, Packing List, Loading Report, and/or supporting docs; OR (B) a standalone Proforma Invoice / Delivery Note from an overseas supplier to a Singapore receiver.
 - ONE ENTRY TOTAL: Produce EXACTLY ONE "Export Permit Declaration (PSS)" entry for the entire document. Set metadata.reference_number to the Invoice Number.
-- INVOICE IS THE ANCHOR — CRITICAL: The number of output items MUST equal exactly the number of line items on the INVOICE. Do NOT create separate entries for PO line items or Packing List line items. The PO and Packing List are reference-only documents — read them to fill fields (hs_code, product_of_origin, nett_weight) on the invoice-anchored rows, but NEVER create additional rows from them.
-- JOIN KEY (for bundle format): Match PO and PL data to each invoice line by (1) item/part code (e.g. MC-THW-PRM-00001) if it appears on both documents, OR (2) description similarity if no shared code exists. If you cannot confidently match a PO/PL line to an invoice line, leave those fields null — do not create a new row.
+- INVOICE IS THE ONLY ANCHOR — THIS IS THE MOST CRITICAL RULE:
+  Step 1: Find the Commercial Invoice (or Tax Invoice / Supplier Invoice) in the bundle. Count how many line items it has — call this N. Your output MUST have exactly N items in the array.
+  Step 2: For each of those N invoice lines, create ONE output row. Then look up the PO and Packing List to fill in any missing fields (hs_code from PO, nett_weight from PL, product_of_origin from PO).
+  Step 3: NEVER create rows from PO items directly. NEVER create rows from Packing List items directly. They are lookup references only.
+  WRONG EXAMPLE: File has 20 PO items + 20 Invoice items + 20 PL items → you output 60 rows. THIS IS WRONG.
+  CORRECT EXAMPLE: File has 20 Invoice items → you output exactly 20 rows, each with hs_code/origin pulled from PO and nett_weight pulled from PL where available.
+- JOIN KEY (for bundle format): Match PO and PL data to each invoice line by (1) item/part code (e.g. MC-THW-PRM-00001) if it appears on both documents, OR (2) description similarity if no shared code exists. If you cannot confidently match a PO/PL line to an invoice line, leave those fields null — do NOT create a new row.
 - hs_code: HS/Tariff code for this item. Numbers only (e.g. "84483200"). Sources in priority order:
   1. Explicit "HS CODE:" or "Tariff Code:" label on any document in the bundle.
   2. "Comm.code.no.:" field on Proforma Invoice / Delivery Note — extract only the numeric portion before any space (e.g. "Comm.code.no.: 831190 COO DE" → "831190").

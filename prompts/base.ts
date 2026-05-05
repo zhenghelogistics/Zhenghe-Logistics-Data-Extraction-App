@@ -164,8 +164,8 @@ EXTRACTION RULES FOR "Export Permit Declaration (PSS)" (Logistics/Shipping Team)
   Step 1: Find the Commercial Invoice (or Tax Invoice / Supplier Invoice) in the bundle. Count how many line items it has — call this N. Your output MUST have exactly N items in the array.
   Step 2: For each of those N invoice lines, create ONE output row. Then look up the PO and Packing List to fill in any missing fields (hs_code from PO, nett_weight from PL, product_of_origin from PO).
   Step 3: NEVER create rows from PO items directly. NEVER create rows from Packing List items directly. They are lookup references only.
-  WRONG EXAMPLE: File has 20 PO items + 20 Invoice items + 20 PL items → you output 60 rows. THIS IS WRONG.
-  CORRECT EXAMPLE: File has 20 Invoice items → you output exactly 20 rows, each with hs_code/origin pulled from PO and nett_weight pulled from PL where available.
+  WRONG: File has N PO items + N Invoice items + N PL items → you output 3N rows (one set per document). THIS IS WRONG.
+  CORRECT: File has N Invoice items → you output exactly N rows, each with hs_code/origin pulled from PO and nett_weight pulled from PL where they match.
 - JOIN KEY (for bundle format): Match PO and PL data to each invoice line by (1) item/part code (e.g. MC-THW-PRM-00001) if it appears on both documents, OR (2) description similarity if no shared code exists. If you cannot confidently match a PO/PL line to an invoice line, leave those fields null — do NOT create a new row.
 - hs_code: HS/Tariff code for this item. Numbers only (e.g. "84483200"). Sources in priority order:
   1. Explicit "HS CODE:" or "Tariff Code:" label on any document in the bundle.

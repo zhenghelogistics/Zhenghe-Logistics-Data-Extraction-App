@@ -151,9 +151,9 @@ EXTRACTION RULES FOR "CDAS Report" (Transport Team):
   - "ADMIN FEE" or "DOC FEE" → data_admin_fee (if both present in same row, use the larger amount)
   - "DETENTION" → detention
   - "REPAIR" or "DAMAGE" → repair
-  - "WASHING" or "FB WATER WASHING" or "WATER WASHING" → washing
+  - "WASHING" or "FB WATER WASHING" or "FB CHEMICAL WASHING" or "CHEMICAL WASHING" or "WATER WASHING" or "STEAM WASH" → washing
   - "DEMURRAGE" → demurrage
-  - "FUEL SURCHARGE" or "EFS" or "ENERGY FUEL SURCHARGE" or "FUEL SURCHARGE IN" → fuel_surcharge (numeric amount) and fuel_surcharge_label (exact charge name as it appears, e.g. "EFS", "FUEL SURCHARGE IN"). Store separately, do NOT add to dhc_in.
+  - "FUEL SURCHARGE" or "EFS" or "ENERGY FUEL SURCHARGE" or "FUEL SURCHARGE IN" or "OPERATIONAL COST SURCHARGE" → fuel_surcharge (numeric amount) and fuel_surcharge_label (exact charge name as it appears, e.g. "EFS", "OPERATIONAL COST SURCHARGE"). Store separately, do NOT add to dhc_in.
 - Strip the "$" symbol and return numeric strings only (e.g. "75.00" not "$75.00").
 - SAME CONTAINER ACROSS ROWS (CWT pattern): Some depots list DHC and EFS/FUEL SURCHARGE as separate rows for the same container number. When you see the same container number twice in the same depot section, merge both rows into ONE CDAS entry: dhc_in from the DHC row, fuel_surcharge from the EFS/FUEL SURCHARGE row.
 

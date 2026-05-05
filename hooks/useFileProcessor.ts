@@ -107,6 +107,7 @@ export function useFileProcessor({ customRules, userRole, addLog, activeTab }: O
       id: Math.random().toString(36).substring(7),
       file,
       status: FileStatus.PENDING,
+      docType: activeTab,
     }));
     setFiles(prev => [...prev, ...newFiles]);
     addLog(`Added ${newFiles.length} file(s) to queue.`);
@@ -126,7 +127,7 @@ export function useFileProcessor({ customRules, userRole, addLog, activeTab }: O
       try {
         let firstResult = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
           setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage, progress } : f));
-        }, userRole ?? undefined, undefined, undefined, activeTab);
+        }, userRole ?? undefined, undefined, undefined, fileWrapper.docType);
 
         // Auto-retry once transparently when partial — most transient failures resolve on retry
         if (firstResult.status === 'partial') {
@@ -134,7 +135,7 @@ export function useFileProcessor({ customRules, userRole, addLog, activeTab }: O
           setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage: 'Retrying…', progress: 0 } : f));
           const retry = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
             setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage, progress } : f));
-          }, userRole ?? undefined, undefined, undefined, activeTab);
+          }, userRole ?? undefined, undefined, undefined, fileWrapper.docType);
           if (retry.documents.length >= firstResult.documents.length) firstResult = retry;
         }
 
@@ -204,7 +205,7 @@ export function useFileProcessor({ customRules, userRole, addLog, activeTab }: O
       const { documents: dataList, warnings: extractionWarnings, status: extractionStatus } =
         await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
           setFiles(prev => prev.map(f => f.id === id ? { ...f, stage, progress } : f));
-        }, userRole ?? undefined, undefined, undefined, activeTab);
+        }, userRole ?? undefined, undefined, undefined, fileWrapper.docType);
       const validationErrors = validateDocumentData(dataList);
       const hasWarnings = validationErrors.length > 0 || extractionWarnings.length > 0;
       const newStatus = extractionStatus === 'failed' ? FileStatus.ERROR
@@ -334,7 +335,7 @@ export function useFileProcessor({ customRules, userRole, addLog, activeTab }: O
           userRole ?? undefined,
           fileWrapper.failedChunkIndices,
           fileWrapper.data,
-          activeTab,
+          fileWrapper.docType,
         );
       const validationErrors = validateDocumentData(dataList);
       const hasWarnings = validationErrors.length > 0 || extractionWarnings.length > 0;

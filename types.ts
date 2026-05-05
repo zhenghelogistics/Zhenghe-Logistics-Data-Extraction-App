@@ -230,6 +230,7 @@ export interface ProcessedFile {
   id: string;
   file: File;
   status: 'pending' | 'processing' | 'completed' | 'error' | 'warning';
+  docType?: string;          // tab active at upload time — determines chunking template
   data?: DocumentData[];
   errorMessage?: string;
   validationErrors?: string[];

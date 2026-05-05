@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { ProcessedFile, FileStatus, DocumentData } from '../types';
 import { AppConfig } from '../config';
+
+const TAB_SHORT_LABEL: Record<string, string> = {
+  'All Files': 'All',
+  'All': 'All',
+  'Logistics Local Charges Report': 'LCR',
+  'Outward Permit Declaration': 'OPD',
+  'Export Permit Declaration (PSS)': 'PSS',
+  'Payment Voucher/GL': 'PV/GL',
+  'Bill of Lading': 'BL',
+  'CDAS Report': 'CDAS',
+  'Allied Report': 'Allied',
+  'Commercial Invoice': 'Invoice',
+  'Packing List': 'PL',
+  'Purchase Order': 'PO',
+};
 import { CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Trash2, FileText, RefreshCw, Copy } from 'lucide-react';
 import { LumaSpin } from './ui/luma-spin';
 import { UserRole } from '../users';
@@ -344,8 +359,15 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
                           className="rounded border-outline/30 text-red-600 focus:ring-red-500 cursor-pointer"
                         />
                       </td>
-                      <td className="whitespace-nowrap py-3.5 pr-3 text-sm font-medium text-primary">
-                        {file.file.name}
+                      <td className="py-3.5 pr-3 text-sm font-medium text-primary max-w-xs">
+                        <div className="flex flex-col gap-1">
+                          <span className="truncate">{file.file.name}</span>
+                          {file.docType && file.docType !== 'All Files' && file.docType !== 'All' && (
+                            <span className="inline-flex w-fit items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary-fixed/30 text-secondary border border-secondary/20">
+                              {TAB_SHORT_LABEL[file.docType] ?? file.docType}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-sm">
                         <div className="relative inline-block">

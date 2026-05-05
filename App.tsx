@@ -42,6 +42,21 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
   'Export Permit Declaration (PSS)': <ScrollText size={15} />,
 };
 
+const TAB_SHORT_LABEL: Record<string, string> = {
+  'All Files': 'All',
+  'All': 'All',
+  'Logistics Local Charges Report': 'LCR',
+  'Outward Permit Declaration': 'OPD',
+  'Export Permit Declaration (PSS)': 'PSS',
+  'Payment Voucher/GL': 'PV/GL',
+  'Bill of Lading': 'BL',
+  'CDAS Report': 'CDAS',
+  'Allied Report': 'Allied',
+  'Commercial Invoice': 'Invoice',
+  'Packing List': 'PL',
+  'Purchase Order': 'PO',
+};
+
 function App() {
   const [logs, setLogs] = useState<string[]>([]);
   const addLog = (message: string) => {
@@ -422,7 +437,7 @@ function App() {
 
               <button onClick={processFiles} disabled={isProcessing || pendingCount === 0} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity cursor-pointer">
                 {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                {isProcessing ? 'Processing...' : `Process${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+                {isProcessing ? 'Processing...' : `Process as ${TAB_SHORT_LABEL[activeTab] ?? activeTab}${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
               </button>
 
               <button onClick={downloadReport} disabled={completedCount === 0} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity cursor-pointer">

@@ -81,7 +81,7 @@ function App() {
     handleIncotermUpdate, handleFreightTermUpdate,
     handleDeleteFile, handleBulkDelete, confirmDeleteFile,
     handleContainerRecordUpdate, handleContainerRecordDelete, handleContainerRecordDeleteMany,
-  } = useFileProcessor({ customRules, userRole, addLog });
+  } = useFileProcessor({ customRules, userRole, addLog, activeTab });
 
   // Deploy update detection
   useEffect(() => {

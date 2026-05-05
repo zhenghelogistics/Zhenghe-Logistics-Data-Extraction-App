@@ -732,6 +732,7 @@ export const extractDocumentData = async (
   role?: string,
   chunkFilter?: number[],      // when set, only process these chunk indices
   existingDocs?: DocumentData[], // when set, merge with these before pipeline
+  docType?: string,            // selected document type from the UI tab
 ): Promise<ExtractionResult> => {
   const systemPrompt = buildSystemPrompt(customInstructions, role);
 
@@ -766,11 +767,24 @@ export const extractDocumentData = async (
   };
 
   onProgress?.('Reading PDF...');
-  const chunkSize = role === 'logistics' ? 8 : 15;
-  // accounts/transport: 3-page overlap so documents straddling chunk boundaries appear in full in at least one chunk
-  // logistics: 0 overlap — SIs are exactly 2 pages, so 6-page chunk boundaries always fall
-  //            between SIs (pages 6→7, 12→13…), never inside one. Overlap causes duplicates.
-  const chunkOverlap = role === 'logistics' ? 1 : role === 'transport' || role === 'accounts' ? 3 : 0;
+  // PSS export permit bundles (PO + Invoice + PL, ~30 pages) must land in a single chunk so the
+  // invoice-anchor rule can join all documents. We use the whole file as one chunk for that type.
+  // All other logistics files (OPD, LCR, ≤20 pages) keep 8-page parallel chunks.
+  let chunkSize: number;
+  let chunkOverlap: number;
+  if (role === 'logistics' && docType === 'Export Permit Declaration (PSS)') {
+    const b64 = await fileToBase64(file);
+    const tmpDoc = await PDFDocument.load(b64);
+    chunkSize = tmpDoc.getPageCount();
+    chunkOverlap = 0;
+  } else if (role === 'logistics') {
+    chunkSize = 8;
+    chunkOverlap = 1;
+  } else {
+    chunkSize = 15;
+    // accounts/transport: 3-page overlap so documents straddling chunk boundaries appear in full in at least one chunk
+    chunkOverlap = role === 'transport' || role === 'accounts' ? 3 : 0;
+  }
   let chunks: Awaited<ReturnType<typeof splitPdfIntoChunks>>;
   try {
     chunks = await splitPdfIntoChunks(file, chunkSize, chunkOverlap);

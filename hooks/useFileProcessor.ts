@@ -13,6 +13,7 @@ interface Options {
   customRules: string[];
   userRole: UserRole | null;
   addLog: (msg: string) => void;
+  activeTab?: string;
 }
 
 const NON_BILLABLE_KEYS = new Set(['dhc_in', 'dhc_out', 'dhe_in', 'dhe_out', 'data_admin_fee']);
@@ -58,7 +59,7 @@ function extractContainerRows(
   return rows;
 }
 
-export function useFileProcessor({ customRules, userRole, addLog }: Options) {
+export function useFileProcessor({ customRules, userRole, addLog, activeTab }: Options) {
   const [files, setFiles] = useState<ProcessedFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [containerRecords, setContainerRecords] = useState<ContainerBillingRecord[]>([]);
@@ -125,7 +126,7 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
       try {
         let firstResult = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
           setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage, progress } : f));
-        }, userRole ?? undefined);
+        }, userRole ?? undefined, undefined, undefined, activeTab);
 
         // Auto-retry once transparently when partial — most transient failures resolve on retry
         if (firstResult.status === 'partial') {
@@ -133,7 +134,7 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
           setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage: 'Retrying…', progress: 0 } : f));
           const retry = await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
             setFiles(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, stage, progress } : f));
-          }, userRole ?? undefined);
+          }, userRole ?? undefined, undefined, undefined, activeTab);
           if (retry.documents.length >= firstResult.documents.length) firstResult = retry;
         }
 
@@ -189,7 +190,7 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
 
     addLog('Batch processing finished.');
     setIsProcessing(false);
-  }, [files, customRules, userRole]);
+  }, [files, customRules, userRole, activeTab]);
 
   const handleReprocess = useCallback(async (id: string) => {
     const fileWrapper = files.find(f => f.id === id);
@@ -203,7 +204,7 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
       const { documents: dataList, warnings: extractionWarnings, status: extractionStatus } =
         await extractDocumentData(fileWrapper.file, customRules, (stage, progress) => {
           setFiles(prev => prev.map(f => f.id === id ? { ...f, stage, progress } : f));
-        }, userRole ?? undefined);
+        }, userRole ?? undefined, undefined, undefined, activeTab);
       const validationErrors = validateDocumentData(dataList);
       const hasWarnings = validationErrors.length > 0 || extractionWarnings.length > 0;
       const newStatus = extractionStatus === 'failed' ? FileStatus.ERROR
@@ -236,7 +237,7 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
       addLog(`ERROR re-processing ${fileWrapper.file.name}: ${errorMessage}`);
     }
     setIsProcessing(false);
-  }, [files, customRules, userRole]);
+  }, [files, customRules, userRole, activeTab]);
 
   const handleIncotermUpdate = (id: string, docIndex: number, newIncoterm: string) => {
     setFiles(prev => prev.map(f => {
@@ -333,6 +334,7 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
           userRole ?? undefined,
           fileWrapper.failedChunkIndices,
           fileWrapper.data,
+          activeTab,
         );
       const validationErrors = validateDocumentData(dataList);
       const hasWarnings = validationErrors.length > 0 || extractionWarnings.length > 0;
@@ -364,7 +366,7 @@ export function useFileProcessor({ customRules, userRole, addLog }: Options) {
       addLog(`ERROR retrying chunks for ${fileWrapper.file.name}: ${errorMessage}`);
     }
     setIsProcessing(false);
-  }, [files, customRules, userRole]);
+  }, [files, customRules, userRole, activeTab]);
 
   return {
     files, setFiles, isProcessing, containerRecords, setContainerRecords,

@@ -766,11 +766,11 @@ export const extractDocumentData = async (
   };
 
   onProgress?.('Reading PDF...');
-  const chunkSize = role === 'transport' ? 30 : role === 'logistics' ? 8 : 15;
-  // accounts: 3-page overlap so BLs that straddle chunk boundaries appear in full in at least one chunk
+  const chunkSize = role === 'logistics' ? 8 : 15;
+  // accounts/transport: 3-page overlap so documents straddling chunk boundaries appear in full in at least one chunk
   // logistics: 0 overlap — SIs are exactly 2 pages, so 6-page chunk boundaries always fall
   //            between SIs (pages 6→7, 12→13…), never inside one. Overlap causes duplicates.
-  const chunkOverlap = role === 'accounts' ? 3 : role === 'logistics' ? 1 : 0;
+  const chunkOverlap = role === 'logistics' ? 1 : role === 'transport' || role === 'accounts' ? 3 : 0;
   let chunks: Awaited<ReturnType<typeof splitPdfIntoChunks>>;
   try {
     chunks = await splitPdfIntoChunks(file, chunkSize, chunkOverlap);

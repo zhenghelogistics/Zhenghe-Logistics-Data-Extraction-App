@@ -62,6 +62,8 @@ export interface PaymentVoucherDetails {
   payable_amount?: string | null;
   total_payable_amount?: string | null;
   charges_summary?: string | null;
+  repair?: string | null;
+  detention?: string | null;
   payment_to?: string | null;
   payment_method?: string | null;
   bl_entries?: BLEntry[] | null;

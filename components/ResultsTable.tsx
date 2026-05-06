@@ -228,8 +228,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
       case 'DHE In': return data.allied_report?.dhe_in || data.cdas_report?.dhe_in || '-';
       case 'DHE Out': return data.allied_report?.dhe_out || data.cdas_report?.dhe_out || '-';
       case 'Data Admin Fee': return data.allied_report?.data_admin_fee || data.cdas_report?.data_admin_fee || '-';
-      case 'Repair': return data.allied_report?.repair || data.cdas_report?.repair || '-';
-      case 'Detention': return data.allied_report?.detention || data.cdas_report?.detention || '-';
+      case 'Repair': return data.payment_voucher_details?.repair || data.allied_report?.repair || data.cdas_report?.repair || '-';
+      case 'Detention': return data.payment_voucher_details?.detention || data.allied_report?.detention || data.cdas_report?.detention || '-';
       case 'Demurrage': return data.allied_report?.demurrage || data.cdas_report?.demurrage || '-';
       case 'Washing': return data.allied_report?.washing || data.cdas_report?.washing || '-';
       case 'Fuel Surcharge': {

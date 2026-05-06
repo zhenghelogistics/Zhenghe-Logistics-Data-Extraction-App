@@ -32,6 +32,8 @@ EXTRACTION RULES FOR "Payment Voucher/GL":
 - BL NUMBER ('bl_number'): Extract the BL/HBL number if present. Link each carrier invoice to its corresponding BL using the Booking Reference number — both the BL and its Tax Invoice share the same Booking Reference.
 - PAYABLE AMOUNT ('payable_amount'): Grand Total with currency (e.g., "250.00 SGD").
 - CHARGES SUMMARY ('charges_summary'): List the charge TYPES found in the tax invoice, comma-separated. Use these short forms for known charges: THC (Terminal Handling Charges), BL (BL Fee / Document Fee / O/B DOC FEE / LOCAL BL), SEALS (Seal Fee / HI SEC SEAL CHG / Container Seal Fee / SEAL CHG), O.F (Ocean Freight), ENS, AMS (Advance Manifest / ADV MFST CHGR), PRINTED BL. For any OTHER charges not in this list, include them as they appear on the invoice (e.g., "FUMIGATION", "ISPS"). Example output: "THC, SEALS, BL, ENS". Do NOT include Surrender Fee (SBL) or Food Grade in the summary — these are not local charges. Only include charges that are actually present in the document.
+- REPAIR ('repair'): Total repair amount. A line item may list multiple containers e.g. "REPAIR - HDMU3424088 $390.6/-, HDMU3424431 $213/-, CAAU6275302 $18/-" — sum all the dollar figures on the REPAIR portion. Numeric string only (e.g. "621.60"). Null if no repair charge.
+- DETENTION ('detention'): Total detention amount. A single line may combine repair and detention e.g. "REPAIR - HDMU... $390.6/-, DETENTION - TLLU1092008 $1890/-" — extract only the amount(s) after the "DETENTION" keyword. Numeric string only (e.g. "1890.00"). Null if no detention charge.
 - MULTI-INVOICE RULE:
   * If multiple invoices are from DIFFERENT suppliers/carriers (different payment_to), create a SEPARATE Payment Voucher/GL entry for each supplier.
   * If multiple invoices are from the SAME supplier/carrier (same payment_to), merge them into ONE Payment Voucher/GL entry: set carrier_invoice_number to all invoice numbers comma-separated, set total_payable_amount to the combined total, and populate bl_entries as an array — one entry per BL with its bl_number, pss_invoice_number, and individual amount.
@@ -235,6 +237,8 @@ Respond ONLY with valid JSON matching this exact structure:
         "payable_amount": "string or null",
         "total_payable_amount": "string or null",
         "charges_summary": "string or null",
+        "repair": "string or null — total repair amount (numeric only, e.g. '621.60'). Sum all container repair figures if multiple containers appear on one line.",
+        "detention": "string or null — total detention amount (numeric only, e.g. '1890.00'). Extract only amounts after the DETENTION keyword, even when repair and detention appear on the same line.",
         "payment_to": "string or null — the company name being paid (carrier/forwarder company, e.g. FR. MEYER'S SOHN (FAR EAST) PTE LTD)",
         "payment_method": "string or null — payment method shown on document (e.g. FAST, CHEQUE, CASH, TT)"
       },

@@ -39,7 +39,7 @@ export const AppConfig = {
       columns: ['File Name', 'Status', 'Document Types Found', 'Upload Date']
     },
     'Payment Voucher/GL': {
-      columns: ["PSS's Invoice #", "Carrier/Forwarder Inv #", "BL Number", "Payable Amount", "Total Payable Amount", "Charges"],
+      columns: ["PSS's Invoice #", "Carrier/Forwarder Inv #", "BL Number", "Payable Amount", "Total Payable Amount", "Charges", "Repair", "Detention"],
     },
     'Bill of Lading': {
       columns: ['BL Number', 'Shipper', 'Consignee', 'Vessel/Voyage', 'POL', 'POD'],

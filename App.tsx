@@ -460,12 +460,10 @@ function App() {
                 Export
               </button>
 
-              {isAdmin && (
-                <button onClick={handlePreviewPVLayout} disabled={isGeneratingPdf} title="Admin: preview new PV layout with dummy data" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
-                  <FileText size={14} />
-                  Preview PV
-                </button>
-              )}
+              <button onClick={handlePreviewPVLayout} disabled={isGeneratingPdf} title="Preview new PV layout with dummy data" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
+                <FileText size={14} />
+                Preview PV
+              </button>
 
 
               {activeTab === 'CDAS Report' && (() => {

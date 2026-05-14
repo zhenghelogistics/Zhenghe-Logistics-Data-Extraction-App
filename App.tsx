@@ -4,7 +4,7 @@ import { useFileProcessor } from './hooks/useFileProcessor';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
 import ExportPermitTab from './components/ExportPermitTab';
-import { generateVoucherPdf, generateCDASVoucherPdf, generateAlliedVoucherPdf } from './services/voucherPdfService';
+import { generateVoucherPdf, generateCDASVoucherPdf, generateAlliedVoucherPdf, generateTestPVPdf } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
@@ -170,6 +170,21 @@ function App() {
     } catch (err) {
       console.error('Failed to generate voucher PDF:', err);
       addToast('Failed to generate voucher PDF. Please try again.');
+    } finally { setIsGeneratingPdf(false); }
+  };
+
+  const handlePreviewPVLayout = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const blob = await generateTestPVPdf();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'PV_layout_preview.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      addToast('Preview generation failed. Check console.');
+      console.error(err);
     } finally { setIsGeneratingPdf(false); }
   };
 
@@ -444,6 +459,13 @@ function App() {
                 <Download size={14} />
                 Export
               </button>
+
+              {isAdmin && (
+                <button onClick={handlePreviewPVLayout} disabled={isGeneratingPdf} title="Admin: preview new PV layout with dummy data" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
+                  <FileText size={14} />
+                  Preview PV
+                </button>
+              )}
 
 
               {activeTab === 'CDAS Report' && (() => {

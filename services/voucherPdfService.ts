@@ -608,8 +608,20 @@ export async function generatePVPdfFromScratch(
 
     const firstPv = pvDocs[0]?.payment_voucher_details;
     payTo     = firstPv?.payment_to || pvDocs[0]?.metadata?.parties?.shipper_supplier || '';
-    totalStr  = stripCurrency(firstPv?.total_payable_amount || firstPv?.payable_amount || '');
     payMethod = firstPv?.payment_method || 'UOB SGD FAST / GIRO PAYMENT';
+
+    // Always compute total from the actual row amounts so it stays in sync
+    // even when the extraction's total_payable_amount is incomplete.
+    let computedTotal = 0;
+    for (const doc of pvDocs) {
+      const pv = doc.payment_voucher_details!;
+      if (pv.bl_entries && pv.bl_entries.length > 0) {
+        for (const e of pv.bl_entries) computedTotal += parseAmt(e.amount);
+      } else {
+        computedTotal += parseAmt(pv.payable_amount);
+      }
+    }
+    totalStr = computedTotal > 0 ? fmt(computedTotal) : stripCurrency(firstPv?.total_payable_amount || firstPv?.payable_amount || '');
   }
 
   // ── Page header: navy left stripe + logo left-aligned + company name ──

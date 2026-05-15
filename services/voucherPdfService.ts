@@ -448,11 +448,13 @@ export async function generatePVPdfFromScratch(
   const dr = (p: PDFPage, x: number, y: number, w: number, h: number, fill?: ReturnType<typeof rgb>, bw = 0) =>
     p.drawRectangle({ x, y, width: w, height: h, ...(fill ? { color: fill } : {}), ...(bw ? { borderColor: NAVY, borderWidth: bw } : {}) });
 
-  const chkbox = (p: PDFPage, x: number, y: number, checked: boolean) => {
-    dr(p, x, y, 9, 9, rgb(1, 1, 1), 0.8);
+  const chkbox = (p: PDFPage, x: number, y: number, checked: boolean, onDark = false) => {
+    const boxFill = rgb(1, 1, 1);
+    p.drawRectangle({ x, y, width: 9, height: 9, color: boxFill, borderColor: onDark ? boxFill : NAVY, borderWidth: 0.8 });
     if (checked) {
-      dl(p, x + 1.5, y + 1.5, x + 7.5, y + 7.5, 1.0);
-      dl(p, x + 7.5, y + 1.5, x + 1.5, y + 7.5, 1.0);
+      const xColor = onDark ? NAVY : NAVY;
+      dl(p, x + 1.5, y + 1.5, x + 7.5, y + 7.5, 1.0, xColor);
+      dl(p, x + 7.5, y + 1.5, x + 1.5, y + 7.5, 1.0, xColor);
     }
   };
 
@@ -523,17 +525,15 @@ export async function generatePVPdfFromScratch(
 
     const logoX = ML + STRIPE_W + 8;
     if (logo) {
-      const dims = logo.scaleToFit(115, HEADER_H - 12);
+      const dims = logo.scaleToFit(CW - STRIPE_W - 24, HEADER_H - 10);
       p.drawImage(logo, {
-        x: logoX,
+        x: logoX + (CW - STRIPE_W - 16 - dims.width) / 2,
         y: y - HEADER_H + (HEADER_H - dims.height) / 2 + 2,
         width: dims.width,
         height: dims.height,
       });
-      dt(p, 'Zhenghe Logistics Pte Ltd', logoX + 122, y - HEADER_H / 2 - 4, 12, fontB);
     } else {
-      dt(p, 'ZHL', logoX + 4, y - HEADER_H / 2 + 2, 20, fontB);
-      dt(p, 'Zhenghe Logistics Pte Ltd', logoX + 52, y - HEADER_H / 2 - 4, 12, fontB);
+      dt(p, 'ZHL  Zhenghe Logistics Pte Ltd', logoX + 10, y - HEADER_H / 2 - 4, 14, fontB);
     }
 
     y -= HEADER_H + 8;
@@ -557,20 +557,21 @@ export async function generatePVPdfFromScratch(
 
     y -= 22;
 
-    // Table header row
-    dr(p, ML, y - HDR_H, CW, HDR_H, undefined, 0.8);
-    dl(p, X_DESC, y, X_DESC, y - HDR_H);
-    dl(p, X_AMT,  y, X_AMT,  y - HDR_H);
+    // Table header row — navy fill, white text
+    dr(p, ML, y - HDR_H, CW, HDR_H, NAVY);
+    dl(p, X_DESC, y, X_DESC, y - HDR_H, 0.6, rgb(1, 1, 1));
+    dl(p, X_AMT,  y, X_AMT,  y - HDR_H, 0.6, rgb(1, 1, 1));
 
     const hy = y - HDR_H + 6;
-    dt(p, 'Item',        X_ITEM + 4, hy, 8, fontB);
-    dt(p, 'Description', X_DESC + 5, hy, 8, fontB);
+    const WHITE = rgb(1, 1, 1);
+    dt(p, 'Item',        X_ITEM + 4, hy, 8, fontB, WHITE);
+    dt(p, 'Description', X_DESC + 5, hy, 8, fontB, WHITE);
 
     const cx = X_AMT + 6;
-    chkbox(p, cx,      hy - 1, currency === 'SGD');
-    dt(p, 'SGD', cx + 12,     hy, 8, fontB);
-    chkbox(p, cx + 36, hy - 1, currency === 'USD');
-    dt(p, 'USD', cx + 48,     hy, 8, fontB);
+    chkbox(p, cx,      hy - 1, currency === 'SGD', true);
+    dt(p, 'SGD', cx + 12,     hy, 8, fontB, WHITE);
+    chkbox(p, cx + 36, hy - 1, currency === 'USD', true);
+    dt(p, 'USD', cx + 48,     hy, 8, fontB, WHITE);
 
     return y - HDR_H;
   };
@@ -643,12 +644,12 @@ export async function generatePVPdfFromScratch(
     dl(p, X_AMT, y, X_AMT, y - ROW_H);
 
     const ty = y - ROW_H + 7;
-    const cx = X_AMT - 105;
+    const cx = X_AMT - 108;
     chkbox(p, cx,      ty - 1, currency === 'SGD');
     dt(p, 'SGD',  cx + 12,    ty, 8, fontB);
-    chkbox(p, cx + 34, ty - 1, currency === 'USD');
-    dt(p, 'USD',  cx + 46,    ty, 8, fontB);
-    dt(p, 'Total', cx + 58,   ty, 8, fontB);
+    chkbox(p, cx + 36, ty - 1, currency === 'USD');
+    dt(p, 'USD',  cx + 48,    ty, 8, fontB);
+    dt(p, 'Total', cx + 70,   ty, 8, fontB);
 
     if (totalStr) {
       const tw = fontB.widthOfTextAtSize(totalStr, 10);

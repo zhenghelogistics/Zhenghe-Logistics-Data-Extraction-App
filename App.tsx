@@ -4,7 +4,7 @@ import { useFileProcessor } from './hooks/useFileProcessor';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
 import ExportPermitTab from './components/ExportPermitTab';
-import { generateVoucherPdf, generateCDASVoucherPdf, generateAlliedVoucherPdf, generateTestPVPdf } from './services/voucherPdfService';
+import { generatePVPdfFromScratch, generateCDASVoucherPdf, generateAlliedVoucherPdf } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
@@ -78,6 +78,7 @@ function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pvCurrencyModal, setPvCurrencyModal] = useState(false);
+  const [pvExportDocs, setPvExportDocs] = useState<DocumentData[] | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const addToast = (message: string, type: 'error' | 'success' = 'error') => {
     const id = crypto.randomUUID();
@@ -154,40 +155,32 @@ function App() {
     } finally { setIsGeneratingPdf(false); }
   };
 
-  const handleGenerateVouchers = async (docs: DocumentData[]) => {
+  const handleGenerateVouchers = (docs: DocumentData[]) => {
     if (docs[0]?.document_type === 'Allied Report') return handleGenerateAlliedVoucher(docs);
     if (docs[0]?.document_type === 'CDAS Report') return handleGenerateCDASVoucher(docs);
-    setIsGeneratingPdf(true);
-    try {
-      const blob = await generateVoucherPdf(docs);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = docs.length === 1
-        ? `voucher_${docs[0].payment_voucher_details?.pss_invoice_number || 'export'}.pdf`
-        : 'payment_vouchers.pdf';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to generate voucher PDF:', err);
-      addToast('Failed to generate voucher PDF. Please try again.');
-    } finally { setIsGeneratingPdf(false); }
+    // Open currency modal with the real docs stored
+    setPvExportDocs(docs);
+    setPvCurrencyModal(true);
   };
-
-  const handlePreviewPVLayout = () => setPvCurrencyModal(true);
 
   const handlePVCurrencySelect = async (currency: 'SGD' | 'USD') => {
     setPvCurrencyModal(false);
+    const docsToExport = pvExportDocs;
+    setPvExportDocs(null);
+    if (!docsToExport || docsToExport.length === 0) return;
     setIsGeneratingPdf(true);
     try {
-      const blob = await generateTestPVPdf(currency, userRole === 'accounts');
+      const blob = await generatePVPdfFromScratch(docsToExport, currency, userRole === 'accounts');
+      const filename = docsToExport.length === 1
+        ? `voucher_${docsToExport[0].payment_voucher_details?.pss_invoice_number || 'export'}_${currency}.pdf`
+        : `payment_vouchers_${currency}.pdf`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `PV_preview_${currency}.pdf`;
+      a.href = url; a.download = filename;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      addToast('Preview generation failed. Check console.');
+      addToast('Failed to generate voucher PDF. Check console.');
       console.error(err);
     } finally { setIsGeneratingPdf(false); }
   };
@@ -464,11 +457,6 @@ function App() {
                 Export
               </button>
 
-              <button onClick={handlePreviewPVLayout} disabled={isGeneratingPdf} title="Preview new PV layout with dummy data" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
-                <FileText size={14} />
-                Preview PV
-              </button>
-
 
               {activeTab === 'CDAS Report' && (() => {
                 const docs = files.flatMap(f => (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING) ? (f.data ?? []).filter(d => d.document_type === 'CDAS Report') : []);
@@ -577,9 +565,9 @@ function App() {
       />
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
-      {/* Currency selection modal for PV preview */}
+      {/* Currency selection modal for PV export/preview */}
       {pvCurrencyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setPvCurrencyModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => { setPvCurrencyModal(false); setPvExportDocs(null); }}>
           <div className="bg-surface rounded-2xl shadow-xl p-8 flex flex-col items-center gap-6 min-w-[300px]" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-primary">Select Currency</h2>
             <p className="text-sm text-secondary text-center">Which currency should the Payment Voucher be generated in?</p>

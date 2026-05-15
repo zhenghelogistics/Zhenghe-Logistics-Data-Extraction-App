@@ -578,14 +578,14 @@ export async function generatePVPdfFromScratch(
 
   // ── Process checklist — fixed content, right column, drawn alongside footer ──
   const drawChecklist = (p: PDFPage, topY: number) => {
-    const CL_W   = 245;
+    const CL_W   = 268;
     const CL_X   = MR_X - CL_W;
-    const REF_W  = 20;
-    const STEP_W = 64;
-    const REQ_W  = 130;
+    const REF_W  = 22;
+    const STEP_W = 70;
+    const REQ_W  = 143;
     const CHK_W  = CL_W - REF_W - STEP_W - REQ_W;
-    const SH     = 17; // single-row height (~20% bigger)
-    const DH     = 28; // double-row height (~20% bigger)
+    const SH     = 19; // single-row height
+    const DH     = 32; // double-row height
 
     const entries: { ref: string; step: string; req: string[] }[] = [
       { ref: '1', step: 'Authorization', req: ['Signed by Cindy /Tahir'] },
@@ -605,8 +605,8 @@ export async function generatePVPdfFromScratch(
     const col2 = col1 + STEP_W;
     const col3 = col2 + REQ_W;
     [col1, col2, col3].forEach(cx => dl(p, cx, cy, cx, cy - SH, 0.5));
-    const FSZ = 7;
-    const hry = cy - SH + 5;
+    const FSZ = 8;
+    const hry = cy - SH + 6;
     dt(p, 'Ref',          CL_X + 3, hry, FSZ, fontB);
     dt(p, 'Process Step', col1 + 3, hry, FSZ, fontB);
     dt(p, 'Requirement',  col2 + 3, hry, FSZ, fontB);
@@ -624,8 +624,8 @@ export async function generatePVPdfFromScratch(
       dt(p, e.step, col1 + 3, mid, FSZ, fontB);
 
       if (e.req.length > 1) {
-        dt(p, e.req[0], col2 + 3, cy - 9,  FSZ, fontR);
-        dt(p, e.req[1], col2 + 3, cy - 19, FSZ, fontR);
+        dt(p, e.req[0], col2 + 3, cy - 10, FSZ, fontR);
+        dt(p, e.req[1], col2 + 3, cy - 22, FSZ, fontR);
       } else {
         dt(p, e.req[0], col2 + 3, mid, FSZ, fontR);
       }
@@ -672,7 +672,7 @@ export async function generatePVPdfFromScratch(
     dl(p, ML + 220, fy - 20, ML + 335, fy - 20);
 
     // RIGHT COLUMN: process checklist pinned to bottom-right corner of page
-    if (showChecklist) drawChecklist(p, 205);
+    if (showChecklist) drawChecklist(p, 250);
   };
 
   // ── Render ──

@@ -95,7 +95,7 @@ function App() {
     files, isProcessing, containerRecords,
     deleteModalOpen, setDeleteModalOpen,
     addFilesToQueue, processFiles, handleReprocess, handleRetryFailedChunks,
-    handleIncotermUpdate, handleFreightTermUpdate,
+    handleIncotermUpdate, handleFreightTermUpdate, handlePSSNumberUpdate,
     handleDeleteFile, handleBulkDelete, confirmDeleteFile,
     handleContainerRecordUpdate, handleContainerRecordDelete, handleContainerRecordDeleteMany,
   } = useFileProcessor({ customRules, userRole, addLog, activeTab });
@@ -514,6 +514,7 @@ function App() {
               files={files}
               onUpdateIncoterm={handleIncotermUpdate}
               onUpdateFreightTerm={handleFreightTermUpdate}
+              onUpdatePSSNumber={handlePSSNumberUpdate}
               onDeleteFile={handleDeleteFile}
               onBulkDelete={handleBulkDelete}
               onGenerateVoucher={handleGenerateVouchers}

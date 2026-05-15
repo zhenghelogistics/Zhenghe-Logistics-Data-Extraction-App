@@ -262,6 +262,19 @@ export function useFileProcessor({ customRules, userRole, addLog, activeTab }: O
     }));
   };
 
+  const handlePSSNumberUpdate = (fileId: string, docIndex: number, entryIndex: number, value: string) => {
+    setFiles(prev => prev.map(f => {
+      if (f.id !== fileId || !f.data) return f;
+      const newData = [...f.data];
+      const doc = newData[docIndex];
+      if (!doc?.payment_voucher_details?.bl_entries) return f;
+      const newEntries = [...doc.payment_voucher_details.bl_entries];
+      newEntries[entryIndex] = { ...newEntries[entryIndex], pss_invoice_number: value };
+      newData[docIndex] = { ...doc, payment_voucher_details: { ...doc.payment_voucher_details, bl_entries: newEntries } };
+      return { ...f, data: newData };
+    }));
+  };
+
   const handleDeleteFile = (id: string) => {
     setFileToDelete(id);
     setDeleteModalOpen(true);
@@ -373,7 +386,7 @@ export function useFileProcessor({ customRules, userRole, addLog, activeTab }: O
     files, setFiles, isProcessing, containerRecords, setContainerRecords,
     deleteModalOpen, setDeleteModalOpen, fileToDelete,
     addFilesToQueue, processFiles, handleReprocess, handleRetryFailedChunks,
-    handleIncotermUpdate, handleFreightTermUpdate,
+    handleIncotermUpdate, handleFreightTermUpdate, handlePSSNumberUpdate,
     handleDeleteFile, handleBulkDelete, confirmDeleteFile,
     handleBillingUpdate, handleContainerRecordUpdate,
     handleContainerRecordDelete, handleContainerRecordDeleteMany,

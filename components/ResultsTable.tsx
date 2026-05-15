@@ -24,6 +24,7 @@ interface ResultsTableProps {
   files: ProcessedFile[];
   onUpdateIncoterm: (fileId: string, docIndex: number, value: string) => void;
   onUpdateFreightTerm: (fileId: string, docIndex: number, value: string) => void;
+  onUpdatePSSNumber?: (fileId: string, docIndex: number, entryIndex: number, value: string) => void;
   onDeleteFile: (fileId: string) => void;
   onBulkDelete: (ids: string[]) => void;
   onGenerateVoucher?: (docs: DocumentData[]) => void;
@@ -34,7 +35,7 @@ interface ResultsTableProps {
   userRole: UserRole | null;
 }
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onDeleteFile, onBulkDelete, onGenerateVoucher, onReprocessFile, onRetryFailedChunks, isGeneratingPdf, activeTab, userRole }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, onUpdateFreightTerm, onUpdatePSSNumber, onDeleteFile, onBulkDelete, onGenerateVoucher, onReprocessFile, onRetryFailedChunks, isGeneratingPdf, activeTab, userRole }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorPopover, setErrorPopover] = useState<{ fileId: string; errors: string[] } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -666,10 +667,21 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ files, onUpdateIncoterm, on
               {isCombined && blEntries.map((entry, ei) => (
                 <tr key={`${uniqueKey}-entry-${ei}`} className="bg-secondary-fixed/10 hover:bg-secondary-fixed/20 border-l-2 border-secondary-container">
                   <td className="px-3 py-2 pl-4" />
-                  {/* PSS's Invoice # */}
+                  {/* PSS's Invoice # — editable inline when missing */}
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-[#4a5568] pl-8">
                     <span className="text-secondary mr-1">↳</span>
-                    {entry.pss_invoice_number || '-'}
+                    {entry.pss_invoice_number ? (
+                      entry.pss_invoice_number
+                    ) : onUpdatePSSNumber ? (
+                      <input
+                        type="text"
+                        placeholder="#SI number"
+                        defaultValue=""
+                        onBlur={e => { const v = e.target.value.trim(); if (v) onUpdatePSSNumber(row.file.id, row.docIndex, ei, v.startsWith('#') ? v : `#${v}`); }}
+                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                        className="w-24 px-1.5 py-0.5 text-xs border border-dashed border-outline/40 rounded bg-transparent text-primary placeholder:text-outline/50 focus:outline-none focus:border-secondary"
+                      />
+                    ) : '-'}
                   </td>
                   {/* Carrier/Forwarder Inv # — not on individual entry */}
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-outline">-</td>

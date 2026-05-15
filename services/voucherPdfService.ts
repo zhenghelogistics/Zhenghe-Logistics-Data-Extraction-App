@@ -670,8 +670,8 @@ export async function generatePVPdfFromScratch(
     dt(p, 'Received By:', ML + 220, fy, 9, fontB);
     dl(p, ML + 220, fy - 20, ML + 335, fy - 20);
 
-    // RIGHT COLUMN: process checklist — accounts role only
-    if (showChecklist) drawChecklist(p, y - ROW_H - 5);
+    // RIGHT COLUMN: process checklist pinned to bottom-right corner of page
+    if (showChecklist) drawChecklist(p, 158);
   };
 
   // ── Render ──
@@ -724,7 +724,7 @@ export async function generatePVPdfFromScratch(
 
 // Generates a preview PDF matching real OOCL data for team sign-off.
 // Remove this export once the layout is approved and integrated into the live flow.
-export async function generateTestPVPdf(): Promise<Blob> {
+export async function generateTestPVPdf(currency: 'SGD' | 'USD' = 'SGD'): Promise<Blob> {
   const dummy: any[] = [{
     document_type: 'Payment Voucher/GL',
     metadata: { reference_number: 'TEST', date: '2026-05-15', currency: 'SGD', incoterms: null, related_reference_number: null, parties: { shipper_supplier: null, consignee_buyer: null, notify_party: null } },
@@ -743,5 +743,5 @@ export async function generateTestPVPdf(): Promise<Blob> {
       ],
     },
   }];
-  return generatePVPdfFromScratch(dummy, 'SGD', true);
+  return generatePVPdfFromScratch(dummy, currency, true);
 }

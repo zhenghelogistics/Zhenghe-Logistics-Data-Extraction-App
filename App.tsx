@@ -77,6 +77,7 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pvCurrencyModal, setPvCurrencyModal] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const addToast = (message: string, type: 'error' | 'success' = 'error') => {
     const id = crypto.randomUUID();
@@ -173,13 +174,16 @@ function App() {
     } finally { setIsGeneratingPdf(false); }
   };
 
-  const handlePreviewPVLayout = async () => {
+  const handlePreviewPVLayout = () => setPvCurrencyModal(true);
+
+  const handlePVCurrencySelect = async (currency: 'SGD' | 'USD') => {
+    setPvCurrencyModal(false);
     setIsGeneratingPdf(true);
     try {
-      const blob = await generateTestPVPdf();
+      const blob = await generateTestPVPdf(currency);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = 'PV_layout_preview.pdf';
+      a.href = url; a.download = `PV_preview_${currency}.pdf`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -572,6 +576,30 @@ function App() {
         message="Are you sure you want to delete this document? This action cannot be undone and will remove it for all users."
       />
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Currency selection modal for PV preview */}
+      {pvCurrencyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setPvCurrencyModal(false)}>
+          <div className="bg-surface rounded-2xl shadow-xl p-8 flex flex-col items-center gap-6 min-w-[300px]" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-primary">Select Currency</h2>
+            <p className="text-sm text-secondary text-center">Which currency should the Payment Voucher be generated in?</p>
+            <div className="flex gap-4 w-full">
+              <button
+                onClick={() => handlePVCurrencySelect('SGD')}
+                className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-colors"
+              >
+                SGD
+              </button>
+              <button
+                onClick={() => handlePVCurrencySelect('USD')}
+                className="flex-1 py-3 rounded-xl border-2 border-primary text-primary font-bold text-sm hover:bg-primary/10 transition-colors"
+              >
+                USD
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

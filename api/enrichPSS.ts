@@ -44,11 +44,11 @@ export default async function handler(req: any, res: any) {
             { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
             {
               type: "text",
-              text: `For each Bill of Lading below, find the PSS or SI invoice number that Zhenghe / PSS Logistics stamped or printed on the invoice page. These numbers often start with # (e.g. #25101630).
+              text: `For each Bill of Lading below, find the internal PSS / SI invoice number that Zhenghe Logistics or PSS Logistics has written, stamped, or printed anywhere in the document. Search EVERY page — it appears most often on the BL page itself (in the Shipper address block, Remarks, Reference, or header area) but can also appear on the carrier's invoice page. Look for labels like "Invoice:", "Invoice No:", "Inv:", "SI:", or a standalone number prefixed with "#". The number is typically 8 digits (e.g. #25111816). It is NOT the carrier's own invoice number.
 
 ${listLines}
 
-Return ONLY a JSON object — BL number as key, PSS/SI number (or null) as value:
+Return ONLY a JSON object — BL number as key, PSS/SI number with "#" prefix (or null if not found) as value:
 {"MEDUUD123456": "#25101234", "MEDUUD999999": null}`,
             },
           ],

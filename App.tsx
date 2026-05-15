@@ -180,7 +180,7 @@ function App() {
     setPvCurrencyModal(false);
     setIsGeneratingPdf(true);
     try {
-      const blob = await generateTestPVPdf(currency);
+      const blob = await generateTestPVPdf(currency, userRole === 'accounts');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `PV_preview_${currency}.pdf`;

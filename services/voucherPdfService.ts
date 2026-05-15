@@ -725,7 +725,7 @@ export async function generatePVPdfFromScratch(
 
 // Generates a preview PDF matching real OOCL data for team sign-off.
 // Remove this export once the layout is approved and integrated into the live flow.
-export async function generateTestPVPdf(currency: 'SGD' | 'USD' = 'SGD'): Promise<Blob> {
+export async function generateTestPVPdf(currency: 'SGD' | 'USD' = 'SGD', showChecklist = true): Promise<Blob> {
   const dummy: any[] = [{
     document_type: 'Payment Voucher/GL',
     metadata: { reference_number: 'TEST', date: '2026-05-15', currency: 'SGD', incoterms: null, related_reference_number: null, parties: { shipper_supplier: null, consignee_buyer: null, notify_party: null } },
@@ -744,5 +744,5 @@ export async function generateTestPVPdf(currency: 'SGD' | 'USD' = 'SGD'): Promis
       ],
     },
   }];
-  return generatePVPdfFromScratch(dummy, currency, true);
+  return generatePVPdfFromScratch(dummy, currency, showChecklist);
 }

@@ -589,8 +589,8 @@ export async function generatePVPdfFromScratch(
     const entries: { ref: string; step: string; req: string[] }[] = [
       { ref: '1', step: 'Authorization', req: ['Signed by Cindy /Tahir'] },
       { ref: '2', step: 'Coding',        req: ['Account code entered in system', 'Acct code:'] },
-      { ref: '3', step: 'Tax',           req: ['GST 9% or Zero Rated', '□ GST 9%  □ZERO RATED'] },
-      { ref: '4', step: 'Fees',          req: ['Bank Charges recorded', '□ NA  □$0.50  □$0.20 other:'] },
+      { ref: '3', step: 'Tax',           req: ['GST 9% or Zero Rated', '[ ] GST 9%  [ ] ZERO RATED'] },
+      { ref: '4', step: 'Fees',          req: ['Bank Charges recorded', '[ ] NA  [ ] $0.50  [ ] $0.20 other:'] },
       { ref: '5', step: 'Reference',     req: ['PV number written on document'] },
       { ref: '6', step: 'Filing',        req: ['Scanned and attached to system'] },
     ];

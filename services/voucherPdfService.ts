@@ -401,31 +401,43 @@ const NAVY = rgb(0, 0.188, 0.529); // ZHL navy #003087
 export async function generatePVPdfFromScratch(
   docs: DocumentData[],
   currency: 'SGD' | 'USD',
+  showChecklist = false,
 ): Promise<Blob> {
   const pdfDoc = await PDFDocument.create();
   const fontR = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
+  // URL-encode spaces so fetch works correctly across all browsers/environments
   let logo: Awaited<ReturnType<typeof pdfDoc.embedPng>> | null = null;
-  try {
-    const bytes = await fetch('/Zhenghe Logistics Logo-02.png').then(r => r.arrayBuffer());
-    logo = await pdfDoc.embedPng(bytes);
-  } catch { /* text fallback */ }
+  for (const path of [
+    '/Zhenghe%20Logistics%20Logo%20Blue.png',
+    '/Zhenghe%20Logistics%20Logo-02.png',
+  ]) {
+    try {
+      const r = await fetch(path);
+      if (!r.ok) continue;
+      logo = await pdfDoc.embedPng(await r.arrayBuffer());
+      break;
+    } catch { /* try next */ }
+  }
 
   const W = 595.28, H = 841.89;
-  const ML = 35, MR_X = 560;
+  const ML = 38, MR_X = 557;
   const CW = MR_X - ML;
 
-  const ITEM_W = 45;
-  const AMT_W  = 110;
+  const ITEM_W = 32;
+  const AMT_W  = 100;
   const X_ITEM = ML;
   const X_DESC = ML + ITEM_W;
   const X_AMT  = MR_X - AMT_W;
   const DESC_W = X_AMT - X_DESC;
 
-  const ROW_H = 26;
-  const HDR_H = 22;
-  const FOOTER_RESERVE = 105;
+  const ROW_H  = 22;
+  const HDR_H  = 20;
+  const HEADER_H = 58;
+  const STRIPE_W = 16;
+  // Reserve enough space for: total row + cash/cheque + signatures + checklist (right col)
+  const FOOTER_RESERVE = 195;
 
   const dt = (p: PDFPage, text: string, x: number, y: number, sz: number, f: typeof fontR, c = NAVY) =>
     p.drawText(text, { x, y, size: sz, font: f, color: c });
@@ -459,13 +471,14 @@ export async function generatePVPdfFromScratch(
 
   // ── Collect rows ──
   const pvDocs = docs.filter(d => d.document_type === 'Payment Voucher/GL' && d.payment_voucher_details);
-  interface PVRow { desc: string; amount: string | null }
+  // singleLine: true means auto-shrink font to fit on one line instead of wrapping
+  interface PVRow { desc: string; amount: string | null; singleLine?: boolean }
   const rows: PVRow[] = [];
 
   for (const doc of pvDocs) {
     const pv = doc.payment_voucher_details!;
     if (pv.carrier_invoice_number)
-      rows.push({ desc: `Payment Inv.  ${shortenInvoiceList(pv.carrier_invoice_number)}`, amount: null });
+      rows.push({ desc: `Payment Inv.  ${shortenInvoiceList(pv.carrier_invoice_number)}`, amount: null, singleLine: true });
 
     if (pv.bl_entries && pv.bl_entries.length > 0) {
       for (const e of pv.bl_entries) {
@@ -482,6 +495,9 @@ export async function generatePVPdfFromScratch(
       const desc = [pv.bl_number ? `BL. ${pv.bl_number}` : '', pssD ? `(${pssD})` : ''].filter(Boolean).join(' ');
       rows.push({ desc, amount: pv.payable_amount ? stripCurrency(pv.payable_amount) : null });
     }
+
+    if (pv.charges_summary)
+      rows.push({ desc: pv.charges_summary, amount: null, singleLine: true });
   }
 
   const firstPv   = pvDocs[0]?.payment_voucher_details;
@@ -489,115 +505,191 @@ export async function generatePVPdfFromScratch(
   const totalStr  = stripCurrency(firstPv?.total_payable_amount || firstPv?.payable_amount || '');
   const payMethod = firstPv?.payment_method || 'UOB SGD FAST / GIRO PAYMENT';
 
-  const today  = new Date();
-  const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
-  const dateStr = `${today.getDate()} ${MONTHS[today.getMonth()]} ${today.getFullYear()}`;
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2, '0');
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dateStr = `${dd}/${mm}/${today.getFullYear()}`;
 
-  // ── Page header: logo box + stripe + title + table header ──
+  // ── Page header: navy left stripe + logo left-aligned + company name ──
   const drawHeader = (p: PDFPage): number => {
-    const headerBoxH = 52;
     let y = H - 20;
 
-    // Logo border box
-    dr(p, ML, y - headerBoxH, CW, headerBoxH, undefined, 1.0);
+    // Outer bordered box
+    dr(p, ML, y - HEADER_H, CW, HEADER_H, undefined, 1.2);
+    // Left navy accent stripe
+    dr(p, ML, y - HEADER_H, STRIPE_W, HEADER_H, NAVY);
+    // Bottom thick stripe
+    dr(p, ML, y - HEADER_H, CW, 5, NAVY);
 
+    const logoX = ML + STRIPE_W + 8;
     if (logo) {
-      const dims = logo.scaleToFit(220, 40);
+      const dims = logo.scaleToFit(115, HEADER_H - 12);
       p.drawImage(logo, {
-        x: ML + (CW - dims.width) / 2,
-        y: y - headerBoxH + (headerBoxH - dims.height) / 2,
+        x: logoX,
+        y: y - HEADER_H + (HEADER_H - dims.height) / 2 + 2,
         width: dims.width,
         height: dims.height,
       });
+      dt(p, 'Zhenghe Logistics Pte Ltd', logoX + 122, y - HEADER_H / 2 - 4, 12, fontB);
     } else {
-      dt(p, 'Zhenghe Logistics Pte Ltd', ML + CW / 2 - 70, y - 34, 14, fontB);
+      dt(p, 'ZHL', logoX + 4, y - HEADER_H / 2 + 2, 20, fontB);
+      dt(p, 'Zhenghe Logistics Pte Ltd', logoX + 52, y - HEADER_H / 2 - 4, 12, fontB);
     }
 
-    y -= headerBoxH;
+    y -= HEADER_H + 8;
 
-    // Thick navy stripe
-    dr(p, ML, y - 5, CW, 5, NAVY);
-    y -= 15;
-
-    // "Payment Voucher" + Ref
-    dt(p, 'Payment Voucher', ML, y - 19, 17, fontB);
-    dt(p, 'Ref:', MR_X - 185, y - 19, 9, fontB);
-    dl(p, MR_X - 155, y - 21, MR_X, y - 21);
-
-    y -= 32;
-    dl(p, ML, y, MR_X, y);
-    y -= 6;
-
-    // Payment To / Date
-    dt(p, 'Payment To:', ML, y - 14, 9, fontB);
-    dt(p, payTo, ML + 63, y - 14, 9, fontR);
-    dl(p, ML + 63, y - 16, MR_X - 140, y - 16);
-    dt(p, 'Date:', MR_X - 135, y - 14, 9, fontB);
-    dt(p, dateStr, MR_X - 105, y - 14, 9, fontR);
+    // "Payment Voucher" + Ref underline
+    dt(p, 'Payment Voucher', ML, y - 13, 16, fontB);
+    dt(p, 'Ref:', MR_X - 165, y - 13, 9, fontB);
+    dl(p, MR_X - 140, y - 15, MR_X, y - 15);
 
     y -= 26;
+    dl(p, ML, y, MR_X, y, 0.8);
+    y -= 4;
+
+    // Payment To / Date row
+    dt(p, 'Payment To:', ML, y - 13, 9, fontB);
+    dt(p, payTo, ML + 62, y - 13, 9, fontR);
+    dl(p, ML + 62, y - 15, MR_X - 125, y - 15);
+    dt(p, 'Date:', MR_X - 120, y - 13, 9, fontB);
+    dt(p, dateStr, MR_X - 95, y - 13, 9, fontR);
+    dl(p, MR_X - 95, y - 15, MR_X, y - 15);
+
+    y -= 22;
 
     // Table header row
     dr(p, ML, y - HDR_H, CW, HDR_H, undefined, 0.8);
     dl(p, X_DESC, y, X_DESC, y - HDR_H);
     dl(p, X_AMT,  y, X_AMT,  y - HDR_H);
 
-    const hy = y - HDR_H + 7;
-    dt(p, 'Item', X_ITEM + 9, hy, 9, fontB);
-    dt(p, 'Description', X_DESC + 5, hy, 9, fontB);
+    const hy = y - HDR_H + 6;
+    dt(p, 'Item',        X_ITEM + 4, hy, 8, fontB);
+    dt(p, 'Description', X_DESC + 5, hy, 8, fontB);
 
-    const cx = X_AMT + 8;
-    chkbox(p, cx, hy - 1, currency === 'SGD');
-    dt(p, 'SGD', cx + 12, hy, 9, fontB);
-    chkbox(p, cx + 40, hy - 1, currency === 'USD');
-    dt(p, 'USD', cx + 52, hy, 9, fontB);
+    const cx = X_AMT + 6;
+    chkbox(p, cx,      hy - 1, currency === 'SGD');
+    dt(p, 'SGD', cx + 12,     hy, 8, fontB);
+    chkbox(p, cx + 36, hy - 1, currency === 'USD');
+    dt(p, 'USD', cx + 48,     hy, 8, fontB);
 
     return y - HDR_H;
   };
 
-  // ── Total row + footer ──
+  // ── Process checklist — fixed content, right column, drawn alongside footer ──
+  const drawChecklist = (p: PDFPage, topY: number) => {
+    const CL_X   = MR_X - 208;
+    const CL_W   = 208;
+    const REF_W  = 18;
+    const STEP_W = 58;
+    const REQ_W  = 112;
+    const CHK_W  = CL_W - REF_W - STEP_W - REQ_W;
+    const SH     = 14; // single-row height
+    const DH     = 23; // double-row height
+
+    const entries: { ref: string; step: string; req: string[] }[] = [
+      { ref: '1', step: 'Authorization', req: ['Signed by Cindy /Tahir'] },
+      { ref: '2', step: 'Coding',        req: ['Account code entered in system', 'Acct code:'] },
+      { ref: '3', step: 'Tax',           req: ['GST 9% or Zero Rated', '□ GST 9%  □ZERO RATED'] },
+      { ref: '4', step: 'Fees',          req: ['Bank Charges recorded', '□ NA  □$0.50  □$0.20 other:'] },
+      { ref: '5', step: 'Reference',     req: ['PV number written on document'] },
+      { ref: '6', step: 'Filing',        req: ['Scanned and attached to system'] },
+    ];
+    const rowHeights = entries.map(e => e.req.length > 1 ? DH : SH);
+
+    let cy = topY;
+
+    // Header row
+    dr(p, CL_X, cy - SH, CL_W, SH, undefined, 0.6);
+    const col1 = CL_X + REF_W;
+    const col2 = col1 + STEP_W;
+    const col3 = col2 + REQ_W;
+    [col1, col2, col3].forEach(cx => dl(p, cx, cy, cx, cy - SH, 0.5));
+    const hry = cy - SH + 4;
+    dt(p, 'Ref',          CL_X + 3, hry, 6, fontB);
+    dt(p, 'Process Step', col1 + 3, hry, 6, fontB);
+    dt(p, 'Requirement',  col2 + 3, hry, 6, fontB);
+    dt(p, 'Check',        col3 + 3, hry, 6, fontB);
+    cy -= SH;
+
+    for (let i = 0; i < entries.length; i++) {
+      const e  = entries[i];
+      const rh = rowHeights[i];
+      dr(p, CL_X, cy - rh, CL_W, rh, undefined, 0.4);
+      [col1, col2, col3].forEach(cx => dl(p, cx, cy, cx, cy - rh, 0.5));
+
+      const mid = cy - rh / 2 - 2.5;
+      dt(p, e.ref,  CL_X + (REF_W - fontR.widthOfTextAtSize(e.ref, 6)) / 2, mid, 6, fontR);
+      dt(p, e.step, col1 + 3, mid, 6, fontB);
+
+      if (e.req.length > 1) {
+        dt(p, e.req[0], col2 + 3, cy - 8,  6, fontR);
+        dt(p, e.req[1], col2 + 3, cy - 17, 6, fontR);
+      } else {
+        dt(p, e.req[0], col2 + 3, mid, 6, fontR);
+      }
+
+      // Checkbox in Check column
+      dr(p, col3 + (CHK_W - 8) / 2, cy - rh / 2 - 4, 8, 8, rgb(1, 1, 1), 0.5);
+      cy -= rh;
+    }
+  };
+
+  // ── Footer: total row + cash/cheque + signatures (left) + checklist (right) ──
   const drawFooter = (p: PDFPage, y: number) => {
     dl(p, ML, y, MR_X, y, 0.8);
 
-    // Total row
+    // Total row (full width)
     dr(p, ML, y - ROW_H, CW, ROW_H, undefined, 0.8);
     dl(p, X_AMT, y, X_AMT, y - ROW_H);
 
-    const ty = y - ROW_H + 8;
-    // "□SGD □USD Total" right-justified inside description column
-    const cx = X_AMT - 118;
-    chkbox(p, cx, ty - 1, currency === 'SGD');
-    dt(p, 'SGD', cx + 12, ty, 9, fontB);
-    chkbox(p, cx + 38, ty - 1, currency === 'USD');
-    dt(p, 'USD', cx + 50, ty, 9, fontB);
-    dt(p, 'Total', cx + 68, ty, 9, fontB);
+    const ty = y - ROW_H + 7;
+    const cx = X_AMT - 105;
+    chkbox(p, cx,      ty - 1, currency === 'SGD');
+    dt(p, 'SGD',  cx + 12,    ty, 8, fontB);
+    chkbox(p, cx + 34, ty - 1, currency === 'USD');
+    dt(p, 'USD',  cx + 46,    ty, 8, fontB);
+    dt(p, 'Total', cx + 58,   ty, 8, fontB);
 
     if (totalStr) {
       const tw = fontB.widthOfTextAtSize(totalStr, 10);
       dt(p, totalStr, MR_X - tw - 5, ty, 10, fontB);
     }
 
-    let fy = y - ROW_H - 22;
+    // LEFT COLUMN: Cash/cheque + approved/received
+    let fy = y - ROW_H - 18;
     dt(p, 'CASH / CHEQUE No.:', ML, fy, 9, fontB);
-    dl(p, ML + 107, fy - 2, MR_X, fy - 2);
-    dt(p, payMethod, ML + 110, fy, 9, fontR);
+    // underline stops before checklist column
+    dl(p, ML + 109, fy - 2, MR_X - 212, fy - 2);
+    dt(p, payMethod, ML + 112, fy, 9, fontR);
 
-    fy -= 46;
+    fy -= 44;
     dt(p, 'Approved By:', ML, fy, 9, fontB);
-    dl(p, ML + 72, fy - 22, ML + 245, fy - 22);
-    dt(p, 'Received By:', MR_X - 230, fy, 9, fontB);
-    dl(p, MR_X - 162, fy - 22, MR_X, fy - 22);
+    dl(p, ML, fy - 20, ML + 200, fy - 20);
+
+    dt(p, 'Received By:', ML + 220, fy, 9, fontB);
+    dl(p, ML + 220, fy - 20, ML + 335, fy - 20);
+
+    // RIGHT COLUMN: process checklist — accounts role only
+    if (showChecklist) drawChecklist(p, y - ROW_H - 5);
   };
 
   // ── Render ──
   let page = pdfDoc.addPage([W, H]);
   let cursorY = drawHeader(page);
-  let rowNum  = 0;
 
   for (const row of rows) {
-    const FSZ    = 9;
-    const wrapped = wrapLine(row.desc, DESC_W - 10, FSZ);
-    const rh      = Math.max(ROW_H, wrapped.length * (FSZ + 4) + 8);
+    let FSZ = 9;
+    let wrapped: string[];
+
+    if (row.singleLine) {
+      // Shrink font until the text fits on one line (min 6.5pt)
+      while (FSZ > 6.5 && fontR.widthOfTextAtSize(row.desc, FSZ) > DESC_W - 10) FSZ -= 0.5;
+      wrapped = [row.desc];
+    } else {
+      wrapped = wrapLine(row.desc, DESC_W - 10, FSZ);
+    }
+
+    const rh = Math.max(ROW_H, wrapped.length * (FSZ + 4) + 8);
 
     if (cursorY - rh < FOOTER_RESERVE) {
       page    = pdfDoc.addPage([W, H]);
@@ -605,7 +697,6 @@ export async function generatePVPdfFromScratch(
     }
 
     const rowBottom = cursorY - rh;
-    rowNum++;
 
     dl(page, ML,     cursorY, ML,     rowBottom, 0.8);
     dl(page, MR_X,   cursorY, MR_X,   rowBottom, 0.8);
@@ -614,8 +705,7 @@ export async function generatePVPdfFromScratch(
     dl(page, ML,     rowBottom, MR_X, rowBottom, 0.6);
 
     const textY = cursorY - FSZ - 5;
-    const nw = fontR.widthOfTextAtSize(String(rowNum), FSZ);
-    dt(page, String(rowNum), X_ITEM + (ITEM_W - nw) / 2, textY, FSZ, fontR);
+    // Item column intentionally blank — no row numbers
     wrapped.forEach((ln, i) => dt(page, ln, X_DESC + 5, textY - i * (FSZ + 3), FSZ, fontR));
     if (row.amount) {
       const aw = fontR.widthOfTextAtSize(row.amount, FSZ);
@@ -625,39 +715,32 @@ export async function generatePVPdfFromScratch(
     cursorY = rowBottom;
   }
 
-  if (cursorY - ROW_H - 92 < 30) {
-    page    = pdfDoc.addPage([W, H]);
-    cursorY = H - 130;
-  }
-
   drawFooter(page, cursorY);
 
   const bytes = await pdfDoc.save();
   return new Blob([bytes], { type: 'application/pdf' });
 }
 
-// Generates a preview PDF with dummy data (8 BL rows) for team sign-off.
-// Remove this export once the layout is approved and integrated.
+// Generates a preview PDF matching real OOCL data for team sign-off.
+// Remove this export once the layout is approved and integrated into the live flow.
 export async function generateTestPVPdf(): Promise<Blob> {
   const dummy: any[] = [{
     document_type: 'Payment Voucher/GL',
-    metadata: { reference_number: 'TEST', date: '2026-05-14', currency: 'SGD', incoterms: null, related_reference_number: null, parties: { shipper_supplier: null, consignee_buyer: null, notify_party: null } },
+    metadata: { reference_number: 'TEST', date: '2026-05-15', currency: 'SGD', incoterms: null, related_reference_number: null, parties: { shipper_supplier: null, consignee_buyer: null, notify_party: null } },
     payment_voucher_details: {
-      carrier_invoice_number: 'SGD2604001, SGD2604002, SGD2604003, SGD2604004',
-      payment_to: 'OCEAN NETWORK EXPRESS PTE. LTD',
-      total_payable_amount: '7,615.45 SGD',
+      carrier_invoice_number: '413 3721004, 413 3723136, 413 3723140, 413 3723388',
+      payment_to: 'OOCL (SINGAPORE) PTE LTD',
+      total_payable_amount: '10103.17 SGD',
       payment_method: 'UOB SGD FAST / GIRO PAYMENT',
+      charges_summary: 'THC, SEALS, BL, O.F, AMS, EMERGENCY BAF, ORIG TRML',
       bl_entries: [
-        { bl_number: 'ONEY12345678', pss_invoice_number: '#26040001', amount: '1,234.56 SGD' },
-        { bl_number: 'ONEY23456789', pss_invoice_number: '#26040002', amount: '987.65 SGD' },
-        { bl_number: 'ONEY34567890', pss_invoice_number: '#26040003', amount: '2,345.00 SGD' },
-        { bl_number: 'ONEY45678901', pss_invoice_number: '#26040004', amount: '456.78 SGD' },
-        { bl_number: 'ONEY56789012', pss_invoice_number: '#26040005', amount: '789.01 SGD' },
-        { bl_number: 'ONEY67890123', pss_invoice_number: '#26040006', amount: '1,234.56 SGD' },
-        { bl_number: 'ONEY78901234', pss_invoice_number: '#26040007', amount: '567.89 SGD' },
-        { bl_number: 'ONEY89012345', pss_invoice_number: '#26040008', amount: '0.00 SGD' },
+        { bl_number: 'OOLU2326622420', pss_invoice_number: '#26050654', amount: '1787.92 SGD' },
+        { bl_number: 'OOLU2326002160', pss_invoice_number: '#26050579', amount: '1532.18 SGD' },
+        { bl_number: 'OOLU2326002270', pss_invoice_number: '#26050578', amount: '1082.54 SGD' },
+        { bl_number: 'OOLU2326001920', pss_invoice_number: '#26050575', amount: '2071.06 SGD' },
+        { bl_number: 'OOLU2326617490', pss_invoice_number: '#26050649', amount: '1335.67 SGD' },
       ],
     },
   }];
-  return generatePVPdfFromScratch(dummy, 'SGD');
+  return generatePVPdfFromScratch(dummy, 'SGD', true);
 }

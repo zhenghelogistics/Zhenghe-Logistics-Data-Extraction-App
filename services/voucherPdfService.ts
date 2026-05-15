@@ -472,45 +472,145 @@ export async function generatePVPdfFromScratch(
   };
 
   // ── Collect rows ──
-  const pvDocs = docs.filter(d => d.document_type === 'Payment Voucher/GL' && d.payment_voucher_details);
   // singleLine: true means auto-shrink font to fit on one line instead of wrapping
   interface PVRow { desc: string; amount: string | null; singleLine?: boolean }
   const rows: PVRow[] = [];
-
-  for (const doc of pvDocs) {
-    const pv = doc.payment_voucher_details!;
-    if (pv.carrier_invoice_number)
-      rows.push({ desc: `Payment Inv.  ${shortenInvoiceList(pv.carrier_invoice_number)}`, amount: null, singleLine: true });
-
-    if (pv.bl_entries && pv.bl_entries.length > 0) {
-      for (const e of pv.bl_entries) {
-        const pssD = e.pss_invoice_number
-          ? (e.pss_invoice_number.startsWith('#') ? e.pss_invoice_number : `#${e.pss_invoice_number}`)
-          : '';
-        const desc = [e.bl_number ? `BL. ${e.bl_number}` : '', pssD ? `(${pssD})` : ''].filter(Boolean).join(' ');
-        rows.push({ desc, amount: e.amount ? stripCurrency(e.amount) : null });
-      }
-    } else if (pv.bl_number) {
-      const pssD = pv.pss_invoice_number
-        ? (pv.pss_invoice_number.startsWith('#') ? pv.pss_invoice_number : `#${pv.pss_invoice_number}`)
-        : '';
-      const desc = [pv.bl_number ? `BL. ${pv.bl_number}` : '', pssD ? `(${pssD})` : ''].filter(Boolean).join(' ');
-      rows.push({ desc, amount: pv.payable_amount ? stripCurrency(pv.payable_amount) : null });
-    }
-
-    if (pv.charges_summary)
-      rows.push({ desc: pv.charges_summary, amount: null, singleLine: true });
-  }
-
-  const firstPv   = pvDocs[0]?.payment_voucher_details;
-  const payTo     = firstPv?.payment_to || pvDocs[0]?.metadata?.parties?.shipper_supplier || '';
-  const totalStr  = stripCurrency(firstPv?.total_payable_amount || firstPv?.payable_amount || '');
-  const payMethod = firstPv?.payment_method || 'UOB SGD FAST / GIRO PAYMENT';
+  let payTo     = '';
+  let totalStr  = '';
+  let payMethod = 'UOB SGD FAST / GIRO PAYMENT';
 
   const today = new Date();
   const dd = String(today.getDate()).padStart(2, '0');
   const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dateStr = `${dd}/${mm}/${today.getFullYear()}`;
+  let dateStr = `${dd}/${mm}/${today.getFullYear()}`;
+
+  const parseAmt = (v: string | null | undefined) => parseFloat(v?.replace(/[^0-9.]/g, '') || '0') || 0;
+  const fmt = (n: number) => n.toFixed(2);
+  const MONTHS_LONG = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const fmtLongDate = (raw: string) => {
+    const [y, m, d] = raw.split('-');
+    return `${parseInt(d)} ${MONTHS_LONG[parseInt(m) - 1]} ${y}`;
+  };
+  const addToMap = (m: Map<string, number>, key: string, val: number) => m.set(key, (m.get(key) ?? 0) + val);
+  const mapDetail = (m: Map<string, number>) => [...m.entries()].map(([k, v]) => `${k} $${v}/-`).join(', ');
+  const mapTotal  = (m: Map<string, number>) => [...m.values()].reduce((s, v) => s + v, 0);
+
+  const docType = docs[0]?.document_type;
+
+  if (docType === 'CDAS Report') {
+    let dhcTotal = 0, adminTotal = 0, fuelTotal = 0;
+    const washMap = new Map<string, number>();
+    const repMap  = new Map<string, number>();
+    const detMap  = new Map<string, number>();
+    const demMap  = new Map<string, number>();
+    let fuelLabel = 'EFS';
+
+    for (const doc of docs) {
+      const c = doc.cdas_report;
+      if (!c) continue;
+      dhcTotal   += parseAmt(c.dhc_in) + parseAmt(c.dhc_out) + parseAmt(c.dhe_in) + parseAmt(c.dhe_out);
+      fuelTotal  += parseAmt(c.fuel_surcharge);
+      adminTotal += parseAmt(c.data_admin_fee);
+      if (c.fuel_surcharge_label) fuelLabel = c.fuel_surcharge_label;
+      const k = c.container_number || '';
+      const w = parseAmt(c.washing);   if (w   > 0 && k) addToMap(washMap, k, w);
+      const r = parseAmt(c.repair);    if (r   > 0 && k) addToMap(repMap,  k, r);
+      const det = parseAmt(c.detention); if (det > 0 && k) addToMap(detMap,  k, det);
+      const dem = parseAmt(c.demurrage); if (dem > 0 && k) addToMap(demMap,  k, dem);
+    }
+
+    if (dhcTotal   > 0) rows.push({ desc: 'DHC',      amount: fmt(dhcTotal) });
+    if (fuelTotal  > 0) rows.push({ desc: fuelLabel,   amount: fmt(fuelTotal) });
+    if (adminTotal > 0) rows.push({ desc: 'ADMIN FEE', amount: fmt(adminTotal) });
+    const wT = mapTotal(washMap); if (wT > 0) rows.push({ desc: washMap.size ? `WASHING - ${mapDetail(washMap)}`   : 'WASHING',   amount: fmt(wT) });
+    const rT = mapTotal(repMap);  if (rT > 0) rows.push({ desc: repMap.size  ? `REPAIR - ${mapDetail(repMap)}`     : 'REPAIR',    amount: fmt(rT) });
+    const dT = mapTotal(detMap);  if (dT > 0) rows.push({ desc: detMap.size  ? `DETENTION - ${mapDetail(detMap)}` : 'DETENTION', amount: fmt(dT) });
+    const mT = mapTotal(demMap);  if (mT > 0) rows.push({ desc: demMap.size  ? `DEMURRAGE - ${mapDetail(demMap)}` : 'DEMURRAGE', amount: fmt(mT) });
+
+    const grand = dhcTotal + fuelTotal + adminTotal + wT + rT + dT + mT;
+    payTo     = 'CDAS LOGISTICS ALLIANCE LTD';
+    totalStr  = fmt(grand);
+    payMethod = 'CIMB - GIRO';
+    const rawDate = docs[0]?.cdas_report?.invoice_date || docs[0]?.metadata?.date || '';
+    if (rawDate) dateStr = fmtLongDate(rawDate);
+
+  } else if (docType === 'Allied Report') {
+    let dhcTotal = 0, dheTotal = 0, adminTotal = 0, fuelTotal = 0, dpfTotal = 0;
+    const washMap = new Map<string, number>();
+    const repMap  = new Map<string, number>();
+    const detMap  = new Map<string, number>();
+    const demMap  = new Map<string, number>();
+    let fuelLabel = 'FUEL SURCHARGE';
+    let dpfLabel  = 'DYNAMIC PRICE FACTOR';
+
+    for (const doc of docs) {
+      const a = doc.allied_report;
+      if (!a) continue;
+      dhcTotal   += parseAmt(a.dhc_in) + parseAmt(a.dhc_out);
+      dheTotal   += parseAmt(a.dhe_in) + parseAmt(a.dhe_out);
+      adminTotal += parseAmt(a.data_admin_fee);
+      fuelTotal  += parseAmt(a.fuel_surcharge);
+      dpfTotal   += parseAmt(a.dynamic_price_factor);
+      if (a.fuel_surcharge_label)        fuelLabel = a.fuel_surcharge_label;
+      if (a.dynamic_price_factor_label)  dpfLabel  = a.dynamic_price_factor_label;
+      const k = a.container_booking_no || '';
+      const w = parseAmt(a.washing);    if (w   > 0 && k) addToMap(washMap, k, w);
+      const r = parseAmt(a.repair);     if (r   > 0 && k) addToMap(repMap,  k, r);
+      const det = parseAmt(a.detention); if (det > 0 && k) addToMap(detMap,  k, det);
+      const dem = parseAmt(a.demurrage); if (dem > 0 && k) addToMap(demMap,  k, dem);
+    }
+
+    if (dhcTotal   > 0) rows.push({ desc: 'DHC',      amount: fmt(dhcTotal) });
+    if (fuelTotal  > 0) rows.push({ desc: fuelLabel,   amount: fmt(fuelTotal) });
+    if (dpfTotal   > 0) rows.push({ desc: dpfLabel,    amount: fmt(dpfTotal) });
+    if (dheTotal   > 0) rows.push({ desc: 'DHE',       amount: fmt(dheTotal) });
+    if (adminTotal > 0) rows.push({ desc: 'ADMIN FEE', amount: fmt(adminTotal) });
+    const wT = mapTotal(washMap); if (wT > 0) rows.push({ desc: washMap.size ? `WASHING - ${mapDetail(washMap)}`   : 'WASHING',   amount: fmt(wT) });
+    const rT = mapTotal(repMap);  if (rT > 0) rows.push({ desc: repMap.size  ? `REPAIR - ${mapDetail(repMap)}`     : 'REPAIR',    amount: fmt(rT) });
+    const dT = mapTotal(detMap);  if (dT > 0) rows.push({ desc: detMap.size  ? `DETENTION - ${mapDetail(detMap)}` : 'DETENTION', amount: fmt(dT) });
+    const mT = mapTotal(demMap);  if (mT > 0) rows.push({ desc: demMap.size  ? `DEMURRAGE - ${mapDetail(demMap)}` : 'DEMURRAGE', amount: fmt(mT) });
+
+    const grand = dhcTotal + dheTotal + adminTotal + fuelTotal + dpfTotal + wT + rT + dT + mT;
+    payTo     = 'ALLIED CONTAINER (E&M) PTE LTD';
+    totalStr  = fmt(grand);
+    payMethod = 'CIMB - GIRO';
+    const rawDate = docs[0]?.allied_report?.invoice_date || docs[0]?.metadata?.date || '';
+    if (rawDate) dateStr = fmtLongDate(rawDate);
+
+  } else {
+    // Payment Voucher / GL
+    const pvDocs = docs.filter(d => d.document_type === 'Payment Voucher/GL' && d.payment_voucher_details);
+
+    for (const doc of pvDocs) {
+      const pv = doc.payment_voucher_details!;
+      if (pv.carrier_invoice_number)
+        rows.push({ desc: `Payment Inv.  ${shortenInvoiceList(pv.carrier_invoice_number)}`, amount: null, singleLine: true });
+
+      if (pv.bl_entries && pv.bl_entries.length > 0) {
+        for (const e of pv.bl_entries) {
+          const pssD = e.pss_invoice_number
+            ? (e.pss_invoice_number.startsWith('#') ? e.pss_invoice_number : `#${e.pss_invoice_number}`)
+            : '';
+          const desc = [e.bl_number ? `BL. ${e.bl_number}` : '', pssD ? `(${pssD})` : ''].filter(Boolean).join(' ');
+          rows.push({ desc, amount: e.amount ? stripCurrency(e.amount) : null });
+        }
+      } else if (pv.bl_number) {
+        const pssD = pv.pss_invoice_number
+          ? (pv.pss_invoice_number.startsWith('#') ? pv.pss_invoice_number : `#${pv.pss_invoice_number}`)
+          : '';
+        const desc = [pv.bl_number ? `BL. ${pv.bl_number}` : '', pssD ? `(${pssD})` : ''].filter(Boolean).join(' ');
+        rows.push({ desc, amount: pv.payable_amount ? stripCurrency(pv.payable_amount) : null });
+      }
+
+      if (pv.charges_summary)
+        rows.push({ desc: pv.charges_summary, amount: null, singleLine: true });
+    }
+
+    const firstPv = pvDocs[0]?.payment_voucher_details;
+    payTo     = firstPv?.payment_to || pvDocs[0]?.metadata?.parties?.shipper_supplier || '';
+    totalStr  = stripCurrency(firstPv?.total_payable_amount || firstPv?.payable_amount || '');
+    payMethod = firstPv?.payment_method || 'UOB SGD FAST / GIRO PAYMENT';
+  }
 
   // ── Page header: navy left stripe + logo left-aligned + company name ──
   const drawHeader = (p: PDFPage): number => {

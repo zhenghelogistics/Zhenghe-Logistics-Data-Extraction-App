@@ -4,7 +4,7 @@ import { useFileProcessor } from './hooks/useFileProcessor';
 import ResultsTable from './components/ResultsTable';
 import CrmBillingTab from './components/CrmBillingTab';
 import ExportPermitTab from './components/ExportPermitTab';
-import { generatePVPdfFromScratch, generateCDASVoucherPdf, generateAlliedVoucherPdf } from './services/voucherPdfService';
+import { generatePVPdfFromScratch } from './services/voucherPdfService';
 import DeveloperNotes from './components/DeveloperNotes';
 import LoginScreen from './components/LoginScreen';
 import CustomRulesPanel from './components/CustomRulesPanel';
@@ -125,40 +125,7 @@ function App() {
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
   const handleDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); addFilesToQueue(Array.from(e.dataTransfer.files)); };
 
-  const handleGenerateCDASVoucher = async (docs: DocumentData[]) => {
-    setIsGeneratingPdf(true);
-    try {
-      const blob = await generateCDASVoucherPdf(docs);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'cdas_payment_voucher.pdf';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to generate CDAS voucher PDF:', err);
-      addToast('Failed to generate CDAS voucher PDF. Please try again.');
-    } finally { setIsGeneratingPdf(false); }
-  };
-
-  const handleGenerateAlliedVoucher = async (docs: DocumentData[]) => {
-    setIsGeneratingPdf(true);
-    try {
-      const blob = await generateAlliedVoucherPdf(docs);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'allied_payment_voucher.pdf';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to generate Allied voucher PDF:', err);
-      addToast('Failed to generate Allied voucher PDF. Please try again.');
-    } finally { setIsGeneratingPdf(false); }
-  };
-
   const handleGenerateVouchers = (docs: DocumentData[]) => {
-    if (docs[0]?.document_type === 'Allied Report') return handleGenerateAlliedVoucher(docs);
-    if (docs[0]?.document_type === 'CDAS Report') return handleGenerateCDASVoucher(docs);
-    // Open currency modal with the real docs stored
     setPvExportDocs(docs);
     setPvCurrencyModal(true);
   };
@@ -171,9 +138,14 @@ function App() {
     setIsGeneratingPdf(true);
     try {
       const blob = await generatePVPdfFromScratch(docsToExport, currency, userRole === 'accounts');
-      const filename = docsToExport.length === 1
-        ? `voucher_${docsToExport[0].payment_voucher_details?.pss_invoice_number || 'export'}_${currency}.pdf`
-        : `payment_vouchers_${currency}.pdf`;
+      const docType = docsToExport[0]?.document_type;
+      const filename = docType === 'CDAS Report'
+        ? `cdas_voucher_${currency}.pdf`
+        : docType === 'Allied Report'
+          ? `allied_voucher_${currency}.pdf`
+          : docsToExport.length === 1
+            ? `voucher_${docsToExport[0].payment_voucher_details?.pss_invoice_number || 'export'}_${currency}.pdf`
+            : `payment_vouchers_${currency}.pdf`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = filename;
@@ -461,7 +433,7 @@ function App() {
               {activeTab === 'CDAS Report' && (() => {
                 const docs = files.flatMap(f => (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING) ? (f.data ?? []).filter(d => d.document_type === 'CDAS Report') : []);
                 return docs.length > 0 ? (
-                  <button onClick={() => handleGenerateCDASVoucher(docs)} disabled={isGeneratingPdf} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer">
+                  <button onClick={() => handleGenerateVouchers(docs)} disabled={isGeneratingPdf} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer">
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export CDAS Voucher'}
                   </button>
@@ -471,7 +443,7 @@ function App() {
               {activeTab === 'Allied Report' && (() => {
                 const docs = files.flatMap(f => (f.status === FileStatus.COMPLETED || f.status === FileStatus.WARNING) ? (f.data ?? []).filter(d => d.document_type === 'Allied Report') : []);
                 return docs.length > 0 ? (
-                  <button onClick={() => handleGenerateAlliedVoucher(docs)} disabled={isGeneratingPdf} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer">
+                  <button onClick={() => handleGenerateVouchers(docs)} disabled={isGeneratingPdf} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-secondary to-primary-container text-white text-xs font-semibold disabled:opacity-70 disabled:cursor-not-allowed transition-opacity cursor-pointer">
                     {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     {isGeneratingPdf ? 'Generating...' : 'Export Allied Voucher'}
                   </button>

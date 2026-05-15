@@ -171,10 +171,15 @@ export const mergeSameSupplierPVs = (docs: DocumentData[]): DocumentData[] => {
       if (pv?.bl_entries && pv.bl_entries.length > 0) return pv.bl_entries;
       return [{ bl_number: pv?.bl_number ?? null, pss_invoice_number: pv?.pss_invoice_number ?? null, amount: pv?.payable_amount ?? null }];
     });
-    // Deduplicate by BL number, merging to keep the best available data per field
+    // Deduplicate by (BL number + normalised amount) so that two invoices referencing
+    // the same BL but with different amounts (e.g. MSC freight + local charges) are
+    // kept as separate rows. Entries with identical BL + amount come from overlapping
+    // chunks and are genuine duplicates — merge those to keep the best field values.
     const blMap = new Map<string, BLEntry>();
     for (const entry of rawEntries) {
-      const key = entry.bl_number?.trim().toUpperCase() || `__no_bl_${blMap.size}`;
+      const blKey  = entry.bl_number?.trim().toUpperCase() || `__no_bl_${blMap.size}`;
+      const amtKey = entry.amount?.replace(/[^0-9.]/g, '') || 'noamt';
+      const key    = `${blKey}__${amtKey}`;
       if (blMap.has(key)) {
         const existing = blMap.get(key)!;
         blMap.set(key, {
